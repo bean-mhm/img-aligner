@@ -1,6 +1,6 @@
 # What
 
-This program allows you to warp an image to look like another, similar image. It's written in C++20 and uses [beva](https://github.com/bean-mhm/beva) my Vulkan wrapper library to utilize the power of the graphics processing unit (GPU).
+This program allows you to warp an image to look like another, similar image.
 
 # Why
 
@@ -33,6 +33,10 @@ in every iteration:
         undo the offset
 ```
 
+For increased performance, grid warping and error calculation are performed on
+the graphics processing unit (GPU) using the Vulkan API with
+[beva](https://github.com/bean-mhm/beva), my Vulkan wrapper library.
+
 # Usage
 
 1. Use the _Load Starting Image_ button in the _IMAGES_ section to open a file dialog and choose the image
@@ -47,6 +51,19 @@ you want to distort. Next, hit _Load Target Image_ to load the target image.
 If you want to batch-process several images, you can call this program from a
 command line or another program using the `--cli` argument to enable the command line interface.
 If no other arguments are provided, a help text will be printed.
+
+# How It's Built
+
+This program is written in C++20 and uses the following libraries.
+
+| Library | Used for |
+|--|--|
+| [GLFW](https://www.glfw.org/) | Window management |
+| [beva](https://github.com/bean-mhm/beva) | Vulkan wrapper |
+| [Dear ImGui](https://github.com/ocornut/imgui) | Graphical user interface |
+| [NFD Extended](https://github.com/btzy/nativefiledialog-extended) | Native file dialogs |
+| [OpenColorIO](https://opencolorio.org/) | Color management |
+| [OpenImageIO](https://github.com/OpenImageIO/oiio) | Reading and writing images |
 
 # Color Management
 
