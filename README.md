@@ -34,8 +34,7 @@ in every iteration:
 ```
 
 For increased performance, grid warping and error calculation are performed on
-the graphics processing unit (GPU) using the Vulkan API with
-[beva](https://github.com/bean-mhm/beva), my Vulkan wrapper library.
+the graphics processing unit (GPU) using the Vulkan API.
 
 # Usage
 
