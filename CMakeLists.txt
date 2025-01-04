@@ -21,7 +21,7 @@ target_link_libraries(img-aligner PUBLIC ${Vulkan_LIBRARIES})
 
 # GLFW
 set(GLFW_LIBRARY_TYPE "STATIC")
-add_subdirectory(glfw-3.4)
+add_subdirectory(glfw)
 target_include_directories(img-aligner PUBLIC ${GLFW_SOURCE_DIR}/include)
 target_link_libraries(img-aligner PUBLIC glfw)
 
