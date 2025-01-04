@@ -51,7 +51,7 @@ If you want to batch-process several images, you can call this program from a
 command line or another program using the `--cli` argument to enable the command line interface.
 If no other arguments are provided, a help text will be printed.
 
-# How It's Built
+# How It's Made
 
 This program is written in C++20 and uses the following libraries.
 
