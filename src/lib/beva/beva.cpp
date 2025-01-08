@@ -999,6 +999,14 @@ namespace bv
         };
     }
 
+    VkSurfaceFormatKHR SurfaceFormat_to_vk(const SurfaceFormat& surface_format)
+    {
+        return VkSurfaceFormatKHR{
+            .format = surface_format.format,
+            .colorSpace = surface_format.color_space
+        };
+    }
+
     DebugLabel DebugLabel_from_vk(const VkDebugUtilsLabelEXT& vk_label)
     {
         return DebugLabel{
@@ -1979,6 +1987,37 @@ namespace bv
                 return std::nullopt;
             }
 
+            // make sure the surface is supported by the physical device and at
+            // least one of its queue families.
+            bool device_supports_surface = false;
+            for (size_t i = 0; i < queue_families().size(); i++)
+            {
+                VkBool32 vk_surface_support = VK_FALSE;
+                VkResult vk_result = vkGetPhysicalDeviceSurfaceSupportKHR(
+                    handle(),
+                    i,
+                    surface->handle(),
+                    &vk_surface_support
+                );
+                if (vk_result != VK_SUCCESS)
+                {
+                    throw Error(
+                        "failed to check physical device's surface support",
+                        vk_result,
+                        false
+                    );
+                }
+                if (vk_surface_support)
+                {
+                    device_supports_surface = true;
+                    break;
+                }
+            }
+            if (!device_supports_surface)
+            {
+                return std::nullopt;
+            }
+
             VkSurfaceCapabilitiesKHR vk_capabilities;
             VkResult vk_result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
                 handle(),
@@ -2123,7 +2162,7 @@ namespace bv
                     continue;
                 }
 
-                indices.push_back(i);
+                indices.push_back((uint32_t)i);
             }
             return indices;
         }

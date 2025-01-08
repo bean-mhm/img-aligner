@@ -1708,7 +1708,8 @@ namespace sul
     private:
         template<typename T>
         struct dependent_false : public std::false_type
-        {};
+        {
+        };
 
         std::vector<Block, Allocator> m_blocks;
         size_type m_bits_number;
@@ -4478,6 +4479,8 @@ namespace bv
         const VkSurfaceFormatKHR& vk_surface_format
     );
 
+    VkSurfaceFormatKHR SurfaceFormat_to_vk(const SurfaceFormat& surface_format);
+
     // provided by VK_KHR_surface
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfaceCapabilitiesKHR.html
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfaceFormatsKHR.html
@@ -5416,8 +5419,7 @@ namespace bv
             VkImageCreateFlags flags
         ) const;
 
-        // this will only have a value if the VK_KHR_swapchain extension is
-        // available and surface is not nullptr.
+        // https://registry.khronos.org/vulkan/specs/latest/man/html/vkGetPhysicalDeviceSurfaceSupportKHR.html
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfaceCapabilitiesKHR.html
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfaceFormatsKHR.html
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfacePresentModesKHR.html
