@@ -1708,8 +1708,7 @@ namespace sul
     private:
         template<typename T>
         struct dependent_false : public std::false_type
-        {
-        };
+        {};
 
         std::vector<Block, Allocator> m_blocks;
         size_type m_bits_number;
