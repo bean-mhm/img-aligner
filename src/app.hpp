@@ -41,6 +41,12 @@ namespace img_aligner
         void imgui_div();
         void imgui_horiz_div();
         void imgui_bold(std::string_view s);
+        bool imgui_combo(
+            const std::string& label,
+            const std::vector<std::string>& items,
+            int* selected_idx,
+            bool full_width
+        );
 
         void render_frame(ImDrawData* draw_data);
         void present_frame();

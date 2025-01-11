@@ -612,7 +612,149 @@ namespace img_aligner
 
     void App::layout_color_management()
     {
-        // TODO
+        static bool cm_params_changed = false;
+
+        ImGui::Begin("Color Management");
+
+        imgui_bold("VIEW");
+        {
+            // Exposure
+            static float view_exposure = 0.f;
+            if (ImGui::SliderFloat("Exposure##CMS", &view_exposure, -10.f, 10.f))
+            {
+                cm_params_changed = true;
+            }
+
+            const std::vector<std::string>& displays{ "item1", "blah", "bleh" };
+            const std::vector<std::string>& views{ "item1", "blah", "bleh" };
+            const std::vector<std::string>& looks{ "item1", "blah", "bleh" };
+
+            static int sel_display = 0;
+            static int sel_view = 0;
+            static int sel_look = 0;
+
+            // display
+            if (imgui_combo("Display##CM", displays, &sel_display, false))
+            {
+                //CMS::setActiveDisplay(displays[sel_display]);
+                //CMS::updateProcessors();
+                cm_params_changed = true;
+
+                // update sel_view
+                //ptrdiff_t activeViewIndex = std::distance(views.begin(), std::find(views.begin(), views.end(), activeView));
+                //if (activeViewIndex < (int)(views.size()))
+                //    selView = activeViewIndex;
+            }
+
+            // view
+            if (imgui_combo("View##CM", views, &sel_view, false))
+            {
+                //CMS::setActiveView(views[sel_view]);
+                //CMS::updateProcessors();
+                cm_params_changed = true;
+            }
+
+            // look
+            if (imgui_combo("Look##CM", looks, &sel_look, false))
+            {
+                //CMS::setActiveLook(looks[sel_look]);
+                //CMS::updateProcessors();
+                cm_params_changed = true;
+            }
+
+            // update
+            if (cm_params_changed)
+            {
+                cm_params_changed = false;
+                //for (auto& slot : slots)
+                //{
+                //    slot.viewImage->moveToGPU();
+                //}
+            }
+        }
+
+        imgui_div();
+        imgui_bold("INFO");
+        {
+            static std::string working_space = "Linear BT.709 I-D65";
+            static std::string working_space_desc =
+                "Open Domain Linear BT.709 I-D65";
+
+            ImGui::TextWrapped("Working Space: %s", working_space.c_str());
+            if (ImGui::IsItemHovered() && !working_space_desc.empty())
+            {
+                ImGui::SetTooltip(working_space_desc.c_str());
+            }
+
+            // color manager error
+            //if (!CMS::getStatus().isOK())
+            //    imGuiText(CMS::getStatus().getError(), true, false);
+        }
+
+        imgui_div();
+        imgui_bold("IMAGE IO");
+        {
+            const std::vector<std::string>& spaces{ "space", "blah" };
+
+            int sel_input_space = 0;
+            int sel_output_space = 0;
+            int sel_non_linear_space = 0;
+
+            // input color space
+            if (imgui_combo("Input##IIO", spaces, &sel_input_space, false))
+            {
+                //CmImageIO::setInputSpace(spaces[sel_input_space]);
+            }
+            if (ImGui::IsItemHovered() && sel_input_space >= 0)
+            {
+                //std::string desc = CMS::getColorSpaceDesc(CMS::getConfig(), spaces[selInputSpace]);
+                //if (!desc.empty()) ImGui::SetTooltip(desc.c_str());
+            }
+
+            // output color space
+            if (imgui_combo("Output##IIO", spaces, &sel_output_space, false))
+            {
+                //CmImageIO::setOutputSpace(spaces[sel_output_space]);
+            }
+            if (ImGui::IsItemHovered() && sel_output_space >= 0)
+            {
+                //std::string desc = CMS::getColorSpaceDesc(CMS::getConfig(), spaces[sel_output_space]);
+                //if (!desc.empty()) ImGui::SetTooltip(desc.c_str());
+            }
+
+            // non-linear color space
+            if (imgui_combo("Non-Linear##IIO", spaces, &sel_non_linear_space, false))
+            {
+                //CmImageIO::setNonLinearSpace(spaces[sel_non_linear_space]);
+            }
+            if (ImGui::IsItemHovered() && sel_non_linear_space >= 0)
+            {
+                //std::string desc = CMS::getColorSpaceDesc(CMS::getConfig(), spaces[sel_non_linear_space]);
+                //if (!desc.empty()) ImGui::SetTooltip(desc.c_str());
+            }
+
+            // auto-detect
+            static bool auto_detect = true;
+            ImGui::Checkbox("Auto-Detect##IIO", &auto_detect);
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::SetTooltip(
+                    "Attempt to detect the input color space for supported "
+                    "images"
+                );
+            }
+
+            // apply view transform
+            static bool apply_view_transform = false;
+            ImGui::Checkbox("Apply View Transform##IIO", &apply_view_transform);
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::SetTooltip("Apply view transform on linear images");
+            }
+        }
+
+        ImGui::NewLine();
+        ImGui::End();
     }
 
     void App::layout_misc()
@@ -753,6 +895,39 @@ namespace img_aligner
         ImGui::PushFont(state.font_bold);
         ImGui::Text(s.data());
         ImGui::PopFont();
+    }
+
+    bool App::imgui_combo(
+        const std::string& label,
+        const std::vector<std::string>& items,
+        int* selected_idx,
+        bool full_width
+    )
+    {
+        static std::vector<std::string> active_combo_list;
+
+        active_combo_list = items;
+        bool result = false;
+
+        if (full_width)
+            ImGui::SetNextItemWidth(-1);
+
+        return ImGui::Combo(
+            label.c_str(),
+            selected_idx,
+            [](void* data, int index, const char** out_text)
+            {
+                if (index < 0 || index >= active_combo_list.size())
+                {
+                    return false;
+                }
+
+                *out_text = active_combo_list[index].c_str();
+                return true;
+            },
+            nullptr,
+            active_combo_list.size()
+        );
     }
 
     void App::render_frame(ImDrawData* draw_data)
