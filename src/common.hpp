@@ -41,6 +41,9 @@ namespace img_aligner
 
     static constexpr ImVec4 COLOR_BG{ .04f, .03f, .08f, 1.f };
     static constexpr ImVec4 COLOR_IMAGE_BORDER{ .05f, .05f, .05f, 1.f };
+    static constexpr ImVec4 COLOR_INFO_TEXT{ .33f, .74f, .91f, 1.f };
+    static constexpr ImVec4 COLOR_WARNING_TEXT{ .94f, .58f, .28f, 1.f };
+    static constexpr ImVec4 COLOR_ERROR_TEXT{ .95f, .3f, .23f, 1.f };
 
     static constexpr float FONT_SIZE = 20.f;
     static constexpr auto FONT_PATH = "./fonts/Outfit-Regular.ttf";
