@@ -30,14 +30,20 @@ namespace img_aligner
         void init_imgui_vk_window_data();
         void init_imgui();
 
+        void layout_image_viewer();
+        void layout_color_management();
+        void layout_misc();
+        void layout_controls();
+
+        void setup_imgui_style();
+        void update_ui_scale_reload_fonts_and_style();
+
+        void imgui_div();
+        void imgui_horiz_div();
+        void imgui_bold(std::string_view s);
+
         void render_frame(ImDrawData* draw_data);
         void present_frame();
-
-        friend void glfw_framebuf_resize_callback(
-            GLFWwindow* window,
-            int width,
-            int height
-        );
 
     };
 
