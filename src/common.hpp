@@ -38,9 +38,11 @@ namespace img_aligner
     static constexpr auto WINDOW_TITLE = "img-aligner - bean-mhm";
     static constexpr uint32_t INITIAL_WIDTH = 960;
     static constexpr uint32_t INITIAL_HEIGHT = 720;
-    static constexpr ImVec4 COLOR_BG{ .04f, .03f, .08f, 1.f };
 
-    static constexpr float FONT_SIZE = 24.f;
+    static constexpr ImVec4 COLOR_BG{ .04f, .03f, .08f, 1.f };
+    static constexpr ImVec4 COLOR_IMAGE_BORDER{ .05f, .05f, .05f, 1.f };
+
+    static constexpr float FONT_SIZE = 20.f;
     static constexpr auto FONT_PATH = "./fonts/Outfit-Regular.ttf";
     static constexpr auto FONT_BOLD_PATH = "./fonts/Outfit-Bold.ttf";
 
@@ -54,6 +56,9 @@ namespace img_aligner
         ImGuiIO* io = nullptr;
         ImFont* font = nullptr;
         ImFont* font_bold = nullptr;
+
+        float ui_scale = 1.f;
+        float image_viewer_zoom = 1.f;
 
         bv::ContextPtr context = nullptr;
         bv::DebugMessengerPtr debug_messenger = nullptr;
