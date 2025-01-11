@@ -88,31 +88,15 @@ namespace img_aligner
             ImGui_ImplVulkan_NewFrame();
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
+            ImGui::DockSpaceOverViewport();
 
-            // draw UI layout
-            {
-                static float f = 0.0f;
-                static int counter = 0;
-
-                ImGui::Begin("Hello, world!");
-
-                ImGui::Text("This is some useful text.");
-                ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
-
-                if (ImGui::Button("Button"))
-                    counter++;
-
-                ImGui::SameLine();
-                ImGui::Text("counter = %d", counter);
-
-                ImGui::Text(
-                    "Application average %.3f ms/frame (%.1f FPS)",
-                    1000.0f / state.io->Framerate,
-                    state.io->Framerate
-                );
-
-                ImGui::End();
-            }
+            // UI layout
+            ImGui::PushFont(state.font);
+            layout_image_viewer();
+            layout_color_management();
+            layout_misc();
+            layout_controls();
+            ImGui::PopFont();
 
             // render
             ImGui::Render();
@@ -531,7 +515,117 @@ namespace img_aligner
         );
     }
 
-    static void setup_imgui_style()
+    void App::init_imgui()
+    {
+        // setup Dear ImGui context
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        state.io = &ImGui::GetIO();
+
+        // enable keyboard and gamepad controls
+        state.io->ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+        state.io->ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+
+        // enable docking
+        state.io->ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
+        // setup platform / renderer backends
+        ImGui_ImplGlfw_InitForVulkan(state.window, true);
+        ImGui_ImplVulkan_InitInfo init_info = {};
+        init_info.Instance = state.context->vk_instance();
+        init_info.PhysicalDevice = state.physical_device->handle();
+        init_info.Device = state.device->handle();
+        init_info.QueueFamily = state.queue->queue_family_index();
+        init_info.Queue = state.queue->handle();
+        init_info.PipelineCache = nullptr;
+        init_info.DescriptorPool = state.imgui_descriptor_pool->handle();
+        init_info.RenderPass = state.imgui_vk_window_data.RenderPass;
+        init_info.Subpass = 0;
+        init_info.MinImageCount = state.imgui_swapchain_min_image_count;
+        init_info.ImageCount = state.imgui_vk_window_data.ImageCount;
+        init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+        init_info.Allocator = state.context->vk_allocator_ptr();
+        init_info.CheckVkResultFn = imgui_check_vk_result;
+        ImGui_ImplVulkan_Init(&init_info);
+
+        // load UI style and fonts
+        update_ui_scale_reload_fonts_and_style();
+    }
+
+    void App::layout_image_viewer()
+    {
+        ImGui::Begin("Image Viewer", 0, ImGuiWindowFlags_HorizontalScrollbar);
+
+        const uint32_t img_width = 3840;
+        const uint32_t img_height = 2880;
+
+        // image selector
+        // TODO: use a combo
+        ImGui::PushFont(state.font_bold);
+        ImGui::Text("Base Image");
+        ImGui::PopFont();
+
+        // image size
+        ImGui::Text("%dx%d", img_width, img_height);
+
+        imgui_horiz_div();
+
+        // zoom
+        {
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(70.f * state.ui_scale);
+            ImGui::DragFloat(
+                "##image_zoom",
+                &state.image_viewer_zoom,
+                .005f,
+                .1f,
+                2.f,
+                "%.2f",
+                ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat
+            );
+
+            ImGui::SameLine();
+            if (ImGui::SmallButton("R##image_viewer"))
+            {
+                state.image_viewer_zoom = 1.f;
+            }
+        }
+
+        // image
+        if (0)
+        {
+            ImGui::Image(
+                0,
+                ImVec2(
+                    (float)img_width * state.image_viewer_zoom,
+                    (float)img_height * state.image_viewer_zoom
+                ),
+                { 0, 0 },
+                { 1, 1 },
+                { 1, 1, 1, 1 },
+                COLOR_IMAGE_BORDER
+            );
+        }
+
+        ImGui::End();
+    }
+
+    void App::layout_color_management()
+    {
+        // TODO
+    }
+
+    void App::layout_misc()
+    {
+        // TODO
+    }
+
+    void App::layout_controls()
+    {
+        // TODO
+    }
+
+    void App::setup_imgui_style()
     {
         // img-aligner style from ImThemes
         ImGuiStyle& style = ImGui::GetStyle();
@@ -622,48 +716,43 @@ namespace img_aligner
         style.Colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.0, 0.0, 0.0, 0.5490196347236633);
     }
 
-    void App::init_imgui()
+    void App::update_ui_scale_reload_fonts_and_style()
     {
-        // setup Dear ImGui context
-        IMGUI_CHECKVERSION();
-        ImGui::CreateContext();
-        state.io = &ImGui::GetIO();
-
-        // enable keyboard and gamepad controls
-        state.io->ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-        state.io->ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
-
-        // load style
-        setup_imgui_style();
-
-        // setup platform / renderer backends
-        ImGui_ImplGlfw_InitForVulkan(state.window, true);
-        ImGui_ImplVulkan_InitInfo init_info = {};
-        init_info.Instance = state.context->vk_instance();
-        init_info.PhysicalDevice = state.physical_device->handle();
-        init_info.Device = state.device->handle();
-        init_info.QueueFamily = state.queue->queue_family_index();
-        init_info.Queue = state.queue->handle();
-        init_info.PipelineCache = nullptr;
-        init_info.DescriptorPool = state.imgui_descriptor_pool->handle();
-        init_info.RenderPass = state.imgui_vk_window_data.RenderPass;
-        init_info.Subpass = 0;
-        init_info.MinImageCount = state.imgui_swapchain_min_image_count;
-        init_info.ImageCount = state.imgui_vk_window_data.ImageCount;
-        init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-        init_info.Allocator = state.context->vk_allocator_ptr();
-        init_info.CheckVkResultFn = imgui_check_vk_result;
-        ImGui_ImplVulkan_Init(&init_info);
-
-        // load fonts
-        state.font = state.io->Fonts->AddFontFromFileTTF(FONT_PATH, FONT_SIZE);
+        // reload fonts
+        state.font = state.io->Fonts->AddFontFromFileTTF(
+            FONT_PATH,
+            FONT_SIZE * state.ui_scale
+        );
         state.font_bold = state.io->Fonts->AddFontFromFileTTF(
-            FONT_BOLD_PATH, FONT_SIZE
+            FONT_BOLD_PATH,
+            FONT_SIZE * state.ui_scale
         );
         if (!state.font || !state.font_bold)
         {
             throw std::runtime_error("failed to load fonts");
         }
+
+        // reload style and apply scale
+        setup_imgui_style();
+        ImGui::GetStyle().ScaleAllSizes(state.ui_scale);
+    }
+
+    void App::imgui_div()
+    {
+        ImGui::NewLine();
+    }
+
+    void App::imgui_horiz_div()
+    {
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4(1.f, 1.f, 1.f, .3f), " | ");
+    }
+
+    void App::imgui_bold(std::string_view s)
+    {
+        ImGui::PushFont(state.font_bold);
+        ImGui::Text(s.data());
+        ImGui::PopFont();
     }
 
     void App::render_frame(ImDrawData* draw_data)
