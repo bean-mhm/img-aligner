@@ -1,0 +1,24 @@
+[submodule "OpenColorIO"]
+	path = OpenColorIO
+	url = https://github.com/AcademySoftwareFoundation/OpenColorIO.git
+[submodule "Imath"]
+	path = Imath
+	url = https://github.com/AcademySoftwareFoundation/Imath.git
+[submodule "openexr"]
+	path = openexr
+	url = https://github.com/AcademySoftwareFoundation/openexr.git
+[submodule "libexpat"]
+	path = libexpat
+	url = https://github.com/libexpat/libexpat.git
+[submodule "yaml-cpp"]
+	path = yaml-cpp
+	url = https://github.com/jbeder/yaml-cpp.git
+[submodule "pystring"]
+	path = pystring
+	url = https://github.com/imageworks/pystring.git
+[submodule "minizip-ng"]
+	path = minizip-ng
+	url = https://github.com/zlib-ng/minizip-ng.git
+[submodule "zlib"]
+	path = zlib
+	url = https://github.com/madler/zlib.git
