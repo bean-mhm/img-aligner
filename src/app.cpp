@@ -622,8 +622,11 @@ namespace img_aligner
 
         imgui_bold("INTERFACE");
 
-        if (ImGui::SliderFloat("Scale##Misc", &state.ui_scale, .75f, 3.f))
+        if (ImGui::InputFloat(
+            "Scale##Misc", &state.ui_scale, .125f, .25f, "%.3f"
+        ))
         {
+            state.ui_scale = std::clamp(state.ui_scale, .75f, 3.f);
             state.ui_scale_updated = true;
         }
 
