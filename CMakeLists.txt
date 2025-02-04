@@ -32,63 +32,14 @@ add_subdirectory(glfw)
 target_include_directories(img-aligner PUBLIC ${GLFW_SOURCE_DIR}/include)
 target_link_libraries(img-aligner PUBLIC glfw)
 
-# Imath
-set(Imath_DIR Imath)
-set(Imath_ROOT Imath)
-add_subdirectory(Imath)
-target_include_directories(img-aligner PUBLIC Imath/src)
-target_link_libraries(img-aligner PUBLIC Imath)
-
-# expat
-set(expat_DIR libexpat/expat)
-set(expat_ROOT libexpat/expat)
-add_subdirectory(libexpat/expat)
-target_include_directories(img-aligner PUBLIC libexpat/expat/lib)
-target_link_libraries(img-aligner PUBLIC expat)
-
-# minizip-ng
-set(minizip-ng_DIR minizip-ng)
-set(minizip-ng_ROOT minizip-ng)
-add_subdirectory(minizip-ng)
-target_include_directories(img-aligner PUBLIC minizip-ng)
-target_link_libraries(img-aligner PUBLIC minizip-ng)
-
-# pystring
-set(pystring_DIR pystring)
-set(pystring_ROOT pystring)
-add_subdirectory(pystring)
-target_include_directories(img-aligner PUBLIC pystring)
-target_link_libraries(img-aligner PUBLIC pystring)
-
-# yaml-cpp
-set(yaml-cpp_DIR yaml-cpp)
-set(yaml-cpp_ROOT yaml-cpp)
-add_subdirectory(yaml-cpp)
-target_include_directories(img-aligner PUBLIC yaml-cpp/include)
-target_link_libraries(img-aligner PUBLIC yaml-cpp)
-
-# zlib
-set(zlib_DIR zlib)
-set(zlib_ROOT zlib)
-add_subdirectory(zlib)
-target_include_directories(img-aligner PUBLIC zlib)
-target_link_libraries(img-aligner PUBLIC zlib)
-
 # OpenEXR
-set(openexr_DIR openexr)
-set(openexr_ROOT openexr)
 add_subdirectory(openexr)
+set(OPENEXR_INSTALL off)
+set(OPENEXR_INSTALL_TOOLS off)
+set(OPENEXR_BUILD_TOOLS off)
+set(OPENEXR_BUILD_EXAMPLES off)
 target_include_directories(img-aligner PUBLIC openexr/src/lib/OpenEXR)
 target_link_libraries(img-aligner PUBLIC OpenEXR)
-
-# OpenColorIO
-set(OCIO_BUILD_APPS OFF)
-set(OCIO_BUILD_TESTS OFF)
-set(OCIO_BUILD_GPU_TESTS OFF)
-set(OCIO_BUILD_PYTHON OFF)
-add_subdirectory(OpenColorIO)
-target_include_directories(img-aligner PUBLIC OpenColorIO/include)
-target_link_libraries(img-aligner PUBLIC OpenColorIO)
 
 # macro to make a directory if it doesn't exist (at build time)
 if(MSVC OR MSYS OR MINGW OR WIN32)

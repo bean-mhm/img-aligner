@@ -84,6 +84,13 @@ namespace img_aligner
                 continue;
             }
 
+            // update UI scale and reload fonts and style if needed
+            if (state.ui_scale_updated)
+            {
+                state.ui_scale_updated = false;
+                update_ui_scale_reload_fonts_and_style();
+            }
+
             // start the Dear ImGui frame
             ImGui_ImplVulkan_NewFrame();
             ImGui_ImplGlfw_NewFrame();
@@ -93,7 +100,6 @@ namespace img_aligner
             // UI layout
             ImGui::PushFont(state.font);
             layout_image_viewer();
-            layout_color_management();
             layout_misc();
             layout_controls();
             ImGui::PopFont();
@@ -169,7 +175,7 @@ namespace img_aligner
         state.window = glfwCreateWindow(
             INITIAL_WIDTH,
             INITIAL_HEIGHT,
-            WINDOW_TITLE,
+            APP_TITLE,
             nullptr,
             nullptr
         );
@@ -210,7 +216,7 @@ namespace img_aligner
 
         state.context = bv::Context::create({
             .will_enumerate_portability = false,
-            .app_name = WINDOW_TITLE,
+            .app_name = APP_TITLE,
             .app_version = bv::Version(1, 1, 0, 0),
             .engine_name = "no engine",
             .engine_version = bv::Version(1, 1, 0, 0),
@@ -610,156 +616,34 @@ namespace img_aligner
         ImGui::End();
     }
 
-    void App::layout_color_management()
+    void App::layout_misc()
     {
-        static bool cm_params_changed = false;
+        ImGui::Begin("Misc");
 
-        ImGui::Begin("Color Management");
+        imgui_bold("INTERFACE");
 
-        imgui_bold("VIEW");
+        if (ImGui::SliderFloat("Scale##Misc", &state.ui_scale, .75f, 3.f))
         {
-            // Exposure
-            static float view_exposure = 0.f;
-            if (ImGui::SliderFloat("Exposure##CMS", &view_exposure, -10.f, 10.f))
-            {
-                cm_params_changed = true;
-            }
-
-            const std::vector<std::string>& displays{ "item1", "blah", "bleh" };
-            const std::vector<std::string>& views{ "item1", "blah", "bleh" };
-            const std::vector<std::string>& looks{ "item1", "blah", "bleh" };
-
-            static int sel_display = 0;
-            static int sel_view = 0;
-            static int sel_look = 0;
-
-            // display
-            if (imgui_combo("Display##CM", displays, &sel_display, false))
-            {
-                //CMS::setActiveDisplay(displays[sel_display]);
-                //CMS::updateProcessors();
-                cm_params_changed = true;
-
-                // update sel_view
-                //ptrdiff_t activeViewIndex = std::distance(views.begin(), std::find(views.begin(), views.end(), activeView));
-                //if (activeViewIndex < (int)(views.size()))
-                //    selView = activeViewIndex;
-            }
-
-            // view
-            if (imgui_combo("View##CM", views, &sel_view, false))
-            {
-                //CMS::setActiveView(views[sel_view]);
-                //CMS::updateProcessors();
-                cm_params_changed = true;
-            }
-
-            // look
-            if (imgui_combo("Look##CM", looks, &sel_look, false))
-            {
-                //CMS::setActiveLook(looks[sel_look]);
-                //CMS::updateProcessors();
-                cm_params_changed = true;
-            }
-
-            // update
-            if (cm_params_changed)
-            {
-                cm_params_changed = false;
-                //for (auto& slot : slots)
-                //{
-                //    slot.viewImage->moveToGPU();
-                //}
-            }
+            state.ui_scale_updated = true;
         }
 
         imgui_div();
         imgui_bold("INFO");
+
+        // version
+        ImGui::TextWrapped(std::format(
+            "{} v{}",
+            APP_TITLE,
+            APP_VERSION
+        ).c_str());
+
+        // GitHub
+        if (ImGui::Button("GitHub##Misc"))
         {
-            static std::string working_space = "Linear BT.709 I-D65";
-            static std::string working_space_desc =
-                "Open Domain Linear BT.709 I-D65";
-
-            ImGui::TextWrapped("Working Space: %s", working_space.c_str());
-            if (ImGui::IsItemHovered() && !working_space_desc.empty())
-            {
-                ImGui::SetTooltip(working_space_desc.c_str());
-            }
-
-            // color manager error
-            //if (!CMS::getStatus().isOK())
-            //    imGuiText(CMS::getStatus().getError(), true, false);
+            open_url(APP_GITHUB_URL);
         }
 
-        imgui_div();
-        imgui_bold("IMAGE IO");
-        {
-            const std::vector<std::string>& spaces{ "space", "blah" };
-
-            int sel_input_space = 0;
-            int sel_output_space = 0;
-            int sel_non_linear_space = 0;
-
-            // input color space
-            if (imgui_combo("Input##IIO", spaces, &sel_input_space, false))
-            {
-                //CmImageIO::setInputSpace(spaces[sel_input_space]);
-            }
-            if (ImGui::IsItemHovered() && sel_input_space >= 0)
-            {
-                //std::string desc = CMS::getColorSpaceDesc(CMS::getConfig(), spaces[selInputSpace]);
-                //if (!desc.empty()) ImGui::SetTooltip(desc.c_str());
-            }
-
-            // output color space
-            if (imgui_combo("Output##IIO", spaces, &sel_output_space, false))
-            {
-                //CmImageIO::setOutputSpace(spaces[sel_output_space]);
-            }
-            if (ImGui::IsItemHovered() && sel_output_space >= 0)
-            {
-                //std::string desc = CMS::getColorSpaceDesc(CMS::getConfig(), spaces[sel_output_space]);
-                //if (!desc.empty()) ImGui::SetTooltip(desc.c_str());
-            }
-
-            // non-linear color space
-            if (imgui_combo("Non-Linear##IIO", spaces, &sel_non_linear_space, false))
-            {
-                //CmImageIO::setNonLinearSpace(spaces[sel_non_linear_space]);
-            }
-            if (ImGui::IsItemHovered() && sel_non_linear_space >= 0)
-            {
-                //std::string desc = CMS::getColorSpaceDesc(CMS::getConfig(), spaces[sel_non_linear_space]);
-                //if (!desc.empty()) ImGui::SetTooltip(desc.c_str());
-            }
-
-            // auto-detect
-            static bool auto_detect = true;
-            ImGui::Checkbox("Auto-Detect##IIO", &auto_detect);
-            if (ImGui::IsItemHovered())
-            {
-                ImGui::SetTooltip(
-                    "Attempt to detect the input color space for supported "
-                    "images"
-                );
-            }
-
-            // apply view transform
-            static bool apply_view_transform = false;
-            ImGui::Checkbox("Apply View Transform##IIO", &apply_view_transform);
-            if (ImGui::IsItemHovered())
-            {
-                ImGui::SetTooltip("Apply view transform on linear images");
-            }
-        }
-
-        ImGui::NewLine();
         ImGui::End();
-    }
-
-    void App::layout_misc()
-    {
-        // TODO
     }
 
     void App::layout_controls()
@@ -861,6 +745,7 @@ namespace img_aligner
     void App::update_ui_scale_reload_fonts_and_style()
     {
         // reload fonts
+        state.io->Fonts->Clear();
         state.font = state.io->Fonts->AddFontFromFileTTF(
             FONT_PATH,
             FONT_SIZE * state.ui_scale
@@ -873,6 +758,8 @@ namespace img_aligner
         {
             throw std::runtime_error("failed to load fonts");
         }
+        state.io->Fonts->Build();
+        ImGui_ImplVulkan_CreateFontsTexture();
 
         // reload style and apply scale
         setup_imgui_style();

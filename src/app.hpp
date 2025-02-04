@@ -31,7 +31,6 @@ namespace img_aligner
         void init_imgui();
 
         void layout_image_viewer();
-        void layout_color_management();
         void layout_misc();
         void layout_controls();
 

@@ -35,7 +35,11 @@
 namespace img_aligner
 {
 
-    static constexpr auto WINDOW_TITLE = "img-aligner - bean-mhm";
+    static constexpr auto APP_TITLE = "img-aligner";
+    static constexpr auto APP_VERSION = "0.1.0-dev";
+    static constexpr auto APP_GITHUB_URL =
+        "https://github.com/bean-mhm/img-aligner";
+
     static constexpr uint32_t INITIAL_WIDTH = 960;
     static constexpr uint32_t INITIAL_HEIGHT = 720;
 
@@ -61,6 +65,8 @@ namespace img_aligner
         ImFont* font_bold = nullptr;
 
         float ui_scale = 1.f;
+        bool ui_scale_updated = false;
+        
         float image_viewer_zoom = 1.f;
 
         bv::ContextPtr context = nullptr;
@@ -87,10 +93,12 @@ namespace img_aligner
 
     std::vector<uint8_t> read_file(const std::string& filename);
 
+    void open_url(std::string_view url);
+
     // if use_transfer_pool is true, the command buffer will be allocated
-        // from transfer_cmd_pool instead of cmd_pool. transfer_cmd_pool has the
-        // VK_COMMAND_POOL_CREATE_TRANSIENT_BIT flag enabled which might be of
-        // interest.
+    // from transfer_cmd_pool instead of cmd_pool. transfer_cmd_pool has the
+    // VK_COMMAND_POOL_CREATE_TRANSIENT_BIT flag enabled which might be of
+    // interest.
     bv::CommandBufferPtr begin_single_time_commands(
         AppState& state,
         bool use_transient_pool

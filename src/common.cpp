@@ -1,5 +1,9 @@
 #include "common.hpp"
 
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+#include <Windows.h>
+#endif
+
 namespace img_aligner
 {
 
@@ -40,6 +44,22 @@ namespace img_aligner
         f.close();
 
         return buf;
+    }
+
+    void open_url(std::string_view url)
+    {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+        ShellExecuteA(NULL, "open", url.data(), NULL, NULL, SW_SHOWNORMAL);
+#elif __APPLE__
+        std::system(std::format("open \"{}\"", url).c_str());
+#elif __linux__
+        std::system(std::format("xdg-open \"{}\"", url).c_str());
+#else
+        throw std::exception(std::format(
+            "{} is not implemented for this platform",
+            __FUNCTION__
+        ).c_str());
+#endif
     }
 
     bv::CommandBufferPtr begin_single_time_commands(
