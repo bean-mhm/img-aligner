@@ -626,7 +626,7 @@ namespace img_aligner
             "Scale##Misc", &state.ui_scale, .125f, .25f, "%.3f"
         ))
         {
-            state.ui_scale = std::clamp(state.ui_scale, .75f, 3.f);
+            state.ui_scale = std::clamp(state.ui_scale, .75f, 2.f);
             state.ui_scale_updated = true;
         }
 
