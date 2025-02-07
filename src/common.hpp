@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 #include <array>
+#include <span>
+#include <memory>
 #include <unordered_map>
 #include <set>
 #include <limits>
@@ -32,6 +34,10 @@
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 
+// access element in 2D array with row-major ordering
+#define ACCESS_2D(arr, ix, iy, res_x) ((arr)[(ix) + (iy) * (res_x)])
+#define INDEX_2D(ix, iy, res_x) ((ix) + (iy) * (res_x))
+
 namespace img_aligner
 {
 
@@ -55,7 +61,8 @@ namespace img_aligner
 
     static constexpr bool DEBUG_MODE = true;
     static constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
-    static constexpr VkSampleCountFlagBits MSAA_LEVEL = VK_SAMPLE_COUNT_8_BIT;
+    static constexpr VkSampleCountFlagBits REQUIRE_MSAA_LEVEL =
+        VK_SAMPLE_COUNT_1_BIT;
 
     struct AppState
     {
@@ -66,7 +73,7 @@ namespace img_aligner
 
         float ui_scale = 1.f;
         bool ui_scale_updated = false;
-        
+
         float image_viewer_zoom = 1.f;
 
         bv::ContextPtr context = nullptr;
@@ -94,6 +101,14 @@ namespace img_aligner
     std::vector<uint8_t> read_file(const std::string& filename);
 
     void open_url(std::string_view url);
+
+    // closest upper power of 2 to an integer.
+    // examples: 11 -> 16, 3000 -> 4096, 256 -> 256
+    uint32_t upper_power_of_2(uint32_t n);
+
+    // how many times an integer can be divided by 2 (or bit-shifted to the
+    // right) until it reaches 0.
+    uint32_t round_log2(uint32_t n);
 
     // if use_transfer_pool is true, the command buffer will be allocated
     // from transfer_cmd_pool instead of cmd_pool. transfer_cmd_pool has the
@@ -135,40 +150,28 @@ namespace img_aligner
         bv::MemoryChunkPtr& out_memory_chunk
     );
 
-    // when new_layout is VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, the
-    // vertex_shader argument defines whether dstStageMask should be set to
-    // VK_PIPELINE_STAGE_VERTEX_SHADER_BIT or
-    // VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, otherwise it's ignored.
     void transition_image_layout(
         const bv::CommandBufferPtr& cmd_buf,
         const bv::ImagePtr& image,
         VkImageLayout old_layout,
         VkImageLayout new_layout,
-        uint32_t mip_levels,
-        bool vertex_shader = false
+        uint32_t mip_levels
     );
 
     void copy_buffer_to_image(
         const bv::CommandBufferPtr& cmd_buf,
         const bv::BufferPtr& buffer,
         const bv::ImagePtr& image,
-        uint32_t width,
-        uint32_t height
+        VkDeviceSize buffer_offset = 0
     );
 
-    // if vertex_shader == true then dstStageMask will be set to
-    // VK_PIPELINE_STAGE_VERTEX_SHADER_BIT instead of
-    // VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT in vkCmdPipelineBarrier().
-    // this means that the vertex shader will wait for the image to be ready
-    // because the image will be used in the vertex shader.
+    // NOTE: the image is expected to be in VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+    // and it will be transitioned to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+    // at the end.
     void generate_mipmaps(
         AppState& state,
         const bv::CommandBufferPtr& cmd_buf,
-        const bv::ImagePtr& image,
-        int32_t width,
-        int32_t height,
-        uint32_t mip_levels,
-        bool vertex_shader = false
+        const bv::ImagePtr& image
     );
 
     bv::ImageViewPtr create_image_view(

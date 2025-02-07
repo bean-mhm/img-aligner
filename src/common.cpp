@@ -62,6 +62,33 @@ namespace img_aligner
 #endif
     }
 
+    uint32_t upper_power_of_2(uint32_t n)
+    {
+        if (n != 0)
+        {
+            n -= 1;
+        }
+
+        uint32_t i = 0;
+        while (n > 0)
+        {
+            n >>= 1;
+            i++;
+        }
+        return (uint32_t)1 << i;
+    }
+
+    uint32_t round_log2(uint32_t n)
+    {
+        uint32_t i = 0;
+        while (n > 0)
+        {
+            n >>= 1;
+            i++;
+        }
+        return i;
+    }
+
     bv::CommandBufferPtr begin_single_time_commands(
         AppState& state,
         bool use_transient_pool
@@ -177,8 +204,7 @@ namespace img_aligner
         const bv::ImagePtr& image,
         VkImageLayout old_layout,
         VkImageLayout new_layout,
-        uint32_t mip_levels,
-        bool vertex_shader
+        uint32_t mip_levels
     )
     {
         VkAccessFlags src_access_mask = 0;
@@ -187,6 +213,15 @@ namespace img_aligner
         VkPipelineStageFlags dst_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 
         if (old_layout == VK_IMAGE_LAYOUT_UNDEFINED
+            && new_layout == VK_IMAGE_LAYOUT_GENERAL)
+        {
+            src_access_mask = 0;
+            dst_access_mask = 0;
+
+            src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+            dst_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        }
+        else if (old_layout == VK_IMAGE_LAYOUT_UNDEFINED
             && new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
         {
             src_access_mask = 0;
@@ -202,10 +237,7 @@ namespace img_aligner
             dst_access_mask = VK_ACCESS_SHADER_READ_BIT;
 
             src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-            dst_stage =
-                vertex_shader
-                ? VK_PIPELINE_STAGE_VERTEX_SHADER_BIT
-                : VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+            dst_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
         }
         else if (old_layout == VK_IMAGE_LAYOUT_UNDEFINED
             && new_layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
@@ -267,12 +299,11 @@ namespace img_aligner
         const bv::CommandBufferPtr& cmd_buf,
         const bv::BufferPtr& buffer,
         const bv::ImagePtr& image,
-        uint32_t width,
-        uint32_t height
+        VkDeviceSize buffer_offset
     )
     {
         VkBufferImageCopy region{
-            .bufferOffset = 0,
+            .bufferOffset = buffer_offset,
             .bufferRowLength = 0,
             .bufferImageHeight = 0,
             .imageSubresource = VkImageSubresourceLayers{
@@ -282,7 +313,7 @@ namespace img_aligner
                 .layerCount = 1
         },
             .imageOffset = { 0, 0, 0 },
-            .imageExtent = { width, height, 1 }
+            .imageExtent = bv::Extent3d_to_vk(image->config().extent)
         };
 
         vkCmdCopyBufferToImage(
@@ -298,11 +329,7 @@ namespace img_aligner
     void generate_mipmaps(
         AppState& state,
         const bv::CommandBufferPtr& cmd_buf,
-        const bv::ImagePtr& image,
-        int32_t width,
-        int32_t height,
-        uint32_t mip_levels,
-        bool vertex_shader
+        const bv::ImagePtr& image
     )
     {
         // check if the image format supports linear blitting
@@ -336,8 +363,10 @@ namespace img_aligner
         }
         };
 
-        int32_t mip_width = width;
-        int32_t mip_height = height;
+        uint32_t mip_levels = image->config().mip_levels;
+
+        int32_t mip_width = (int32_t)image->config().extent.width;
+        int32_t mip_height = (int32_t)image->config().extent.height;
 
         for (uint32_t i = 1; i < mip_levels; i++)
         {
@@ -392,11 +421,7 @@ namespace img_aligner
             vkCmdPipelineBarrier(
                 cmd_buf->handle(),
                 VK_PIPELINE_STAGE_TRANSFER_BIT,
-
-                vertex_shader
-                ? VK_PIPELINE_STAGE_VERTEX_SHADER_BIT
-                : VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-
+                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                 0,
                 0, nullptr,
                 0, nullptr,
@@ -415,11 +440,7 @@ namespace img_aligner
         vkCmdPipelineBarrier(
             cmd_buf->handle(),
             VK_PIPELINE_STAGE_TRANSFER_BIT,
-
-            vertex_shader
-            ? VK_PIPELINE_STAGE_VERTEX_SHADER_BIT
-            : VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
             0,
             0, nullptr,
             0, nullptr,
