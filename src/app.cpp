@@ -698,7 +698,7 @@ namespace img_aligner
                 (uint32_t)1024
             );
         }
-        ImGui::SetTooltip(
+        ImGui::SetItemTooltip(
             "Resolution of the warping grid in the smallest axis (width "
             "or height)"
         );
@@ -714,7 +714,7 @@ namespace img_aligner
                 .5f
             );
         }
-        ImGui::SetTooltip(
+        ImGui::SetItemTooltip(
             "The actual grid used for warping has extra added borders to "
             "prevent black empty spaces when the edges get warped. This value "
             "controls the amount of that padding proportional to the grid "
@@ -733,7 +733,7 @@ namespace img_aligner
                 (uint32_t)16384
             );
         }
-        ImGui::SetTooltip(
+        ImGui::SetItemTooltip(
             "The images are temporarily downsampled throughout the "
             "optimization process to improve computation speed. This value "
             "defines the maximum intermediate image resolution in the smallest "
