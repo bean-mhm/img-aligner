@@ -29,6 +29,7 @@ namespace img_aligner
         pick_physical_device();
         create_logical_device();
         create_memory_bank();
+        create_command_pools();
         create_imgui_descriptor_pool();
         init_imgui_vk_window_data();
         init_imgui();
@@ -330,7 +331,7 @@ namespace img_aligner
             // make sure the desired level of multisampling is supported
             if (!(pdev.properties().limits.framebuffer_color_sample_counts
                 & pdev.properties().limits.framebuffer_depth_sample_counts
-                & MSAA_LEVEL))
+                & REQUIRE_MSAA_LEVEL))
             {
                 continue;
             }
@@ -441,6 +442,24 @@ namespace img_aligner
     void App::create_memory_bank()
     {
         state.mem_bank = bv::MemoryBank::create(state.device);
+    }
+
+    void App::create_command_pools()
+    {
+        state.cmd_pool = bv::CommandPool::create(
+            state.device,
+            {
+                .flags = 0,
+                .queue_family_index = state.queue->queue_family_index()
+            }
+        );
+        state.transient_cmd_pool = bv::CommandPool::create(
+            state.device,
+            {
+                .flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT,
+                .queue_family_index = state.queue->queue_family_index()
+            }
+        );
     }
 
     void App::create_imgui_descriptor_pool()
@@ -651,7 +670,115 @@ namespace img_aligner
 
     void App::layout_controls()
     {
-        // TODO
+        ImGui::Begin("Controls");
+
+        imgui_bold("IMAGES");
+
+        if (ImGui::Button("Load Base Image##Controls"))
+        {
+            std::cout << "load base\n";
+        }
+
+        if (ImGui::Button("Load Target Image##Controls"))
+        {
+            std::cout << "load target\n";
+        }
+
+        imgui_bold("OPTIMIZATION");
+
+        if (ImGui::InputScalar(
+            "Grid Resolution#Controls",
+            ImGuiDataType_U32,
+            &grid_warp_params.grid_res_smallest_axis
+        ))
+        {
+            grid_warp_params.grid_res_smallest_axis = std::clamp(
+                grid_warp_params.grid_res_smallest_axis,
+                (uint32_t)0,
+                (uint32_t)1024
+            );
+        }
+        ImGui::SetTooltip(
+            "Resolution of the warping grid in the smallest axis (width "
+            "or height)"
+        );
+
+        if (ImGui::InputFloat(
+            "Grid Padding#Controls",
+            &grid_warp_params.grid_padding
+        ))
+        {
+            grid_warp_params.grid_padding = std::clamp(
+                grid_warp_params.grid_padding,
+                0.f,
+                .5f
+            );
+        }
+        ImGui::SetTooltip(
+            "The actual grid used for warping has extra added borders to "
+            "prevent black empty spaces when the edges get warped. This value "
+            "controls the amount of that padding proportional to the grid "
+            "resolution."
+        );
+
+        if (ImGui::InputScalar(
+            "Intermediate Resolution#Controls",
+            ImGuiDataType_U32,
+            &grid_warp_params.intermediate_res_smallest_axis
+        ))
+        {
+            grid_warp_params.intermediate_res_smallest_axis = std::clamp(
+                grid_warp_params.intermediate_res_smallest_axis,
+                (uint32_t)1,
+                (uint32_t)16384
+            );
+        }
+        ImGui::SetTooltip(
+            "The images are temporarily downsampled throughout the "
+            "optimization process to improve computation speed. This value "
+            "defines the maximum intermediate image resolution in the smallest "
+            "axis (width or height)."
+        );
+
+        if (ImGui::Button("Start Alignin'##Controls"))
+        {
+            // generate fake test image
+            uint32_t test_image_width = 320;
+            uint32_t test_image_height = 180;
+            std::vector<float> test_image_data(
+                test_image_width * test_image_height * 4
+            );
+            for (uint32_t y = 0; y < test_image_height; y++)
+            {
+                for (uint32_t x = 0; x < test_image_width; x++)
+                {
+                    float u = ((float)x + .5f) / (float)test_image_width;
+                    float v = ((float)y + .5f) / (float)test_image_height;
+
+                    uint32_t red_idx = (x + y * test_image_width) * 4;
+                    test_image_data[red_idx + 0] = u;
+                    test_image_data[red_idx + 1] = v;
+                    test_image_data[red_idx + 2] =
+                        std::cos(10.f * v) * .05f + .05f;
+                    test_image_data[red_idx + 3] = 1.f;
+                }
+            }
+            grid_warp_params.img_width = test_image_width;
+            grid_warp_params.img_height = test_image_height;
+            grid_warp_params.base_img_pixels_rgba = std::span<float>(
+                test_image_data.data(), test_image_data.size()
+            );
+            grid_warp_params.target_img_pixels_rgba = std::span<float>(
+                test_image_data.data(), test_image_data.size()
+            );
+
+            grid_warper = std::make_unique<grid_warp::GridWarper>(
+                state,
+                grid_warp_params
+            );
+        }
+
+        ImGui::End();
     }
 
     void App::setup_imgui_style()

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common.hpp"
+#include "grid_warp.hpp"
 
 namespace img_aligner
 {
@@ -14,6 +15,9 @@ namespace img_aligner
     private:
         AppState state;
 
+        grid_warp::Params grid_warp_params;
+        std::unique_ptr<grid_warp::GridWarper> grid_warper = nullptr;
+
         void init();
         void main_loop();
         void cleanup();
@@ -26,6 +30,7 @@ namespace img_aligner
         void pick_physical_device();
         void create_logical_device();
         void create_memory_bank();
+        void create_command_pools();
         void create_imgui_descriptor_pool();
         void init_imgui_vk_window_data();
         void init_imgui();
