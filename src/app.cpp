@@ -617,10 +617,10 @@ namespace img_aligner
         }
 
         // image
-        if (0)
+        if (grid_warper != nullptr)
         {
             ImGui::Image(
-                0,
+                (ImTextureID)grid_warper->base_img_ds_imgui,
                 ImVec2(
                     (float)img_width * state.image_viewer_zoom,
                     (float)img_height * state.image_viewer_zoom
@@ -742,6 +742,8 @@ namespace img_aligner
 
         if (ImGui::Button("Start Alignin'##Controls"))
         {
+            grid_warp_params.will_display_images_in_ui = true;
+
             // generate fake test image
             uint32_t test_image_width = 320;
             uint32_t test_image_height = 180;
