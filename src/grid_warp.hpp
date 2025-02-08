@@ -77,6 +77,7 @@ namespace img_aligner::grid_warp
         uint32_t grid_res_smallest_axis = 12;
         float grid_padding = .25f;
         uint32_t intermediate_res_smallest_axis = 800;
+        bool will_display_images_in_ui = false;
     };
 
     class GridWarper
@@ -87,11 +88,20 @@ namespace img_aligner::grid_warp
             const Params& params
         );
 
+        // descriptor sets for ImGUI's Vulkan implementation to display images
+        // in the UI.
+        VkDescriptorSet base_img_ds_imgui = nullptr;
+        VkDescriptorSet target_img_ds_imgui = nullptr;
+        VkDescriptorSet warped_img_ds_imgui = nullptr;
+        VkDescriptorSet difference_img_ds_imgui = nullptr;
+        VkDescriptorSet final_img_ds_imgui = nullptr;
+
     private:
         void create_vertex_and_index_buffer_and_generate_vertices();
         void create_sampler_and_images(
             std::span<float> base_img_pixels_rgba,
-            std::span<float> target_img_pixels_rgba
+            std::span<float> target_img_pixels_rgba,
+            bool will_display_images_in_ui
         );
 
     private:

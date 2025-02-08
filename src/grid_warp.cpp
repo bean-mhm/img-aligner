@@ -117,7 +117,8 @@ namespace img_aligner::grid_warp
         create_vertex_and_index_buffer_and_generate_vertices();
         create_sampler_and_images(
             params.base_img_pixels_rgba,
-            params.target_img_pixels_rgba
+            params.target_img_pixels_rgba,
+            params.will_display_images_in_ui
         );
     }
 
@@ -251,7 +252,8 @@ namespace img_aligner::grid_warp
 
     void GridWarper::create_sampler_and_images(
         std::span<float> base_img_pixels_rgba,
-        std::span<float> target_img_pixels_rgba
+        std::span<float> target_img_pixels_rgba,
+        bool will_display_images_in_ui
     )
     {
         // calculate the size of each of the base and target images in bytes
@@ -352,7 +354,7 @@ namespace img_aligner::grid_warp
             base_img,
             base_img_mem
         );
-        create_image_view(
+        base_imgview = create_image_view(
             state,
             base_img,
             RGBA_FORMAT,
@@ -383,7 +385,7 @@ namespace img_aligner::grid_warp
             target_img,
             target_img_mem
         );
-        create_image_view(
+        target_imgview = create_image_view(
             state,
             target_img,
             RGBA_FORMAT,
@@ -415,7 +417,7 @@ namespace img_aligner::grid_warp
             warped_img,
             warped_img_mem
         );
-        create_image_view(
+        warped_imgview = create_image_view(
             state,
             warped_img,
             RGBA_FORMAT,
@@ -449,7 +451,7 @@ namespace img_aligner::grid_warp
             final_img,
             final_img_mem
         );
-        create_image_view(
+        final_imgview = create_image_view(
             state,
             final_img,
             RGBA_FORMAT,
@@ -490,7 +492,7 @@ namespace img_aligner::grid_warp
             difference_img,
             difference_img_mem
         );
-        create_image_view(
+        difference_imgview = create_image_view(
             state,
             difference_img,
             R_FORMAT,
@@ -537,6 +539,37 @@ namespace img_aligner::grid_warp
 
         staging_buf = nullptr;
         staging_buf_mem = nullptr;
+
+        // create descriptor sets for ImGUI's Vulkan implementation to display
+        // images in the UI.
+        if (will_display_images_in_ui)
+        {
+            base_img_ds_imgui = ImGui_ImplVulkan_AddTexture(
+                sampler->handle(),
+                base_imgview->handle(),
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            );
+            target_img_ds_imgui = ImGui_ImplVulkan_AddTexture(
+                sampler->handle(),
+                target_imgview->handle(),
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            );
+            warped_img_ds_imgui = ImGui_ImplVulkan_AddTexture(
+                sampler->handle(),
+                warped_imgview->handle(),
+                VK_IMAGE_LAYOUT_GENERAL
+            );
+            difference_img_ds_imgui = ImGui_ImplVulkan_AddTexture(
+                sampler->handle(),
+                difference_imgview->handle(),
+                VK_IMAGE_LAYOUT_GENERAL
+            );
+            final_img_ds_imgui = ImGui_ImplVulkan_AddTexture(
+                sampler->handle(),
+                final_imgview->handle(),
+                VK_IMAGE_LAYOUT_GENERAL
+            );
+        }
     }
 
 }
