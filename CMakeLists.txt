@@ -74,8 +74,11 @@ mkdir_if_needed("${CMAKE_BINARY_DIR}/bin/shaders")
 add_custom_command(TARGET img-aligner
     POST_BUILD
     COMMAND echo compiling shaders
-    COMMAND "${GLSLC_PATH}" -fshader-stage=vertex "${CMAKE_SOURCE_DIR}/shaders/vert.glsl" -o "${CMAKE_BINARY_DIR}/bin/shaders/vert.spv"
-    COMMAND "${GLSLC_PATH}" -fshader-stage=fragment "${CMAKE_SOURCE_DIR}/shaders/frag.glsl" -o "${CMAKE_BINARY_DIR}/bin/shaders/frag.spv"
+    COMMAND "${GLSLC_PATH}" -fshader-stage=vertex "${CMAKE_SOURCE_DIR}/shaders/fullscreen_quad_vert.glsl" -o "${CMAKE_BINARY_DIR}/bin/shaders/fullscreen_quad_vert.spv"
+    COMMAND "${GLSLC_PATH}" -fshader-stage=vertex "${CMAKE_SOURCE_DIR}/shaders/grid_warp_pass_vert.glsl" -o "${CMAKE_BINARY_DIR}/bin/shaders/grid_warp_pass_vert.spv"
+    COMMAND "${GLSLC_PATH}" -fshader-stage=fragment "${CMAKE_SOURCE_DIR}/shaders/grid_warp_pass_frag.glsl" -o "${CMAKE_BINARY_DIR}/bin/shaders/grid_warp_pass_frag.spv"
+    COMMAND "${GLSLC_PATH}" -fshader-stage=fragment "${CMAKE_SOURCE_DIR}/shaders/difference_pass_frag.glsl" -o "${CMAKE_BINARY_DIR}/bin/shaders/difference_pass_frag.spv"
+    COMMAND "${GLSLC_PATH}" -fshader-stage=fragment "${CMAKE_SOURCE_DIR}/shaders/ui_pass_frag.glsl" -o "${CMAKE_BINARY_DIR}/bin/shaders/ui_pass_frag.spv"
     COMMAND echo done compiling shaders
 )
 
@@ -85,7 +88,7 @@ mkdir_if_needed("${CMAKE_BINARY_DIR}/bin/fonts")
 add_custom_command(TARGET img-aligner
     POST_BUILD
     COMMAND echo copying resource files
-    COMMAND ${COPY_COMMAND_PREFIX} \"${CMAKE_SOURCE_DIR}/licenses/.\" \"${CMAKE_BINARY_DIR}/bin/licenses\" ${COPY_COMMAND_SUFFIX}
-    COMMAND ${COPY_COMMAND_PREFIX} \"${CMAKE_SOURCE_DIR}/fonts/.\" \"${CMAKE_BINARY_DIR}/bin/fonts\" ${COPY_COMMAND_SUFFIX}
+    COMMAND ${COPY_COMMAND_PREFIX} "\"${CMAKE_SOURCE_DIR}/licenses/.\" \"${CMAKE_BINARY_DIR}/bin/licenses\"" ${COPY_COMMAND_SUFFIX}
+    COMMAND ${COPY_COMMAND_PREFIX} "\"${CMAKE_SOURCE_DIR}/fonts/.\" \"${CMAKE_BINARY_DIR}/bin/fonts\"" ${COPY_COMMAND_SUFFIX}
     COMMAND echo done copying resource files
 )

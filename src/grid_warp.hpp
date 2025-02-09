@@ -22,50 +22,20 @@ namespace img_aligner::grid_warp
         bool operator==(const GridVertex& other) const;
     };
 
-    struct DifferencePassFragPushConstants
+    struct GridWarpPassFragPushConstants
     {
-        float warped_img_mul = 1.f;
+        float base_img_mul = 1.f;
     };
 
-    struct WarpPass
+    struct DifferencePassFragPushConstants
     {
-        AppState& state;
+        float target_img_mul = 1.f;
+    };
 
-        uint32_t texture_mip_levels = 1;
-        bv::ImagePtr texture_img = nullptr;
-        bv::MemoryChunkPtr texture_img_mem = nullptr;
-        bv::ImageViewPtr texture_imgview = nullptr;
-        bv::SamplerPtr texture_sampler = nullptr;
-
-        std::vector<GridVertex> vertices;
-
-        bv::BufferPtr vertex_buf = nullptr;
-        bv::MemoryChunkPtr vertex_buf_mem = nullptr;
-
-        std::vector<bv::BufferPtr> uniform_bufs;
-        std::vector<bv::MemoryChunkPtr> uniform_bufs_mem;
-        std::vector<void*> uniform_bufs_mapped;
-
-        bv::DescriptorPoolPtr descriptor_pool = nullptr;
-        std::vector<bv::DescriptorSetPtr> descriptor_sets;
-
-        void create_texture_image();
-        void create_texture_sampler();
-        void load_model();
-        void create_vertex_buffer();
-        void create_index_buffer();
-        void create_uniform_buffers();
-        void create_descriptor_pool();
-        void create_descriptor_sets();
-        void create_command_buffers();
-
-        void record_command_buffer(
-            const bv::CommandBufferPtr& cmd_buf,
-            uint32_t img_idx,
-            float elapsed
-        );
-
-        void update_uniform_buffer(uint32_t frame_idx, float elapsed);
+    struct UiPassFragPushConstants
+    {
+        float img_mul = 1.f;
+        int32_t use_flim = 0;
     };
 
     struct Params
@@ -85,28 +55,79 @@ namespace img_aligner::grid_warp
     public:
         GridWarper(
             AppState& state,
-            const Params& params
+            const Params& params,
+            size_t thread_idx
         );
+        ~GridWarper();
 
-        // descriptor sets for ImGUI's Vulkan implementation to display images
-        // in the UI.
-        VkDescriptorSet base_img_ds_imgui = nullptr;
-        VkDescriptorSet target_img_ds_imgui = nullptr;
-        VkDescriptorSet warped_img_ds_imgui = nullptr;
-        VkDescriptorSet difference_img_ds_imgui = nullptr;
-        VkDescriptorSet final_img_ds_imgui = nullptr;
+        // run the grid warp pass. if hires is set to true, the warped image
+        // will be rendered to warped_hires_img, otherwise warped_img will be
+        // used.
+        void run_grid_warp_pass(bool hires, size_t thread_idx);
+
+        // run the difference pass and return the average difference (error)
+        // between warped_img and target_img. the average is calculated by
+        // generating mipmaps for the difference image which has a square
+        // resolution of a power of 2.
+        float run_difference_pass(size_t thread_idx);
+
+        // run the UI pass. this will render one of the images to ui_img. said
+        // image can be selected by changing ui_pass_selected_ds.
+        void run_ui_pass(size_t thread_idx);
+
+        // descriptor set for ImGUI's Vulkan implementation to display the UI
+        // image using ImGui::Image(). this will be nullptr if
+        // will_display_images_in_ui is false.
+        VkDescriptorSet ui_img_ds_imgui = nullptr;
+
+        // this defines which descriptor set we'll use for the next UI pass, and
+        // therefore which image will ultimately be displayed in the UI. the
+        // application is in charge of changing this to point to one of the
+        // UI pass desciptor sets below and then calling run_ui_pass() to update
+        // the UI image. after that, it can use ImGui::Image() with
+        // ui_img_ds_imgui to display the UI image.
+        bv::DescriptorSetPtr ui_pass_selected_ds = nullptr;
+
+        // the application should set ui_pass_selected_ds to point to one of
+        // these descriptor sets to choose which image to display in the UI.
+        bv::DescriptorSetPtr ui_pass_ds_base_img = nullptr;
+        bv::DescriptorSetPtr ui_pass_ds_target_img = nullptr;
+        bv::DescriptorSetPtr ui_pass_ds_warped_img = nullptr;
+        bv::DescriptorSetPtr ui_pass_ds_warped_hires_img = nullptr;
+        bv::DescriptorSetPtr ui_pass_ds_difference_img = nullptr;
 
     private:
-        void create_vertex_and_index_buffer_and_generate_vertices();
+        void create_vertex_and_index_buffer_and_generate_vertices(
+            size_t thread_idx
+        );
         void create_sampler_and_images(
             std::span<float> base_img_pixels_rgba,
             std::span<float> target_img_pixels_rgba,
-            bool will_display_images_in_ui
+            size_t thread_idx
+        );
+        void create_avg_difference_buffer();
+        void create_passes();
+
+        void create_ui_pass_descriptor_set(
+            const bv::ImageViewPtr& image_view,
+            VkImageLayout image_layout,
+            bv::DescriptorSetPtr& out_descriptor_set
+        );
+
+        bv::CommandBufferPtr create_grid_warp_pass_cmd_buf(
+            bool hires,
+            size_t thread_idx
+        );
+        bv::CommandBufferPtr create_difference_pass_cmd_buf(size_t thread_idx);
+        bv::CommandBufferPtr create_ui_pass_cmd_buf(
+            const bv::DescriptorSetPtr& descriptor_set,
+            size_t thread_idx
         );
 
     private:
         static constexpr VkFormat RGBA_FORMAT = VK_FORMAT_R32G32B32A32_SFLOAT;
         static constexpr VkFormat R_FORMAT = VK_FORMAT_R32_SFLOAT;
+        static constexpr VkFormat UI_FORMAT = VK_FORMAT_R16G16B16A16_SFLOAT;
 
         AppState& state;
 
@@ -122,6 +143,8 @@ namespace img_aligner::grid_warp
         uint32_t padded_grid_res_x = 1;
         uint32_t padded_grid_res_y = 1;
 
+        bool will_display_images_in_ui = false;
+
         // vertex buffer for the grid vertices, host-visible and host-coherent
         // because we'll keep moving the vertices in every iteration.
         bv::BufferPtr vertex_buf = nullptr;
@@ -129,6 +152,7 @@ namespace img_aligner::grid_warp
         GridVertex* vertex_buf_mapped = nullptr;
 
         // index buffer for the grid vertices
+        uint32_t n_triangle_vertices = 0;
         bv::BufferPtr index_buf = nullptr;
         bv::MemoryChunkPtr index_buf_mem = nullptr;
 
@@ -154,6 +178,12 @@ namespace img_aligner::grid_warp
         bv::MemoryChunkPtr warped_img_mem = nullptr;
         bv::ImageViewPtr warped_imgview = nullptr;
 
+        // grid warped image at original resolution, no mipmapping. this will
+        // only be updated after optimization is stopped.
+        bv::ImagePtr warped_hires_img = nullptr;
+        bv::MemoryChunkPtr warped_hires_img_mem = nullptr;
+        bv::ImageViewPtr warped_hires_imgview = nullptr;
+
         // logarithmic difference image (difference between the warped image and
         // the target image), square resolution which is equal to the upper
         // power of 2 of the intermediate resolution, mipmapped so we can get
@@ -163,47 +193,71 @@ namespace img_aligner::grid_warp
         bv::MemoryChunkPtr difference_img_mem = nullptr;
         bv::ImageViewPtr difference_imgview = nullptr;
 
-        // grid warped image at original resolution, no mipmapping. this will
-        // only be updated after optimization is stopped.
-        bv::ImagePtr final_img = nullptr;
-        bv::MemoryChunkPtr final_img_mem = nullptr;
-        bv::ImageViewPtr final_imgview = nullptr;
+        // the UI image. whenever we wanna display any of the images, we'll
+        // render it to this image while also applying the sRGB OETF.
+        bv::ImagePtr ui_img = nullptr;
+        bv::MemoryChunkPtr ui_img_mem = nullptr;
+        bv::ImageViewPtr ui_imgview = nullptr;
 
-        // NOTE: there are two types of passes:
+        // the average difference buffer is a host-visible buffer into which we
+        // copy the last mip level of the difference image which contains a
+        // single float value representing the average difference (error)
+        // between warped_img and target_img.
+        bv::BufferPtr avg_difference_buf = nullptr;
+        bv::MemoryChunkPtr avg_difference_buf_mem = nullptr;
+        float* avg_difference_buf_mapped = nullptr;
+
+        // NOTE: there are 3 types of passes:
         // 1. grid warp pass
         //    - renders to warped_img or final_img (we make 2 framebuffers and
         //      use the appropriate one).
         //    - samples base_img
         //    - uses the grid vertex buffer
         // 2. difference pass
-        //    - renders to difference_img.
+        //    - renders to difference_img
         //    - samples warped_img and target_img
-        //    - does NOT use the vertex buffer, instead, generates vertices for
-        //      a "full-screen" quad in the vertex shader.
+        //    - does not use a vertex buffer. instead, generates vertices for a
+        //      "full-screen" quad in the vertex shader.
+        // 3. UI pass (for displaying the images)
+        //    - renders to ui_img
+        //    - samples any of the other images
+        //    - does not use a vertex buffer
 
         // grid warp pass: descriptor stuff
         bv::DescriptorSetLayoutPtr gwp_descriptor_set_layout = nullptr;
         bv::DescriptorPoolPtr gwp_descriptor_pool = nullptr;
-        std::vector<bv::DescriptorSetPtr> gwp_descriptor_sets;
+        bv::DescriptorSetPtr gwp_descriptor_set;
 
         // grid warp pass
+        bv::RenderPassPtr gwp_render_pass = nullptr;
+        bv::FramebufferPtr gwp_framebuf = nullptr;
+        bv::FramebufferPtr gwp_framebuf_hires = nullptr;
         bv::PipelineLayoutPtr gwp_pipeline_layout = nullptr;
         bv::GraphicsPipelinePtr gwp_graphics_pipeline = nullptr;
-        bv::RenderPassPtr gwp_render_pass = nullptr;
-        bv::FramebufferPtr gwp_framebuf_warped_img = nullptr;
-        bv::FramebufferPtr gwp_framebuf_final_img = nullptr;
+        GridWarpPassFragPushConstants gwp_frag_push_constants;
 
         // difference pass: descriptor stuff
         bv::DescriptorSetLayoutPtr dfp_descriptor_set_layout = nullptr;
         bv::DescriptorPoolPtr dfp_descriptor_pool = nullptr;
-        std::vector<bv::DescriptorSetPtr> dfp_descriptor_sets;
+        bv::DescriptorSetPtr dfp_descriptor_set;
 
         // difference pass
-        bv::PipelineLayoutPtr dfp_pipeline_layout = nullptr;
-        bv::GraphicsPipelinePtr dfp_graphics_pipeline = nullptr;
         bv::RenderPassPtr dfp_render_pass = nullptr;
         bv::FramebufferPtr dfp_framebuf = nullptr;
+        bv::PipelineLayoutPtr dfp_pipeline_layout = nullptr;
+        bv::GraphicsPipelinePtr dfp_graphics_pipeline = nullptr;
         DifferencePassFragPushConstants dfp_frag_push_constants;
+
+        // UI pass: descriptor stuff
+        bv::DescriptorSetLayoutPtr uip_descriptor_set_layout = nullptr;
+        bv::DescriptorPoolPtr uip_descriptor_pool = nullptr;
+
+        // UI pass
+        bv::RenderPassPtr uip_render_pass = nullptr;
+        bv::FramebufferPtr uip_framebuf = nullptr;
+        bv::PipelineLayoutPtr uip_pipeline_layout = nullptr;
+        bv::GraphicsPipelinePtr uip_graphics_pipeline = nullptr;
+        UiPassFragPushConstants uip_frag_push_constants;
 
     };
 

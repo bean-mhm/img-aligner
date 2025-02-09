@@ -8,6 +8,7 @@
 #include <array>
 #include <span>
 #include <memory>
+#include <mutex>
 #include <unordered_map>
 #include <set>
 #include <limits>
@@ -64,6 +65,9 @@ namespace img_aligner
     static constexpr VkSampleCountFlagBits REQUIRE_MSAA_LEVEL =
         VK_SAMPLE_COUNT_1_BIT;
 
+    // total number of threads that create or submit command buffers
+    static constexpr size_t N_THREADS = 2;
+
     struct AppState
     {
         GLFWwindow* window = nullptr;
@@ -81,11 +85,15 @@ namespace img_aligner
         bv::SurfacePtr surface = nullptr;
         std::optional<bv::PhysicalDevice> physical_device;
         bv::DevicePtr device = nullptr;
+
         bv::QueuePtr queue = nullptr;
+        std::mutex queue_mutex;
+
         bv::MemoryBankPtr mem_bank = nullptr;
 
-        bv::CommandPoolPtr cmd_pool = nullptr;
-        bv::CommandPoolPtr transient_cmd_pool = nullptr;
+        // command pools for each thread
+        std::vector<bv::CommandPoolPtr> cmd_pools;
+        std::vector<bv::CommandPoolPtr> transient_cmd_pools;
 
         bv::DescriptorPoolPtr imgui_descriptor_pool = nullptr;
         uint32_t imgui_swapchain_min_image_count = 0;
@@ -116,7 +124,8 @@ namespace img_aligner
     // interest.
     bv::CommandBufferPtr begin_single_time_commands(
         AppState& state,
-        bool use_transient_pool
+        bool use_transient_pool,
+        size_t thread_idx
     );
 
     // end and submit one-time command buffer. if no fence is provided,
@@ -125,6 +134,7 @@ namespace img_aligner
     void end_single_time_commands(
         AppState& state,
         bv::CommandBufferPtr& cmd_buf,
+        bool lock_queue_mutex,
         const bv::FencePtr fence = nullptr
     );
 
@@ -165,13 +175,23 @@ namespace img_aligner
         VkDeviceSize buffer_offset = 0
     );
 
-    // NOTE: the image is expected to be in VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
-    // and it will be transitioned to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-    // at the end.
+    // if use_general_layout is true, the image is expected to be in
+    // VK_IMAGE_LAYOUT_GENERAL and no layout transitions will happen. otherwise,
+    // the image must be in VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL and it will be
+    // transitioned to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL at the end.
+    //
+    // next_stage_mask defines the upcoming pipeline stages that should wait for
+    // the mipmap operation to finish.
+    //
+    // next_stage_access_mask defines what operation in the upcoming stage will
+    // wait for the mipmap operation to finish.
     void generate_mipmaps(
         AppState& state,
-        const bv::CommandBufferPtr& cmd_buf,
-        const bv::ImagePtr& image
+        bv::CommandBufferPtr& cmd_buf,
+        const bv::ImagePtr& image,
+        bool use_general_layout,
+        VkPipelineStageFlags next_stage_mask,
+        VkAccessFlags next_stage_access_mask
     );
 
     bv::ImageViewPtr create_image_view(

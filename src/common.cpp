@@ -91,11 +91,16 @@ namespace img_aligner
 
     bv::CommandBufferPtr begin_single_time_commands(
         AppState& state,
-        bool use_transient_pool
+        bool use_transient_pool,
+        size_t thread_idx
     )
     {
+        auto& pool = (use_transient_pool
+            ? state.transient_cmd_pools[thread_idx]
+            : state.cmd_pools[thread_idx]);
+
         auto cmd_buf = bv::CommandPool::allocate_buffer(
-            use_transient_pool ? state.transient_cmd_pool : state.cmd_pool,
+            pool,
             VK_COMMAND_BUFFER_LEVEL_PRIMARY
         );
         cmd_buf->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -105,15 +110,22 @@ namespace img_aligner
     void end_single_time_commands(
         AppState& state,
         bv::CommandBufferPtr& cmd_buf,
+        bool lock_queue_mutex,
         const bv::FencePtr fence
     )
     {
         cmd_buf->end();
-        state.queue->submit({}, {}, { cmd_buf }, {}, fence);
+
+        {
+            std::scoped_lock lock(state.queue_mutex);
+            state.queue->submit({}, {}, { cmd_buf }, {}, fence);
+        }
+
         if (fence == nullptr)
         {
             state.queue->wait_idle();
         }
+        
         cmd_buf = nullptr;
     }
 
@@ -328,8 +340,11 @@ namespace img_aligner
 
     void generate_mipmaps(
         AppState& state,
-        const bv::CommandBufferPtr& cmd_buf,
-        const bv::ImagePtr& image
+        bv::CommandBufferPtr& cmd_buf,
+        const bv::ImagePtr& image,
+        bool use_general_layout,
+        VkPipelineStageFlags next_stage_mask,
+        VkAccessFlags next_stage_access_mask
     )
     {
         // check if the image format supports linear blitting
@@ -360,7 +375,7 @@ namespace img_aligner
                 .levelCount = 1,
                 .baseArrayLayer = 0,
                 .layerCount = 1
-        }
+            }
         };
 
         uint32_t mip_levels = image->config().mip_levels;
@@ -372,8 +387,12 @@ namespace img_aligner
         {
             barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
             barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-            barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-            barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            barrier.oldLayout = use_general_layout
+                ? VK_IMAGE_LAYOUT_GENERAL
+                : VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            barrier.newLayout = use_general_layout
+                ? VK_IMAGE_LAYOUT_GENERAL
+                : VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
             barrier.subresourceRange.baseMipLevel = i - 1;
             vkCmdPipelineBarrier(
                 cmd_buf->handle(),
@@ -414,14 +433,18 @@ namespace img_aligner
             );
 
             barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-            barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-            barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            barrier.dstAccessMask = next_stage_access_mask;
+            barrier.oldLayout = use_general_layout
+                ? VK_IMAGE_LAYOUT_GENERAL
+                : VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            barrier.newLayout = use_general_layout
+                ? VK_IMAGE_LAYOUT_GENERAL
+                : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             barrier.subresourceRange.baseMipLevel = i - 1;
             vkCmdPipelineBarrier(
                 cmd_buf->handle(),
                 VK_PIPELINE_STAGE_TRANSFER_BIT,
-                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                next_stage_mask,
                 0,
                 0, nullptr,
                 0, nullptr,
@@ -433,14 +456,18 @@ namespace img_aligner
         }
 
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        barrier.dstAccessMask = next_stage_access_mask;
+        barrier.oldLayout = use_general_layout
+            ? VK_IMAGE_LAYOUT_GENERAL
+            : VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        barrier.newLayout = use_general_layout
+            ? VK_IMAGE_LAYOUT_GENERAL
+            : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         barrier.subresourceRange.baseMipLevel = mip_levels - 1;
         vkCmdPipelineBarrier(
             cmd_buf->handle(),
             VK_PIPELINE_STAGE_TRANSFER_BIT,
-            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+            next_stage_mask,
             0,
             0, nullptr,
             0, nullptr,

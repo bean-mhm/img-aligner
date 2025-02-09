@@ -138,8 +138,8 @@ namespace img_aligner
 
         state.imgui_descriptor_pool = nullptr;
 
-        state.transient_cmd_pool = nullptr;
-        state.cmd_pool = nullptr;
+        state.cmd_pools.clear();
+        state.transient_cmd_pools.clear();
 
         state.mem_bank = nullptr;
         state.queue = nullptr;
@@ -446,20 +446,23 @@ namespace img_aligner
 
     void App::create_command_pools()
     {
-        state.cmd_pool = bv::CommandPool::create(
-            state.device,
-            {
-                .flags = 0,
-                .queue_family_index = state.queue->queue_family_index()
-            }
-        );
-        state.transient_cmd_pool = bv::CommandPool::create(
-            state.device,
-            {
-                .flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT,
-                .queue_family_index = state.queue->queue_family_index()
-            }
-        );
+        for (size_t i = 0; i < N_THREADS; i++)
+        {
+            state.cmd_pools.push_back(bv::CommandPool::create(
+                state.device,
+                {
+                    .flags = 0,
+                    .queue_family_index = state.queue->queue_family_index()
+                }
+            ));
+            state.transient_cmd_pools.push_back(bv::CommandPool::create(
+                state.device,
+                {
+                    .flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT,
+                    .queue_family_index = state.queue->queue_family_index()
+                }
+            ));
+        }
     }
 
     void App::create_imgui_descriptor_pool()
@@ -471,14 +474,14 @@ namespace img_aligner
 
         std::vector<bv::DescriptorPoolSize> pool_sizes
         {
-            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1 }
+            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 16 }
         };
 
         state.imgui_descriptor_pool = bv::DescriptorPool::create(
             state.device,
             {
                 .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
-                .max_sets = 1,
+                .max_sets = 16,
                 .pool_sizes = pool_sizes
             }
         );
@@ -581,8 +584,8 @@ namespace img_aligner
     {
         ImGui::Begin("Image Viewer", 0, ImGuiWindowFlags_HorizontalScrollbar);
 
-        const uint32_t img_width = 3840;
-        const uint32_t img_height = 2880;
+        const uint32_t img_width = 1920;
+        const uint32_t img_height = 1080;
 
         // image selector
         // TODO: use a combo
@@ -620,13 +623,13 @@ namespace img_aligner
         if (grid_warper != nullptr)
         {
             ImGui::Image(
-                (ImTextureID)grid_warper->base_img_ds_imgui,
+                (ImTextureID)grid_warper->ui_img_ds_imgui,
                 ImVec2(
                     (float)img_width * state.image_viewer_zoom,
                     (float)img_height * state.image_viewer_zoom
                 ),
-                { 0, 0 },
-                { 1, 1 },
+                { 0, 1 },
+                { 1, 0 },
                 { 1, 1, 1, 1 },
                 COLOR_IMAGE_BORDER
             );
@@ -687,7 +690,7 @@ namespace img_aligner
         imgui_bold("OPTIMIZATION");
 
         if (ImGui::InputScalar(
-            "Grid Resolution#Controls",
+            "Grid Resolution##Controls",
             ImGuiDataType_U32,
             &grid_warp_params.grid_res_smallest_axis
         ))
@@ -698,13 +701,13 @@ namespace img_aligner
                 (uint32_t)1024
             );
         }
-        ImGui::SetItemTooltip(
+        imgui_tooltip(
             "Resolution of the warping grid in the smallest axis (width "
             "or height)"
         );
 
         if (ImGui::InputFloat(
-            "Grid Padding#Controls",
+            "Grid Padding##Controls",
             &grid_warp_params.grid_padding
         ))
         {
@@ -714,7 +717,7 @@ namespace img_aligner
                 .5f
             );
         }
-        ImGui::SetItemTooltip(
+        imgui_tooltip(
             "The actual grid used for warping has extra added borders to "
             "prevent black empty spaces when the edges get warped. This value "
             "controls the amount of that padding proportional to the grid "
@@ -722,7 +725,7 @@ namespace img_aligner
         );
 
         if (ImGui::InputScalar(
-            "Intermediate Resolution#Controls",
+            "Intermediate Resolution##Controls",
             ImGuiDataType_U32,
             &grid_warp_params.intermediate_res_smallest_axis
         ))
@@ -733,7 +736,7 @@ namespace img_aligner
                 (uint32_t)16384
             );
         }
-        ImGui::SetItemTooltip(
+        imgui_tooltip(
             "The images are temporarily downsampled throughout the "
             "optimization process to improve computation speed. This value "
             "defines the maximum intermediate image resolution in the smallest "
@@ -758,10 +761,10 @@ namespace img_aligner
                     float v = ((float)y + .5f) / (float)test_image_height;
 
                     uint32_t red_idx = (x + y * test_image_width) * 4;
-                    test_image_data[red_idx + 0] = u;
-                    test_image_data[red_idx + 1] = v;
+                    test_image_data[red_idx + 0] = std::pow(u, 1.f / 2.2f);
+                    test_image_data[red_idx + 1] = std::pow(v, 1.f / 2.2f);
                     test_image_data[red_idx + 2] =
-                        std::cos(10.f * v) * .05f + .05f;
+                        std::pow(std::cos(30.f * u) * .1f + .1f, 1.f / 2.2f);
                     test_image_data[red_idx + 3] = 1.f;
                 }
             }
@@ -776,8 +779,15 @@ namespace img_aligner
 
             grid_warper = std::make_unique<grid_warp::GridWarper>(
                 state,
-                grid_warp_params
+                grid_warp_params,
+                0
             );
+
+            grid_warper->run_grid_warp_pass(false, 0);
+            grid_warper->run_difference_pass(0);
+
+            grid_warper->ui_pass_selected_ds = grid_warper->ui_pass_ds_base_img;
+            grid_warper->run_ui_pass(0);
         }
 
         ImGui::End();
@@ -896,6 +906,9 @@ namespace img_aligner
         // reload style and apply scale
         setup_imgui_style();
         ImGui::GetStyle().ScaleAllSizes(state.ui_scale);
+
+        ImGui::GetStyle().HoverDelayNormal = .65f;
+        ImGui::GetStyle().HoverStationaryDelay = .2f;
     }
 
     void App::imgui_div()
@@ -947,6 +960,19 @@ namespace img_aligner
             nullptr,
             active_combo_list.size()
         );
+    }
+
+    void App::imgui_tooltip(std::string_view s)
+    {
+        if (!ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+            return;
+
+        ImGui::SetNextWindowContentSize({ 400.f * state.ui_scale, 0.f });
+        if (!ImGui::BeginTooltip())
+            return;
+
+        ImGui::TextWrapped(s.data());
+        ImGui::EndTooltip();
     }
 
     void App::render_frame(ImDrawData* draw_data)

@@ -51,6 +51,7 @@ namespace img_aligner
             int* selected_idx,
             bool full_width
         );
+        void imgui_tooltip(std::string_view s);
 
         void render_frame(ImDrawData* draw_data);
         void present_frame();
