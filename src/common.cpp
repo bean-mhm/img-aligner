@@ -125,7 +125,7 @@ namespace img_aligner
         {
             state.queue->wait_idle();
         }
-        
+
         cmd_buf = nullptr;
     }
 
@@ -424,9 +424,17 @@ namespace img_aligner
             vkCmdBlitImage(
                 cmd_buf->handle(),
                 image->handle(),
-                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+
+                use_general_layout
+                ? VK_IMAGE_LAYOUT_GENERAL
+                : VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+
                 image->handle(),
-                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+
+                use_general_layout
+                ? VK_IMAGE_LAYOUT_GENERAL
+                : VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+
                 1,
                 &blit,
                 VK_FILTER_LINEAR

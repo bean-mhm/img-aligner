@@ -191,6 +191,7 @@ namespace img_aligner::grid_warp
         difference_img = nullptr;
         difference_img_mem = nullptr;
         difference_imgview = nullptr;
+        difference_imgview_first_mip = nullptr;
 
         ui_img = nullptr;
         ui_img_mem = nullptr;
@@ -297,9 +298,9 @@ namespace img_aligner::grid_warp
 
             std::vector<uint32_t> indices;
             indices.reserve(n_triangle_vertices);
-            for (int32_t y = 0; y < padded_grid_res_y; y++)
+            for (int32_t y = 0; y < (int32_t)padded_grid_res_y; y++)
             {
-                for (int32_t x = 0; x < padded_grid_res_x; x++)
+                for (int32_t x = 0; x < (int32_t)padded_grid_res_x; x++)
                 {
                     // index of bottom left, bottom right, top left and top
                     // right vertices
@@ -375,9 +376,9 @@ namespace img_aligner::grid_warp
         int32_t horizontal_pad = (int32_t)(padded_grid_res_x - grid_res_x) / 2;
         int32_t vertical_pad = (int32_t)(padded_grid_res_y - grid_res_y) / 2;
 
-        for (int32_t y = 0; y <= padded_grid_res_y; y++)
+        for (int32_t y = 0; y <= (int32_t)padded_grid_res_y; y++)
         {
-            for (int32_t x = 0; x <= padded_grid_res_x; x++)
+            for (int32_t x = 0; x <= (int32_t)padded_grid_res_x; x++)
             {
                 // remove the offset caused by padding
                 int32_t ax = x - horizontal_pad;
@@ -623,7 +624,7 @@ namespace img_aligner::grid_warp
             VK_IMAGE_TILING_OPTIMAL,
 
             VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
-            | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+            | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
             difference_img,
@@ -635,6 +636,13 @@ namespace img_aligner::grid_warp
             R_FORMAT,
             VK_IMAGE_ASPECT_COLOR_BIT,
             difference_mip_levels
+        );
+        difference_imgview_first_mip = create_image_view(
+            state,
+            difference_img,
+            R_FORMAT,
+            VK_IMAGE_ASPECT_COLOR_BIT,
+            1
         );
         transition_image_layout(
             cmd_buf,
@@ -677,12 +685,6 @@ namespace img_aligner::grid_warp
             VK_ACCESS_SHADER_READ_BIT
         );
 
-        // end, submit, and wait for the command buffer
-        end_single_time_commands(state, cmd_buf, true);
-
-        staging_buf = nullptr;
-        staging_buf_mem = nullptr;
-
         // UI-specific
         if (will_display_images_in_ui)
         {
@@ -698,7 +700,10 @@ namespace img_aligner::grid_warp
                 VK_SAMPLE_COUNT_1_BIT,
                 UI_FORMAT,
                 VK_IMAGE_TILING_OPTIMAL,
-                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+
+                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
+                | VK_IMAGE_USAGE_SAMPLED_BIT,
+
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
                 ui_img,
                 ui_img_mem
@@ -726,6 +731,12 @@ namespace img_aligner::grid_warp
                 VK_IMAGE_LAYOUT_GENERAL
             );
         }
+
+        // end, submit, and wait for the command buffer
+        end_single_time_commands(state, cmd_buf, true);
+
+        staging_buf = nullptr;
+        staging_buf_mem = nullptr;
     }
 
     void GridWarper::create_avg_difference_buffer()
@@ -1258,7 +1269,7 @@ namespace img_aligner::grid_warp
             bv::FramebufferConfig{
                 .flags = 0,
                 .render_pass = dfp_render_pass,
-                .attachments = { difference_imgview },
+                .attachments = { difference_imgview_first_mip },
                 .width = difference_img->config().extent.width,
                 .height = difference_img->config().extent.height,
                 .layers = 1
@@ -1288,8 +1299,8 @@ namespace img_aligner::grid_warp
             bv::Viewport viewport{
                 .x = 0.f,
                 .y = 0.f,
-                .width = (float)difference_img->config().extent.width,
-                .height = (float)difference_img->config().extent.height,
+                .width = (float)dfp_framebuf->config().width,
+                .height = (float)dfp_framebuf->config().height,
                 .min_depth = 0.f,
                 .max_depth = 1.f
             };
@@ -1297,8 +1308,8 @@ namespace img_aligner::grid_warp
             bv::Rect2d scissor{
                 .offset = { 0, 0 },
                 .extent = {
-                    difference_img->config().extent.width,
-                    difference_img->config().extent.height
+                    dfp_framebuf->config().width,
+                    dfp_framebuf->config().height
                 }
             };
 
@@ -1557,8 +1568,8 @@ namespace img_aligner::grid_warp
             bv::Viewport viewport{
                 .x = 0.f,
                 .y = 0.f,
-                .width = (float)ui_img->config().extent.width,
-                .height = (float)ui_img->config().extent.height,
+                .width = (float)uip_framebuf->config().width,
+                .height = (float)uip_framebuf->config().height,
                 .min_depth = 0.f,
                 .max_depth = 1.f
             };
@@ -1566,8 +1577,8 @@ namespace img_aligner::grid_warp
             bv::Rect2d scissor{
                 .offset = { 0, 0 },
                 .extent = {
-                    ui_img->config().extent.width,
-                    ui_img->config().extent.height
+                    uip_framebuf->config().width,
+                    uip_framebuf->config().height
                 }
             };
 
@@ -1850,25 +1861,6 @@ namespace img_aligner::grid_warp
             dfp_graphics_pipeline->handle()
         );
 
-        VkViewport viewport{
-            .x = 0.f,
-            .y = 0.f,
-            .width = (float)dfp_framebuf->config().width,
-            .height = (float)dfp_framebuf->config().height,
-            .minDepth = 0.f,
-            .maxDepth = 1.f
-        };
-        vkCmdSetViewport(cmd_buf->handle(), 0, 1, &viewport);
-
-        VkRect2D scissor{
-            .offset = { 0, 0 },
-            .extent = {
-                dfp_framebuf->config().width,
-                dfp_framebuf->config().height
-            }
-        };
-        vkCmdSetScissor(cmd_buf->handle(), 0, 1, &scissor);
-
         auto vk_descriptor_set = dfp_descriptor_set->handle();
         vkCmdBindDescriptorSets(
             cmd_buf->handle(),
@@ -2010,25 +2002,6 @@ namespace img_aligner::grid_warp
             VK_PIPELINE_BIND_POINT_GRAPHICS,
             uip_graphics_pipeline->handle()
         );
-
-        VkViewport viewport{
-            .x = 0.f,
-            .y = 0.f,
-            .width = (float)uip_framebuf->config().width,
-            .height = (float)uip_framebuf->config().height,
-            .minDepth = 0.f,
-            .maxDepth = 1.f
-        };
-        vkCmdSetViewport(cmd_buf->handle(), 0, 1, &viewport);
-
-        VkRect2D scissor{
-            .offset = { 0, 0 },
-            .extent = {
-                uip_framebuf->config().width,
-                uip_framebuf->config().height
-            }
-        };
-        vkCmdSetScissor(cmd_buf->handle(), 0, 1, &scissor);
 
         auto vk_descriptor_set = descriptor_set->handle();
         vkCmdBindDescriptorSets(

@@ -192,6 +192,7 @@ namespace img_aligner::grid_warp
         bv::ImagePtr difference_img = nullptr;
         bv::MemoryChunkPtr difference_img_mem = nullptr;
         bv::ImageViewPtr difference_imgview = nullptr;
+        bv::ImageViewPtr difference_imgview_first_mip = nullptr;
 
         // the UI image. whenever we wanna display any of the images, we'll
         // render it to this image while also applying the sRGB OETF.
