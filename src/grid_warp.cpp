@@ -139,6 +139,7 @@ namespace img_aligner::grid_warp
         if (ui_img_ds_imgui != nullptr)
             ImGui_ImplVulkan_RemoveTexture(ui_img_ds_imgui);
 
+        uip_fence = nullptr;
         uip_graphics_pipeline = nullptr;
         uip_pipeline_layout = nullptr;
         uip_framebuf = nullptr;
@@ -147,6 +148,7 @@ namespace img_aligner::grid_warp
         uip_descriptor_pool = nullptr;
         uip_descriptor_set_layout = nullptr;
 
+        dfp_fence = nullptr;
         dfp_graphics_pipeline = nullptr;
         dfp_pipeline_layout = nullptr;
         dfp_framebuf = nullptr;
@@ -156,6 +158,7 @@ namespace img_aligner::grid_warp
         dfp_descriptor_pool = nullptr;
         dfp_descriptor_set_layout = nullptr;
 
+        gwp_fence = nullptr;
         gwp_graphics_pipeline = nullptr;
         gwp_pipeline_layout = nullptr;
         gwp_framebuf = nullptr;
@@ -205,34 +208,22 @@ namespace img_aligner::grid_warp
 
     void GridWarper::run_grid_warp_pass(bool hires, size_t thread_idx)
     {
-        static bv::FencePtr fence = nullptr;
-        if (!fence)
-        {
-            fence = bv::Fence::create(state.device, 0);
-        }
-
         auto cmd_buf = create_grid_warp_pass_cmd_buf(hires, thread_idx);
         {
             std::scoped_lock lock(state.queue_mutex);
-            state.queue->submit({}, {}, { cmd_buf }, {}, fence);
+            state.queue->submit({}, {}, { cmd_buf }, {}, gwp_fence);
         }
-        fence->wait();
+        gwp_fence->wait();
     }
 
     float GridWarper::run_difference_pass(size_t thread_idx)
     {
-        static bv::FencePtr fence = nullptr;
-        if (!fence)
-        {
-            fence = bv::Fence::create(state.device, 0);
-        }
-
         auto cmd_buf = create_difference_pass_cmd_buf(thread_idx);
         {
             std::scoped_lock lock(state.queue_mutex);
-            state.queue->submit({}, {}, { cmd_buf }, {}, fence);
+            state.queue->submit({}, {}, { cmd_buf }, {}, dfp_fence);
         }
-        fence->wait();
+        dfp_fence->wait();
 
         return *avg_difference_buf_mapped;
     }
@@ -251,18 +242,12 @@ namespace img_aligner::grid_warp
             );
         }
 
-        static bv::FencePtr fence = nullptr;
-        if (!fence)
-        {
-            fence = bv::Fence::create(state.device, 0);
-        }
-
         auto cmd_buf = create_ui_pass_cmd_buf(ui_pass_selected_ds, thread_idx);
         {
             std::scoped_lock lock(state.queue_mutex);
-            state.queue->submit({}, {}, { cmd_buf }, {}, fence);
+            state.queue->submit({}, {}, { cmd_buf }, {}, uip_fence);
         }
-        fence->wait();
+        uip_fence->wait();
     }
 
     void GridWarper::create_vertex_and_index_buffer_and_generate_vertices(
@@ -890,7 +875,7 @@ namespace img_aligner::grid_warp
 
         // grid warp pass: descriptor set
         {
-            gwp_descriptor_set = gwp_descriptor_pool->allocate_set(
+            gwp_descriptor_set = bv::DescriptorPool::allocate_set(
                 gwp_descriptor_pool,
                 gwp_descriptor_set_layout
             );
@@ -1122,6 +1107,9 @@ namespace img_aligner::grid_warp
             );
         }
 
+        // grid warp pass: fence
+        gwp_fence = bv::Fence::create(state.device, 0);
+
         // difference pass: descriptor set layout
         {
             bv::DescriptorSetLayoutBinding binding_warped_img{
@@ -1169,7 +1157,7 @@ namespace img_aligner::grid_warp
 
         // difference pass: descriptor set
         {
-            dfp_descriptor_set = dfp_descriptor_pool->allocate_set(
+            dfp_descriptor_set = bv::DescriptorPool::allocate_set(
                 dfp_descriptor_pool,
                 dfp_descriptor_set_layout
             );
@@ -1404,6 +1392,9 @@ namespace img_aligner::grid_warp
                 }
             );
         }
+
+        // difference pass: fence
+        dfp_fence = bv::Fence::create(state.device, 0);
 
         // UI pass: descriptor set layout
         if (will_display_images_in_ui)
@@ -1673,6 +1664,9 @@ namespace img_aligner::grid_warp
                 }
             );
         }
+
+        // UI pass: fence
+        uip_fence = bv::Fence::create(state.device, 0);
     }
 
     void GridWarper::create_ui_pass_descriptor_set(
@@ -1681,7 +1675,7 @@ namespace img_aligner::grid_warp
         bv::DescriptorSetPtr& out_descriptor_set
     )
     {
-        out_descriptor_set = uip_descriptor_pool->allocate_set(
+        out_descriptor_set = bv::DescriptorPool::allocate_set(
             uip_descriptor_pool,
             uip_descriptor_set_layout
         );

@@ -236,6 +236,7 @@ namespace img_aligner::grid_warp
         bv::PipelineLayoutPtr gwp_pipeline_layout = nullptr;
         bv::GraphicsPipelinePtr gwp_graphics_pipeline = nullptr;
         GridWarpPassFragPushConstants gwp_frag_push_constants;
+        bv::FencePtr gwp_fence = nullptr;
 
         // difference pass: descriptor stuff
         bv::DescriptorSetLayoutPtr dfp_descriptor_set_layout = nullptr;
@@ -248,6 +249,7 @@ namespace img_aligner::grid_warp
         bv::PipelineLayoutPtr dfp_pipeline_layout = nullptr;
         bv::GraphicsPipelinePtr dfp_graphics_pipeline = nullptr;
         DifferencePassFragPushConstants dfp_frag_push_constants;
+        bv::FencePtr dfp_fence = nullptr;
 
         // UI pass: descriptor stuff
         bv::DescriptorSetLayoutPtr uip_descriptor_set_layout = nullptr;
@@ -259,6 +261,7 @@ namespace img_aligner::grid_warp
         bv::PipelineLayoutPtr uip_pipeline_layout = nullptr;
         bv::GraphicsPipelinePtr uip_graphics_pipeline = nullptr;
         UiPassFragPushConstants uip_frag_push_constants;
+        bv::FencePtr uip_fence = nullptr;
 
     };
 
