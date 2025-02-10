@@ -99,10 +99,14 @@ namespace img_aligner
             ImGui::DockSpaceOverViewport();
 
             // UI layout
+            // the ordering of these functions matters because layout_controls()
+            // might recreate the grid warper and consequently the UI image
+            // descriptor set that's used in ImGui::Image() so
+            // layout_image_viewer() should be called after layout_controls().
             ImGui::PushFont(state.font);
-            layout_image_viewer();
-            layout_misc();
             layout_controls();
+            layout_misc();
+            layout_image_viewer();
             ImGui::PopFont();
 
             // render
