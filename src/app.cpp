@@ -126,6 +126,8 @@ namespace img_aligner
 
     void App::cleanup()
     {
+        grid_warper = nullptr;
+
         state.device->wait_idle();
 
         ImGui_ImplVulkan_Shutdown();
