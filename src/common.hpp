@@ -78,7 +78,10 @@ namespace img_aligner
         float ui_scale = 1.f;
         bool ui_scale_updated = false;
 
+        int selected_image_idx = 0;
         float image_viewer_zoom = 1.f;
+        float image_viewer_exposure = 0.f;
+        bool image_viewer_use_flim = false;
 
         bv::ContextPtr context = nullptr;
         bv::DebugMessengerPtr debug_messenger = nullptr;

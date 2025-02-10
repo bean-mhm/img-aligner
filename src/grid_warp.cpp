@@ -128,16 +128,10 @@ namespace img_aligner::grid_warp
 
     GridWarper::~GridWarper()
     {
-        ui_pass_selected_ds = nullptr;
+        if (_ui_img_ds_for_imgui != nullptr)
+            ImGui_ImplVulkan_RemoveTexture(_ui_img_ds_for_imgui);
 
-        ui_pass_ds_base_img = nullptr;
-        ui_pass_ds_target_img = nullptr;
-        ui_pass_ds_warped_img = nullptr;
-        ui_pass_ds_warped_hires_img = nullptr;
-        ui_pass_ds_difference_img = nullptr;
-
-        if (ui_img_ds_imgui != nullptr)
-            ImGui_ImplVulkan_RemoveTexture(ui_img_ds_imgui);
+        _ui_image_infos.clear();
 
         uip_fence = nullptr;
         uip_graphics_pipeline = nullptr;
@@ -214,6 +208,7 @@ namespace img_aligner::grid_warp
             state.queue->submit({}, {}, { cmd_buf }, {}, gwp_fence);
         }
         gwp_fence->wait();
+        gwp_fence->reset();
     }
 
     float GridWarper::run_difference_pass(size_t thread_idx)
@@ -224,30 +219,46 @@ namespace img_aligner::grid_warp
             state.queue->submit({}, {}, { cmd_buf }, {}, dfp_fence);
         }
         dfp_fence->wait();
+        dfp_fence->reset();
 
         return *avg_difference_buf_mapped;
     }
 
-    void GridWarper::run_ui_pass(size_t thread_idx)
+    void GridWarper::run_ui_pass(
+        size_t ui_image_info_idx,
+        float exposure,
+        bool use_flim,
+        size_t thread_idx
+    )
     {
         if (!will_display_images_in_ui)
         {
             throw std::logic_error("can't run UI pass when it's disabled");
         }
 
-        if (!ui_pass_selected_ds)
+        if (ui_image_info_idx >= _ui_image_infos.size())
         {
-            throw std::invalid_argument(
-                "no descriptor set is selected for the UI pass"
-            );
+            throw std::invalid_argument("invalid index for the UI image info");
         }
 
-        auto cmd_buf = create_ui_pass_cmd_buf(ui_pass_selected_ds, thread_idx);
+        const auto& ui_image_info = _ui_image_infos[ui_image_info_idx];
+
+        uip_frag_push_constants.single_channel =
+            ui_image_info.single_channel ? 1 : 0;
+
+        uip_frag_push_constants.img_mul = std::exp2(exposure);
+        uip_frag_push_constants.use_flim = use_flim ? 1 : 0;
+
+        auto cmd_buf = create_ui_pass_cmd_buf(
+            ui_image_info.ui_pass_ds,
+            thread_idx
+        );
         {
             std::scoped_lock lock(state.queue_mutex);
             state.queue->submit({}, {}, { cmd_buf }, {}, uip_fence);
         }
         uip_fence->wait();
+        uip_fence->reset();
     }
 
     void GridWarper::create_vertex_and_index_buffer_and_generate_vertices(
@@ -708,9 +719,9 @@ namespace img_aligner::grid_warp
                 1
             );
 
-            // create descriptor set for ImGUI's Vulkan implementation to display
-            // the UI image
-            ui_img_ds_imgui = ImGui_ImplVulkan_AddTexture(
+            // create descriptor set for ImGUI's Vulkan implementation to
+            // display the UI image
+            _ui_img_ds_for_imgui = ImGui_ImplVulkan_AddTexture(
                 sampler->handle(),
                 ui_imgview->handle(),
                 VK_IMAGE_LAYOUT_GENERAL
@@ -1438,33 +1449,72 @@ namespace img_aligner::grid_warp
         // UI pass: descriptor sets
         if (will_display_images_in_ui)
         {
+            _ui_image_infos.push_back({
+                "Base Image",
+                base_img->config().extent.width,
+                base_img->config().extent.height,
+                false,
+                nullptr
+                });
             create_ui_pass_descriptor_set(
                 base_imgview,
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                ui_pass_ds_base_img
+                _ui_image_infos.back().ui_pass_ds
             );
+
+            _ui_image_infos.push_back({
+                "Target Image",
+                target_img->config().extent.width,
+                target_img->config().extent.height,
+                false,
+                nullptr
+                });
             create_ui_pass_descriptor_set(
                 target_imgview,
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                ui_pass_ds_target_img
+                _ui_image_infos.back().ui_pass_ds
             );
+
+            _ui_image_infos.push_back({
+                "Warped Image (Intermediate Resolution)",
+                warped_img->config().extent.width,
+                warped_img->config().extent.height,
+                false,
+                nullptr
+                });
             create_ui_pass_descriptor_set(
                 warped_imgview,
                 VK_IMAGE_LAYOUT_GENERAL,
-                ui_pass_ds_warped_img
+                _ui_image_infos.back().ui_pass_ds
             );
+
+            _ui_image_infos.push_back({
+                "Warped Image (Original Resolution)",
+                warped_hires_img->config().extent.width,
+                warped_hires_img->config().extent.height,
+                false,
+                nullptr
+                });
             create_ui_pass_descriptor_set(
                 warped_hires_imgview,
                 VK_IMAGE_LAYOUT_GENERAL,
-                ui_pass_ds_warped_hires_img
+                _ui_image_infos.back().ui_pass_ds
             );
+
+            // we only need the bottom left corner of the difference image which
+            // is a rectangle of the intermediate resolution.
+            _ui_image_infos.push_back({
+                "Difference Image",
+                warped_img->config().extent.width,
+                warped_img->config().extent.height,
+                true,
+                nullptr
+                });
             create_ui_pass_descriptor_set(
                 difference_imgview,
                 VK_IMAGE_LAYOUT_GENERAL,
-                ui_pass_ds_difference_img
+                _ui_image_infos.back().ui_pass_ds
             );
-
-            ui_pass_selected_ds = ui_pass_ds_base_img;
         }
 
         // UI pass: render pass

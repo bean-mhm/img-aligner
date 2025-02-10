@@ -35,9 +35,9 @@ namespace img_aligner
         void init_imgui_vk_window_data();
         void init_imgui();
 
-        void layout_image_viewer();
-        void layout_misc();
         void layout_controls();
+        void layout_misc();
+        void layout_image_viewer();
 
         void setup_imgui_style();
         void update_ui_scale_reload_fonts_and_style();
@@ -55,6 +55,8 @@ namespace img_aligner
 
         void render_frame(ImDrawData* draw_data);
         void present_frame();
+
+        void update_grid_warper_ui_image();
 
     };
 

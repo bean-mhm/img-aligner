@@ -4,6 +4,7 @@
 layout(push_constant, std430) uniform pc {
     layout(offset = 0) float img_mul;
     layout(offset = 4) int use_flim;
+    layout(offset = 8) int single_channel;
 };
 
 // uniforms
@@ -655,6 +656,12 @@ void main()
 
     // eliminae negative values
     out_col.rgb = max(out_col.rgb, 0.);
+
+    if (single_channel == 1)
+    {
+        out_col.rgb = vec3(out_col.r);
+        out_col.a = 1.;
+    }
 
     // flim
     if (use_flim == 1)

@@ -36,6 +36,7 @@ namespace img_aligner::grid_warp
     {
         float img_mul = 1.f;
         int32_t use_flim = 0;
+        int32_t single_channel = 0;
     };
 
     struct Params
@@ -48,6 +49,19 @@ namespace img_aligner::grid_warp
         float grid_padding = .25f;
         uint32_t intermediate_res_smallest_axis = 800;
         bool will_display_images_in_ui = false;
+    };
+
+    // this is used in the UI to choose what image to display. the descriptor
+    // set is used in the UI pass.
+    struct UiImageInfo
+    {
+        std::string name = "";
+        uint32_t width = 1;
+        uint32_t height = 1;
+        bool single_channel = false;
+
+        // descriptor set to use with the UI pass
+        bv::DescriptorSetPtr ui_pass_ds = nullptr;
     };
 
     class GridWarper
@@ -73,28 +87,45 @@ namespace img_aligner::grid_warp
 
         // run the UI pass. this will render one of the images to ui_img. said
         // image can be selected by changing ui_pass_selected_ds.
-        void run_ui_pass(size_t thread_idx);
+        void run_ui_pass(
+            size_t ui_image_info_idx,
+            float exposure,
+            bool use_flim,
+            size_t thread_idx
+        );
 
-        // descriptor set for ImGUI's Vulkan implementation to display the UI
-        // image using ImGui::Image(). this will be nullptr if
-        // will_display_images_in_ui is false.
-        VkDescriptorSet ui_img_ds_imgui = nullptr;
+        constexpr const std::vector<UiImageInfo>& ui_image_infos() const
+        {
+            return _ui_image_infos;
+        }
 
-        // this defines which descriptor set we'll use for the next UI pass, and
-        // therefore which image will ultimately be displayed in the UI. the
-        // application is in charge of changing this to point to one of the
-        // UI pass desciptor sets below and then calling run_ui_pass() to update
-        // the UI image. after that, it can use ImGui::Image() with
-        // ui_img_ds_imgui to display the UI image.
-        bv::DescriptorSetPtr ui_pass_selected_ds = nullptr;
+        // descriptor set to use with ImGui::Image()
+        constexpr VkDescriptorSet ui_img_ds_for_imgui() const
+        {
+            if (!will_display_images_in_ui || _ui_img_ds_for_imgui == nullptr)
+            {
+                throw std::logic_error(
+                    "UI image descriptor set for ImGUI doesn't exist"
+                );
+            }
+            return _ui_img_ds_for_imgui;
+        }
 
-        // the application should set ui_pass_selected_ds to point to one of
-        // these descriptor sets to choose which image to display in the UI.
-        bv::DescriptorSetPtr ui_pass_ds_base_img = nullptr;
-        bv::DescriptorSetPtr ui_pass_ds_target_img = nullptr;
-        bv::DescriptorSetPtr ui_pass_ds_warped_img = nullptr;
-        bv::DescriptorSetPtr ui_pass_ds_warped_hires_img = nullptr;
-        bv::DescriptorSetPtr ui_pass_ds_difference_img = nullptr;
+        constexpr void ui_img_size(
+            uint32_t& out_width,
+            uint32_t& out_height
+        ) const
+        {
+            if (!will_display_images_in_ui || !ui_img)
+            {
+                throw std::logic_error(
+                    "can't get UI image size if UI mode is disabled or if UI "
+                    "image doesn't exist"
+                );
+            }
+            out_width = ui_img->config().extent.width;
+            out_height = ui_img->config().extent.height;
+        }
 
     private:
         void create_vertex_and_index_buffer_and_generate_vertices(
@@ -200,6 +231,11 @@ namespace img_aligner::grid_warp
         bv::MemoryChunkPtr ui_img_mem = nullptr;
         bv::ImageViewPtr ui_imgview = nullptr;
 
+        // descriptor set for ImGUI's Vulkan implementation to display the UI
+        // image using ImGui::Image(). this will be nullptr if
+        // will_display_images_in_ui is false.
+        VkDescriptorSet _ui_img_ds_for_imgui = nullptr;
+
         // the average difference buffer is a host-visible buffer into which we
         // copy the last mip level of the difference image which contains a
         // single float value representing the average difference (error)
@@ -262,6 +298,9 @@ namespace img_aligner::grid_warp
         bv::GraphicsPipelinePtr uip_graphics_pipeline = nullptr;
         UiPassFragPushConstants uip_frag_push_constants;
         bv::FencePtr uip_fence = nullptr;
+
+        // descriptor sets for the UI pass
+        std::vector<UiImageInfo> _ui_image_infos;
 
     };
 

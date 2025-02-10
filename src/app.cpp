@@ -586,97 +586,6 @@ namespace img_aligner
         update_ui_scale_reload_fonts_and_style();
     }
 
-    void App::layout_image_viewer()
-    {
-        ImGui::Begin("Image Viewer", 0, ImGuiWindowFlags_HorizontalScrollbar);
-
-        const uint32_t img_width = 1920;
-        const uint32_t img_height = 1080;
-
-        // image selector
-        // TODO: use a combo
-        ImGui::PushFont(state.font_bold);
-        ImGui::Text("Base Image");
-        ImGui::PopFont();
-
-        // image size
-        ImGui::Text("%dx%d", img_width, img_height);
-
-        imgui_horiz_div();
-
-        // zoom
-        {
-            ImGui::SameLine();
-            ImGui::SetNextItemWidth(70.f * state.ui_scale);
-            ImGui::DragFloat(
-                "##image_zoom",
-                &state.image_viewer_zoom,
-                .005f,
-                .1f,
-                2.f,
-                "%.2f",
-                ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat
-            );
-
-            ImGui::SameLine();
-            if (ImGui::SmallButton("R##image_viewer"))
-            {
-                state.image_viewer_zoom = 1.f;
-            }
-        }
-
-        // image
-        if (grid_warper != nullptr)
-        {
-            ImGui::Image(
-                (ImTextureID)grid_warper->ui_img_ds_imgui,
-                ImVec2(
-                    (float)img_width * state.image_viewer_zoom,
-                    (float)img_height * state.image_viewer_zoom
-                ),
-                { 0, 1 },
-                { 1, 0 },
-                { 1, 1, 1, 1 },
-                COLOR_IMAGE_BORDER
-            );
-        }
-
-        ImGui::End();
-    }
-
-    void App::layout_misc()
-    {
-        ImGui::Begin("Misc");
-
-        imgui_bold("INTERFACE");
-
-        if (ImGui::InputFloat(
-            "Scale##Misc", &state.ui_scale, .125f, .25f, "%.3f"
-        ))
-        {
-            state.ui_scale = std::clamp(state.ui_scale, .75f, 2.f);
-            state.ui_scale_updated = true;
-        }
-
-        imgui_div();
-        imgui_bold("INFO");
-
-        // version
-        ImGui::TextWrapped(std::format(
-            "{} v{}",
-            APP_TITLE,
-            APP_VERSION
-        ).c_str());
-
-        // GitHub
-        if (ImGui::Button("GitHub##Misc"))
-        {
-            open_url(APP_GITHUB_URL);
-        }
-
-        ImGui::End();
-    }
-
     void App::layout_controls()
     {
         ImGui::Begin("Controls");
@@ -693,6 +602,7 @@ namespace img_aligner
             std::cout << "load target\n";
         }
 
+        imgui_div();
         imgui_bold("OPTIMIZATION");
 
         if (ImGui::InputScalar(
@@ -792,9 +702,165 @@ namespace img_aligner
             grid_warper->run_grid_warp_pass(false, 0);
             grid_warper->run_difference_pass(0);
 
-            grid_warper->ui_pass_selected_ds = grid_warper->ui_pass_ds_base_img;
-            grid_warper->run_ui_pass(0);
+            state.selected_image_idx = 0;
+            update_grid_warper_ui_image();
         }
+
+        ImGui::End();
+    }
+
+    void App::layout_misc()
+    {
+        ImGui::Begin("Misc");
+
+        imgui_bold("INTERFACE");
+
+        if (ImGui::InputFloat(
+            "Scale##Misc", &state.ui_scale, .125f, .25f, "%.3f"
+        ))
+        {
+            state.ui_scale = std::clamp(state.ui_scale, .75f, 2.f);
+            state.ui_scale_updated = true;
+        }
+
+        imgui_div();
+        imgui_bold("INFO");
+
+        // version
+        ImGui::TextWrapped(std::format(
+            "{} v{}",
+            APP_TITLE,
+            APP_VERSION
+        ).c_str());
+
+        // GitHub
+        if (ImGui::Button("GitHub##Misc"))
+        {
+            open_url(APP_GITHUB_URL);
+        }
+
+        ImGui::End();
+    }
+
+    void App::layout_image_viewer()
+    {
+        ImGui::Begin("Image Viewer", 0, ImGuiWindowFlags_HorizontalScrollbar);
+
+        if (!grid_warper)
+        {
+            ImGui::End();
+            return;
+        }
+
+        // image selector
+        std::vector<std::string> image_names;
+        for (const auto& ui_image_info : grid_warper->ui_image_infos())
+        {
+            image_names.push_back(ui_image_info.name);
+        }
+        if (imgui_combo(
+            "##image_selector",
+            image_names,
+            &state.selected_image_idx,
+            false
+        ))
+        {
+            update_grid_warper_ui_image();
+        }
+
+        const auto& sel_img_info =
+            grid_warper->ui_image_infos()[state.selected_image_idx];
+
+        // image size
+        ImGui::Text("%ux%u", sel_img_info.width, sel_img_info.height);
+
+        imgui_horiz_div();
+
+        // zoom
+        {
+            ImGui::SameLine();
+            ImGui::Text("Zoom");
+
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(70.f * state.ui_scale);
+            ImGui::DragFloat(
+                "##image_zoom",
+                &state.image_viewer_zoom,
+                .005f,
+                .1f,
+                3.f,
+                "%.2f",
+                ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat
+            );
+
+            ImGui::SameLine();
+            if (ImGui::Button("R##image_zoom_reset"))
+            {
+                state.image_viewer_zoom = 1.f;
+            }
+        }
+
+        imgui_horiz_div();
+
+        // exposure
+        {
+            ImGui::SameLine();
+            ImGui::Text("Exposure");
+
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(70.f * state.ui_scale);
+            if (ImGui::DragFloat(
+                "##image_exposure",
+                &state.image_viewer_exposure,
+                .05f,
+                -10.f,
+                10.f,
+                "%.2f",
+                ImGuiSliderFlags_NoRoundToFormat
+            ))
+            {
+                update_grid_warper_ui_image();
+            }
+
+            ImGui::SameLine();
+            if (ImGui::Button("R##image_exposure_reset"))
+            {
+                state.image_viewer_exposure = 0.f;
+                update_grid_warper_ui_image();
+            }
+        }
+
+        imgui_horiz_div();
+
+        // use flim
+        ImGui::SameLine();
+        if (ImGui::Checkbox("flim", &state.image_viewer_use_flim))
+        {
+            update_grid_warper_ui_image();
+        }
+
+        ImGui::NewLine();
+
+        // image
+        uint32_t ui_img_width = 1, ui_img_height = 1;
+        grid_warper->ui_img_size(ui_img_width, ui_img_height);
+        ImGui::Image(
+            (ImTextureID)grid_warper->ui_img_ds_for_imgui(),
+            ImVec2(
+                (float)sel_img_info.width * state.image_viewer_zoom,
+                (float)sel_img_info.height * state.image_viewer_zoom
+            ),
+            {
+                0,
+                (float)sel_img_info.height / (float)ui_img_height
+            },
+            {
+                (float)sel_img_info.width / (float)ui_img_width,
+                0
+            },
+            { 1, 1, 1, 1 },
+            COLOR_IMAGE_BORDER
+        );
 
         ImGui::End();
     }
@@ -1197,6 +1263,16 @@ namespace img_aligner
 
         window_data.SemaphoreIndex =
             (window_data.SemaphoreIndex + 1) % window_data.SemaphoreCount;
+    }
+
+    void App::update_grid_warper_ui_image()
+    {
+        grid_warper->run_ui_pass(
+            state.selected_image_idx,
+            state.image_viewer_exposure,
+            state.image_viewer_use_flim,
+            0
+        );
     }
 
     static void glfw_error_callback(int error, const char* description)
