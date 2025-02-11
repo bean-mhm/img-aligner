@@ -40,8 +40,7 @@ namespace img_aligner::grid_warp
     )
         : state(state),
         img_width(params.img_width),
-        img_height(params.img_height),
-        will_display_images_in_ui(params.will_display_images_in_ui)
+        img_height(params.img_height)
     {
         if (img_width < 1 || img_height < 1)
         {
@@ -128,20 +127,6 @@ namespace img_aligner::grid_warp
 
     GridWarper::~GridWarper()
     {
-        if (_ui_img_ds_for_imgui != nullptr)
-            ImGui_ImplVulkan_RemoveTexture(_ui_img_ds_for_imgui);
-
-        _ui_image_infos.clear();
-
-        uip_fence = nullptr;
-        uip_graphics_pipeline = nullptr;
-        uip_pipeline_layout = nullptr;
-        uip_framebuf = nullptr;
-        uip_render_pass = nullptr;
-
-        uip_descriptor_pool = nullptr;
-        uip_descriptor_set_layout = nullptr;
-
         dfp_fence = nullptr;
         dfp_graphics_pipeline = nullptr;
         dfp_pipeline_layout = nullptr;
@@ -190,10 +175,6 @@ namespace img_aligner::grid_warp
         difference_imgview = nullptr;
         difference_imgview_first_mip = nullptr;
 
-        ui_img = nullptr;
-        ui_img_mem = nullptr;
-        ui_imgview = nullptr;
-
         sampler = nullptr;
 
         avg_difference_buf = nullptr;
@@ -224,41 +205,54 @@ namespace img_aligner::grid_warp
         return *avg_difference_buf_mapped;
     }
 
-    void GridWarper::run_ui_pass(
-        size_t ui_image_info_idx,
-        float exposure,
-        bool use_flim,
-        size_t thread_idx
-    )
+    void GridWarper::add_images_to_ui_pass(UiPass& ui_pass)
     {
-        if (!will_display_images_in_ui)
-        {
-            throw std::logic_error("can't run UI pass when it's disabled");
-        }
-
-        if (ui_image_info_idx >= _ui_image_infos.size())
-        {
-            throw std::invalid_argument("invalid index for the UI image info");
-        }
-
-        const auto& ui_image_info = _ui_image_infos[ui_image_info_idx];
-
-        uip_frag_push_constants.single_channel =
-            ui_image_info.single_channel ? 1 : 0;
-
-        uip_frag_push_constants.img_mul = std::exp2(exposure);
-        uip_frag_push_constants.use_flim = use_flim ? 1 : 0;
-
-        auto cmd_buf = create_ui_pass_cmd_buf(
-            ui_image_info.ui_pass_ds,
-            thread_idx
+        ui_pass.add_image(
+            base_imgview,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            "Base Image",
+            base_img->config().extent.width,
+            base_img->config().extent.height,
+            false
         );
-        {
-            std::scoped_lock lock(state.queue_mutex);
-            state.queue->submit({}, {}, { cmd_buf }, {}, uip_fence);
-        }
-        uip_fence->wait();
-        uip_fence->reset();
+
+        ui_pass.add_image(
+            target_imgview,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            "Target Image",
+            target_img->config().extent.width,
+            target_img->config().extent.height,
+            false
+        );
+
+        ui_pass.add_image(
+            warped_imgview,
+            VK_IMAGE_LAYOUT_GENERAL,
+            "Warped Image (Intermediate Resolution)",
+            warped_img->config().extent.width,
+            warped_img->config().extent.height,
+            false
+        );
+
+        ui_pass.add_image(
+            warped_hires_imgview,
+            VK_IMAGE_LAYOUT_GENERAL,
+            "Warped Image (Original Resolution)",
+            warped_hires_img->config().extent.width,
+            warped_hires_img->config().extent.height,
+            false
+        );
+
+        // we only need the bottom left corner of the difference image which
+        // is a rectangle of the intermediate resolution.
+        ui_pass.add_image(
+            difference_imgview,
+            VK_IMAGE_LAYOUT_GENERAL,
+            "Difference Image",
+            warped_img->config().extent.width,
+            warped_img->config().extent.height,
+            true
+        );
     }
 
     void GridWarper::create_vertex_and_index_buffer_and_generate_vertices(
@@ -681,53 +675,6 @@ namespace img_aligner::grid_warp
             VK_ACCESS_SHADER_READ_BIT
         );
 
-        // UI-specific
-        if (will_display_images_in_ui)
-        {
-            // create the UI image which uses the original resolution with no
-            // mipmapping. images with different resolutions will just be
-            // rendered to the bottom-left corner at which we'll crop when
-            // providing UV coordinates to ImGUI.
-            create_image(
-                state,
-                img_width,
-                img_height,
-                1,
-                VK_SAMPLE_COUNT_1_BIT,
-                UI_FORMAT,
-                VK_IMAGE_TILING_OPTIMAL,
-
-                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
-                | VK_IMAGE_USAGE_SAMPLED_BIT,
-
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                ui_img,
-                ui_img_mem
-            );
-            ui_imgview = create_image_view(
-                state,
-                ui_img,
-                UI_FORMAT,
-                VK_IMAGE_ASPECT_COLOR_BIT,
-                1
-            );
-            transition_image_layout(
-                cmd_buf,
-                ui_img,
-                VK_IMAGE_LAYOUT_UNDEFINED,
-                VK_IMAGE_LAYOUT_GENERAL,
-                1
-            );
-
-            // create descriptor set for ImGUI's Vulkan implementation to
-            // display the UI image
-            _ui_img_ds_for_imgui = ImGui_ImplVulkan_AddTexture(
-                sampler->handle(),
-                ui_imgview->handle(),
-                VK_IMAGE_LAYOUT_GENERAL
-            );
-        }
-
         // end, submit, and wait for the command buffer
         end_single_time_commands(state, cmd_buf, true);
 
@@ -766,9 +713,6 @@ namespace img_aligner::grid_warp
 
         bv::ShaderModulePtr dfp_frag_shader_module = nullptr;
         bv::ShaderStage dfp_frag_shader_stage{};
-
-        bv::ShaderModulePtr uip_frag_shader_module = nullptr;
-        bv::ShaderStage uip_frag_shader_stage{};
 
         {
             std::vector<uint8_t> shader_code = read_file(
@@ -827,21 +771,6 @@ namespace img_aligner::grid_warp
                 .flags = {},
                 .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
                 .module = dfp_frag_shader_module,
-                .entry_point = "main",
-                .specialization_info = std::nullopt
-            };
-
-            shader_code = read_file(
-                "./shaders/ui_pass_frag.spv"
-            );
-            uip_frag_shader_module = bv::ShaderModule::create(
-                state.device,
-                std::move(shader_code)
-            );
-            uip_frag_shader_stage = bv::ShaderStage{
-                .flags = {},
-                .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-                .module = uip_frag_shader_module,
                 .entry_point = "main",
                 .specialization_info = std::nullopt
             };
@@ -1406,350 +1335,6 @@ namespace img_aligner::grid_warp
 
         // difference pass: fence
         dfp_fence = bv::Fence::create(state.device, 0);
-
-        // UI pass: descriptor set layout
-        if (will_display_images_in_ui)
-        {
-            bv::DescriptorSetLayoutBinding binding_img{
-                .binding = 0,
-                .descriptor_type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                .descriptor_count = 1,
-                .stage_flags = VK_SHADER_STAGE_FRAGMENT_BIT,
-                .immutable_samplers = { sampler }
-            };
-
-            uip_descriptor_set_layout = bv::DescriptorSetLayout::create(
-                state.device,
-                {
-                    .flags = 0,
-                    .bindings = { binding_img }
-                }
-            );
-        }
-
-        // UI pass: descriptor pool
-        if (will_display_images_in_ui)
-        {
-            // 1 image in every descriptor set * less than 16 sets in total
-            bv::DescriptorPoolSize image_pool_size{
-                .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                .descriptor_count = 16
-            };
-
-            uip_descriptor_pool = bv::DescriptorPool::create(
-                state.device,
-                {
-                    .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
-                    .max_sets = 16,
-                    .pool_sizes = { image_pool_size }
-                }
-            );
-        }
-
-        // UI pass: descriptor sets
-        if (will_display_images_in_ui)
-        {
-            _ui_image_infos.push_back({
-                "Base Image",
-                base_img->config().extent.width,
-                base_img->config().extent.height,
-                false,
-                nullptr
-                });
-            create_ui_pass_descriptor_set(
-                base_imgview,
-                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                _ui_image_infos.back().ui_pass_ds
-            );
-
-            _ui_image_infos.push_back({
-                "Target Image",
-                target_img->config().extent.width,
-                target_img->config().extent.height,
-                false,
-                nullptr
-                });
-            create_ui_pass_descriptor_set(
-                target_imgview,
-                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                _ui_image_infos.back().ui_pass_ds
-            );
-
-            _ui_image_infos.push_back({
-                "Warped Image (Intermediate Resolution)",
-                warped_img->config().extent.width,
-                warped_img->config().extent.height,
-                false,
-                nullptr
-                });
-            create_ui_pass_descriptor_set(
-                warped_imgview,
-                VK_IMAGE_LAYOUT_GENERAL,
-                _ui_image_infos.back().ui_pass_ds
-            );
-
-            _ui_image_infos.push_back({
-                "Warped Image (Original Resolution)",
-                warped_hires_img->config().extent.width,
-                warped_hires_img->config().extent.height,
-                false,
-                nullptr
-                });
-            create_ui_pass_descriptor_set(
-                warped_hires_imgview,
-                VK_IMAGE_LAYOUT_GENERAL,
-                _ui_image_infos.back().ui_pass_ds
-            );
-
-            // we only need the bottom left corner of the difference image which
-            // is a rectangle of the intermediate resolution.
-            _ui_image_infos.push_back({
-                "Difference Image",
-                warped_img->config().extent.width,
-                warped_img->config().extent.height,
-                true,
-                nullptr
-                });
-            create_ui_pass_descriptor_set(
-                difference_imgview,
-                VK_IMAGE_LAYOUT_GENERAL,
-                _ui_image_infos.back().ui_pass_ds
-            );
-        }
-
-        // UI pass: render pass
-        if (will_display_images_in_ui)
-        {
-            bv::Attachment color_attachment{
-                .flags = 0,
-                .format = UI_FORMAT,
-                .samples = VK_SAMPLE_COUNT_1_BIT,
-                .load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
-                .store_op = VK_ATTACHMENT_STORE_OP_STORE,
-                .stencil_load_op = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-                .stencil_store_op = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-                .initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
-                .final_layout = VK_IMAGE_LAYOUT_GENERAL
-            };
-
-            bv::AttachmentReference color_attachment_ref{
-                .attachment = 0,
-                .layout = VK_IMAGE_LAYOUT_GENERAL
-            };
-
-            bv::Subpass subpass{
-                .flags = 0,
-                .pipeline_bind_point = VK_PIPELINE_BIND_POINT_GRAPHICS,
-                .input_attachments = {},
-                .color_attachments = { color_attachment_ref },
-                .resolve_attachments = {},
-                .depth_stencil_attachment = std::nullopt,
-                .preserve_attachment_indices = {}
-            };
-
-            bv::SubpassDependency dependency{
-                .src_subpass = VK_SUBPASS_EXTERNAL,
-                .dst_subpass = 0,
-                .src_stage_mask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                .dst_stage_mask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                .src_access_mask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-                .dst_access_mask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-                .dependency_flags = 0
-            };
-
-            uip_render_pass = bv::RenderPass::create(
-                state.device,
-                bv::RenderPassConfig{
-                    .flags = 0,
-                    .attachments = { color_attachment },
-                    .subpasses = { subpass },
-                    .dependencies = { dependency }
-                }
-            );
-        }
-
-        // UI pass: framebuffer
-        if (will_display_images_in_ui)
-        {
-            uip_framebuf = bv::Framebuffer::create(
-                state.device,
-                bv::FramebufferConfig{
-                    .flags = 0,
-                    .render_pass = uip_render_pass,
-                    .attachments = { ui_imgview },
-                    .width = ui_img->config().extent.width,
-                    .height = ui_img->config().extent.height,
-                    .layers = 1
-                }
-            );
-        }
-
-        // UI pass: pipeline layout
-        if (will_display_images_in_ui)
-        {
-            bv::PushConstantRange frag_push_constant_range{
-                .stage_flags = VK_SHADER_STAGE_FRAGMENT_BIT,
-                .offset = 0,
-                .size = sizeof(UiPassFragPushConstants)
-            };
-
-            uip_pipeline_layout = bv::PipelineLayout::create(
-                state.device,
-                bv::PipelineLayoutConfig{
-                    .flags = 0,
-                    .set_layouts = { uip_descriptor_set_layout },
-                    .push_constant_ranges = { frag_push_constant_range }
-                }
-            );
-        }
-
-        // UI pass: graphics pipeline
-        if (will_display_images_in_ui)
-        {
-            bv::Viewport viewport{
-                .x = 0.f,
-                .y = 0.f,
-                .width = (float)uip_framebuf->config().width,
-                .height = (float)uip_framebuf->config().height,
-                .min_depth = 0.f,
-                .max_depth = 1.f
-            };
-
-            bv::Rect2d scissor{
-                .offset = { 0, 0 },
-                .extent = {
-                    uip_framebuf->config().width,
-                    uip_framebuf->config().height
-                }
-            };
-
-            bv::ViewportState viewport_state{
-                .viewports = { viewport },
-                .scissors = { scissor }
-            };
-
-            bv::RasterizationState rasterization_state{
-                .depth_clamp_enable = false,
-                .rasterizer_discard_enable = false,
-                .polygon_mode = VK_POLYGON_MODE_FILL,
-                .cull_mode = VK_CULL_MODE_BACK_BIT,
-                .front_face = VK_FRONT_FACE_CLOCKWISE,
-                .depth_bias_enable = false,
-                .depth_bias_constant_factor = 0.f,
-                .depth_bias_clamp = 0.f,
-                .depth_bias_slope_factor = 0.f,
-                .line_width = 1.f
-            };
-
-            bv::MultisampleState multisample_state{
-                .rasterization_samples = VK_SAMPLE_COUNT_1_BIT,
-                .sample_shading_enable = false,
-                .min_sample_shading = 1.f,
-                .sample_mask = {},
-                .alpha_to_coverage_enable = false,
-                .alpha_to_one_enable = false
-            };
-
-            bv::DepthStencilState depth_stencil_state{
-                .flags = 0,
-                .depth_test_enable = false,
-                .depth_write_enable = false,
-                .depth_compare_op = VK_COMPARE_OP_LESS,
-                .depth_bounds_test_enable = false,
-                .stencil_test_enable = false,
-                .front = {},
-                .back = {},
-                .min_depth_bounds = 0.f,
-                .max_depth_bounds = 1.f
-            };
-
-            bv::ColorBlendAttachment color_blend_attachment{
-                .blend_enable = false,
-                .src_color_blend_factor = VK_BLEND_FACTOR_ONE,
-                .dst_color_blend_factor = VK_BLEND_FACTOR_ZERO,
-                .color_blend_op = VK_BLEND_OP_ADD,
-                .src_alpha_blend_factor = VK_BLEND_FACTOR_ONE,
-                .dst_alpha_blend_factor = VK_BLEND_FACTOR_ZERO,
-                .alpha_blend_op = VK_BLEND_OP_ADD,
-                .color_write_mask =
-                VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
-                | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT
-            };
-
-            bv::ColorBlendState color_blend_state{
-                .flags = 0,
-                .logic_op_enable = false,
-                .logic_op = VK_LOGIC_OP_COPY,
-                .attachments = { color_blend_attachment },
-                .blend_constants = { 0.f, 0.f, 0.f, 0.f }
-            };
-
-            uip_graphics_pipeline = bv::GraphicsPipeline::create(
-                state.device,
-                bv::GraphicsPipelineConfig{
-                    .flags = 0,
-                    .stages = {
-                        fullscreen_quad_vert_shader_stage,
-                        uip_frag_shader_stage
-                    },
-                    .vertex_input_state = bv::VertexInputState{
-                        .binding_descriptions = {},
-                        .attribute_descriptions = {}
-                    },
-                    .input_assembly_state = bv::InputAssemblyState{
-                        .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-                        .primitive_restart_enable = false
-                    },
-                    .tessellation_state = std::nullopt,
-                    .viewport_state = viewport_state,
-                    .rasterization_state = rasterization_state,
-                    .multisample_state = multisample_state,
-                    .depth_stencil_state = depth_stencil_state,
-                    .color_blend_state = color_blend_state,
-                    .dynamic_states = {},
-                    .layout = uip_pipeline_layout,
-                    .render_pass = uip_render_pass,
-                    .subpass_index = 0,
-                    .base_pipeline = std::nullopt
-                }
-            );
-        }
-
-        // UI pass: fence
-        uip_fence = bv::Fence::create(state.device, 0);
-    }
-
-    void GridWarper::create_ui_pass_descriptor_set(
-        const bv::ImageViewPtr& image_view,
-        VkImageLayout image_layout,
-        bv::DescriptorSetPtr& out_descriptor_set
-    )
-    {
-        out_descriptor_set = bv::DescriptorPool::allocate_set(
-            uip_descriptor_pool,
-            uip_descriptor_set_layout
-        );
-
-        bv::DescriptorImageInfo img_info{
-            .sampler = sampler,
-            .image_view = image_view,
-            .image_layout = image_layout
-        };
-
-        std::vector<bv::WriteDescriptorSet> descriptor_writes;
-
-        descriptor_writes.push_back({
-            .dst_set = out_descriptor_set,
-            .dst_binding = 0,
-            .dst_array_element = 0,
-            .descriptor_count = 1,
-            .descriptor_type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .image_infos = { img_info },
-            .buffer_infos = {},
-            .texel_buffer_views = {}
-            });
-
-        bv::DescriptorSet::update_sets(state.device, descriptor_writes, {});
     }
 
     bv::CommandBufferPtr GridWarper::create_grid_warp_pass_cmd_buf(
@@ -2000,83 +1585,6 @@ namespace img_aligner::grid_warp
             1,
             &copy_region
         );
-
-        cmd_buf->end();
-
-        return cmd_buf;
-    }
-
-    bv::CommandBufferPtr GridWarper::create_ui_pass_cmd_buf(
-        const bv::DescriptorSetPtr& descriptor_set,
-        size_t thread_idx
-    )
-    {
-        bv::CommandBufferPtr cmd_buf = bv::CommandPool::allocate_buffer(
-            state.cmd_pools[thread_idx],
-            VK_COMMAND_BUFFER_LEVEL_PRIMARY
-        );
-        cmd_buf->begin(0);
-
-        VkClearValue clear_val{};
-        clear_val.color = { { 0.f, 0.f, 0.f, 0.f } };
-
-        VkRenderPassBeginInfo render_pass_info{
-            .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-            .pNext = nullptr,
-            .renderPass = uip_render_pass->handle(),
-            .framebuffer = uip_framebuf->handle(),
-            .renderArea = VkRect2D{
-                .offset = { 0, 0 },
-                .extent = {
-                    uip_framebuf->config().width,
-                    uip_framebuf->config().height
-                }
-            },
-            .clearValueCount = 1,
-            .pClearValues = &clear_val
-        };
-        vkCmdBeginRenderPass(
-            cmd_buf->handle(),
-            &render_pass_info,
-            VK_SUBPASS_CONTENTS_INLINE
-        );
-
-        vkCmdBindPipeline(
-            cmd_buf->handle(),
-            VK_PIPELINE_BIND_POINT_GRAPHICS,
-            uip_graphics_pipeline->handle()
-        );
-
-        auto vk_descriptor_set = descriptor_set->handle();
-        vkCmdBindDescriptorSets(
-            cmd_buf->handle(),
-            VK_PIPELINE_BIND_POINT_GRAPHICS,
-            uip_pipeline_layout->handle(),
-            0,
-            1,
-            &vk_descriptor_set,
-            0,
-            nullptr
-        );
-
-        vkCmdPushConstants(
-            cmd_buf->handle(),
-            uip_pipeline_layout->handle(),
-            VK_SHADER_STAGE_FRAGMENT_BIT,
-            0,
-            sizeof(UiPassFragPushConstants),
-            &uip_frag_push_constants
-        );
-
-        vkCmdDraw(
-            cmd_buf->handle(),
-            6,
-            1,
-            0,
-            0
-        );
-
-        vkCmdEndRenderPass(cmd_buf->handle());
 
         cmd_buf->end();
 

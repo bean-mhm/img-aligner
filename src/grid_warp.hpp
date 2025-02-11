@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common.hpp"
+#include "ui_pass.hpp"
 
 namespace img_aligner::grid_warp
 {
@@ -32,13 +33,6 @@ namespace img_aligner::grid_warp
         float target_img_mul = 1.f;
     };
 
-    struct UiPassFragPushConstants
-    {
-        float img_mul = 1.f;
-        int32_t use_flim = 0;
-        int32_t single_channel = 0;
-    };
-
     struct Params
     {
         uint32_t img_width = 1;
@@ -48,20 +42,6 @@ namespace img_aligner::grid_warp
         uint32_t grid_res_smallest_axis = 12;
         float grid_padding = .25f;
         uint32_t intermediate_res_smallest_axis = 800;
-        bool will_display_images_in_ui = false;
-    };
-
-    // this is used in the UI to choose what image to display. the descriptor
-    // set is used in the UI pass.
-    struct UiImageInfo
-    {
-        std::string name = "";
-        uint32_t width = 1;
-        uint32_t height = 1;
-        bool single_channel = false;
-
-        // descriptor set to use with the UI pass
-        bv::DescriptorSetPtr ui_pass_ds = nullptr;
     };
 
     class GridWarper
@@ -85,47 +65,7 @@ namespace img_aligner::grid_warp
         // resolution of a power of 2.
         float run_difference_pass(size_t thread_idx);
 
-        // run the UI pass. this will render one of the images to ui_img. said
-        // image can be selected by changing ui_pass_selected_ds.
-        void run_ui_pass(
-            size_t ui_image_info_idx,
-            float exposure,
-            bool use_flim,
-            size_t thread_idx
-        );
-
-        constexpr const std::vector<UiImageInfo>& ui_image_infos() const
-        {
-            return _ui_image_infos;
-        }
-
-        // descriptor set to use with ImGui::Image()
-        constexpr VkDescriptorSet ui_img_ds_for_imgui() const
-        {
-            if (!will_display_images_in_ui || _ui_img_ds_for_imgui == nullptr)
-            {
-                throw std::logic_error(
-                    "UI image descriptor set for ImGUI doesn't exist"
-                );
-            }
-            return _ui_img_ds_for_imgui;
-        }
-
-        constexpr void ui_img_size(
-            uint32_t& out_width,
-            uint32_t& out_height
-        ) const
-        {
-            if (!will_display_images_in_ui || !ui_img)
-            {
-                throw std::logic_error(
-                    "can't get UI image size if UI mode is disabled or if UI "
-                    "image doesn't exist"
-                );
-            }
-            out_width = ui_img->config().extent.width;
-            out_height = ui_img->config().extent.height;
-        }
+        void add_images_to_ui_pass(UiPass& ui_pass);
 
     private:
         void create_vertex_and_index_buffer_and_generate_vertices(
@@ -139,26 +79,15 @@ namespace img_aligner::grid_warp
         void create_avg_difference_buffer();
         void create_passes();
 
-        void create_ui_pass_descriptor_set(
-            const bv::ImageViewPtr& image_view,
-            VkImageLayout image_layout,
-            bv::DescriptorSetPtr& out_descriptor_set
-        );
-
         bv::CommandBufferPtr create_grid_warp_pass_cmd_buf(
             bool hires,
             size_t thread_idx
         );
         bv::CommandBufferPtr create_difference_pass_cmd_buf(size_t thread_idx);
-        bv::CommandBufferPtr create_ui_pass_cmd_buf(
-            const bv::DescriptorSetPtr& descriptor_set,
-            size_t thread_idx
-        );
 
     private:
         static constexpr VkFormat RGBA_FORMAT = VK_FORMAT_R32G32B32A32_SFLOAT;
         static constexpr VkFormat R_FORMAT = VK_FORMAT_R32_SFLOAT;
-        static constexpr VkFormat UI_FORMAT = VK_FORMAT_R16G16B16A16_SFLOAT;
 
         AppState& state;
 
@@ -173,8 +102,6 @@ namespace img_aligner::grid_warp
 
         uint32_t padded_grid_res_x = 1;
         uint32_t padded_grid_res_y = 1;
-
-        bool will_display_images_in_ui = false;
 
         // vertex buffer for the grid vertices, host-visible and host-coherent
         // because we'll keep moving the vertices in every iteration.
@@ -225,17 +152,6 @@ namespace img_aligner::grid_warp
         bv::ImageViewPtr difference_imgview = nullptr;
         bv::ImageViewPtr difference_imgview_first_mip = nullptr;
 
-        // the UI image. whenever we wanna display any of the images, we'll
-        // render it to this image while also applying the sRGB OETF.
-        bv::ImagePtr ui_img = nullptr;
-        bv::MemoryChunkPtr ui_img_mem = nullptr;
-        bv::ImageViewPtr ui_imgview = nullptr;
-
-        // descriptor set for ImGUI's Vulkan implementation to display the UI
-        // image using ImGui::Image(). this will be nullptr if
-        // will_display_images_in_ui is false.
-        VkDescriptorSet _ui_img_ds_for_imgui = nullptr;
-
         // the average difference buffer is a host-visible buffer into which we
         // copy the last mip level of the difference image which contains a
         // single float value representing the average difference (error)
@@ -244,7 +160,7 @@ namespace img_aligner::grid_warp
         bv::MemoryChunkPtr avg_difference_buf_mem = nullptr;
         float* avg_difference_buf_mapped = nullptr;
 
-        // NOTE: there are 3 types of passes:
+        // NOTE: there are 2 types of passes:
         // 1. grid warp pass
         //    - renders to warped_img or final_img (we make 2 framebuffers and
         //      use the appropriate one).
@@ -255,10 +171,6 @@ namespace img_aligner::grid_warp
         //    - samples warped_img and target_img
         //    - does not use a vertex buffer. instead, generates vertices for a
         //      "full-screen" quad in the vertex shader.
-        // 3. UI pass (for displaying the images)
-        //    - renders to ui_img
-        //    - samples any of the other images
-        //    - does not use a vertex buffer
 
         // grid warp pass: descriptor stuff
         bv::DescriptorSetLayoutPtr gwp_descriptor_set_layout = nullptr;
@@ -286,21 +198,6 @@ namespace img_aligner::grid_warp
         bv::GraphicsPipelinePtr dfp_graphics_pipeline = nullptr;
         DifferencePassFragPushConstants dfp_frag_push_constants;
         bv::FencePtr dfp_fence = nullptr;
-
-        // UI pass: descriptor stuff
-        bv::DescriptorSetLayoutPtr uip_descriptor_set_layout = nullptr;
-        bv::DescriptorPoolPtr uip_descriptor_pool = nullptr;
-
-        // UI pass
-        bv::RenderPassPtr uip_render_pass = nullptr;
-        bv::FramebufferPtr uip_framebuf = nullptr;
-        bv::PipelineLayoutPtr uip_pipeline_layout = nullptr;
-        bv::GraphicsPipelinePtr uip_graphics_pipeline = nullptr;
-        UiPassFragPushConstants uip_frag_push_constants;
-        bv::FencePtr uip_fence = nullptr;
-
-        // descriptor sets for the UI pass
-        std::vector<UiImageInfo> _ui_image_infos;
 
     };
 

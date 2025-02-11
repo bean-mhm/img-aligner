@@ -76,6 +76,13 @@ namespace img_aligner
                 );
                 state.imgui_vk_window_data.FrameIndex = 0;
                 state.imgui_swapchain_rebuild = false;
+
+                // the maximum number of frames in flight could change, so we
+                // recreate the UI pass just in case.
+                if (ui_pass != nullptr)
+                {
+                    recreate_ui_pass();
+                }
             }
 
             // sleep if window is iconified
@@ -86,9 +93,9 @@ namespace img_aligner
             }
 
             // update UI scale and reload fonts and style if needed
-            if (state.ui_scale_updated)
+            if (ui_scale_updated)
             {
-                state.ui_scale_updated = false;
+                ui_scale_updated = false;
                 update_ui_scale_reload_fonts_and_style();
             }
 
@@ -100,10 +107,10 @@ namespace img_aligner
 
             // UI layout
             // the ordering of these functions matters because layout_controls()
-            // might recreate the grid warper and consequently the UI image
-            // descriptor set that's used in ImGui::Image() so
-            // layout_image_viewer() should be called after layout_controls().
-            ImGui::PushFont(state.font);
+            // might recreate the UI pass and consequently the descriptor sets
+            // that are used in ImGui::Image() so layout_image_viewer() should
+            // be called after layout_controls().
+            ImGui::PushFont(font);
             layout_controls();
             layout_misc();
             layout_image_viewer();
@@ -330,14 +337,6 @@ namespace img_aligner
                 );
             }
             catch (const bv::Error&)
-            {
-                continue;
-            }
-
-            // make sure the desired level of multisampling is supported
-            if (!(pdev.properties().limits.framebuffer_color_sample_counts
-                & pdev.properties().limits.framebuffer_depth_sample_counts
-                & REQUIRE_MSAA_LEVEL))
             {
                 continue;
             }
@@ -586,6 +585,29 @@ namespace img_aligner
         update_ui_scale_reload_fonts_and_style();
     }
 
+    void App::recreate_ui_pass()
+    {
+        // TODO_use_max_base_or_target_img_width;
+        ui_pass = std::make_unique<UiPass>(
+            state,
+            (uint32_t)8000,
+            (uint32_t)8000,
+            state.imgui_vk_window_data.ImageCount
+        );
+
+        if (grid_warper != nullptr)
+        {
+            grid_warper->add_images_to_ui_pass(*ui_pass);
+        }
+
+        if (selected_image_idx >= ui_pass->images().size())
+        {
+            selected_image_idx = 0;
+        }
+
+        run_ui_pass_next_frame = true;
+    }
+
     void App::layout_controls()
     {
         ImGui::Begin("Controls");
@@ -661,8 +683,6 @@ namespace img_aligner
 
         if (ImGui::Button("Start Alignin'##Controls"))
         {
-            grid_warp_params.will_display_images_in_ui = true;
-
             // generate fake test image
             uint32_t test_image_width = 320;
             uint32_t test_image_height = 180;
@@ -702,8 +722,7 @@ namespace img_aligner
             grid_warper->run_grid_warp_pass(false, 0);
             grid_warper->run_difference_pass(0);
 
-            state.selected_image_idx = 0;
-            update_grid_warper_ui_image();
+            recreate_ui_pass();
         }
 
         ImGui::End();
@@ -716,11 +735,11 @@ namespace img_aligner
         imgui_bold("INTERFACE");
 
         if (ImGui::InputFloat(
-            "Scale##Misc", &state.ui_scale, .125f, .25f, "%.3f"
+            "Scale##Misc", &ui_scale, .125f, .25f, "%.3f"
         ))
         {
-            state.ui_scale = std::clamp(state.ui_scale, .75f, 2.f);
-            state.ui_scale_updated = true;
+            ui_scale = std::clamp(ui_scale, .75f, 2.f);
+            ui_scale_updated = true;
         }
 
         imgui_div();
@@ -746,7 +765,7 @@ namespace img_aligner
     {
         ImGui::Begin("Image Viewer", 0, ImGuiWindowFlags_HorizontalScrollbar);
 
-        if (!grid_warper)
+        if (!ui_pass || !grid_warper)
         {
             ImGui::End();
             return;
@@ -754,22 +773,22 @@ namespace img_aligner
 
         // image selector
         std::vector<std::string> image_names;
-        for (const auto& ui_image_info : grid_warper->ui_image_infos())
+        for (const auto& ui_image_info : ui_pass->images())
         {
             image_names.push_back(ui_image_info.name);
         }
         if (imgui_combo(
             "##image_selector",
             image_names,
-            &state.selected_image_idx,
+            &selected_image_idx,
             false
         ))
         {
-            update_grid_warper_ui_image();
+            run_ui_pass_next_frame = true;
         }
 
         const auto& sel_img_info =
-            grid_warper->ui_image_infos()[state.selected_image_idx];
+            ui_pass->images()[selected_image_idx];
 
         // image size
         ImGui::Text("%ux%u", sel_img_info.width, sel_img_info.height);
@@ -782,10 +801,10 @@ namespace img_aligner
             ImGui::Text("Zoom");
 
             ImGui::SameLine();
-            ImGui::SetNextItemWidth(70.f * state.ui_scale);
+            ImGui::SetNextItemWidth(70.f * ui_scale);
             ImGui::DragFloat(
                 "##image_zoom",
-                &state.image_viewer_zoom,
+                &image_viewer_zoom,
                 .005f,
                 .1f,
                 3.f,
@@ -796,7 +815,7 @@ namespace img_aligner
             ImGui::SameLine();
             if (ImGui::Button("R##image_zoom_reset"))
             {
-                state.image_viewer_zoom = 1.f;
+                image_viewer_zoom = 1.f;
             }
         }
 
@@ -808,10 +827,10 @@ namespace img_aligner
             ImGui::Text("Exposure");
 
             ImGui::SameLine();
-            ImGui::SetNextItemWidth(70.f * state.ui_scale);
+            ImGui::SetNextItemWidth(70.f * ui_scale);
             if (ImGui::DragFloat(
                 "##image_exposure",
-                &state.image_viewer_exposure,
+                &image_viewer_exposure,
                 .05f,
                 -10.f,
                 10.f,
@@ -819,14 +838,14 @@ namespace img_aligner
                 ImGuiSliderFlags_NoRoundToFormat
             ))
             {
-                update_grid_warper_ui_image();
+                run_ui_pass_next_frame = true;
             }
 
             ImGui::SameLine();
             if (ImGui::Button("R##image_exposure_reset"))
             {
-                state.image_viewer_exposure = 0.f;
-                update_grid_warper_ui_image();
+                image_viewer_exposure = 0.f;
+                run_ui_pass_next_frame = true;
             }
         }
 
@@ -834,32 +853,18 @@ namespace img_aligner
 
         // use flim
         ImGui::SameLine();
-        if (ImGui::Checkbox("flim", &state.image_viewer_use_flim))
+        if (ImGui::Checkbox("flim", &image_viewer_use_flim))
         {
-            update_grid_warper_ui_image();
+            run_ui_pass_next_frame = true;
         }
 
         ImGui::NewLine();
 
         // image
-        uint32_t ui_img_width = 1, ui_img_height = 1;
-        grid_warper->ui_img_size(ui_img_width, ui_img_height);
-        ImGui::Image(
-            (ImTextureID)grid_warper->ui_img_ds_for_imgui(),
-            ImVec2(
-                (float)sel_img_info.width * state.image_viewer_zoom,
-                (float)sel_img_info.height * state.image_viewer_zoom
-            ),
-            {
-                0,
-                (float)sel_img_info.height / (float)ui_img_height
-            },
-            {
-                (float)sel_img_info.width / (float)ui_img_width,
-                0
-            },
-            { 1, 1, 1, 1 },
-            COLOR_IMAGE_BORDER
+        ui_pass->draw_imgui_image(
+            next_frame_idx(),
+            ui_pass->images()[selected_image_idx],
+            image_viewer_zoom
         );
 
         ImGui::End();
@@ -960,15 +965,15 @@ namespace img_aligner
     {
         // reload fonts
         state.io->Fonts->Clear();
-        state.font = state.io->Fonts->AddFontFromFileTTF(
+        font = state.io->Fonts->AddFontFromFileTTF(
             FONT_PATH,
-            FONT_SIZE * state.ui_scale
+            FONT_SIZE * ui_scale
         );
-        state.font_bold = state.io->Fonts->AddFontFromFileTTF(
+        font_bold = state.io->Fonts->AddFontFromFileTTF(
             FONT_BOLD_PATH,
-            FONT_SIZE * state.ui_scale
+            FONT_SIZE * ui_scale
         );
-        if (!state.font || !state.font_bold)
+        if (!font || !font_bold)
         {
             throw std::runtime_error("failed to load fonts");
         }
@@ -977,7 +982,7 @@ namespace img_aligner
 
         // reload style and apply scale
         setup_imgui_style();
-        ImGui::GetStyle().ScaleAllSizes(state.ui_scale);
+        ImGui::GetStyle().ScaleAllSizes(ui_scale);
 
         ImGui::GetStyle().HoverDelayNormal = .65f;
         ImGui::GetStyle().HoverStationaryDelay = .2f;
@@ -996,7 +1001,7 @@ namespace img_aligner
 
     void App::imgui_bold(std::string_view s)
     {
-        ImGui::PushFont(state.font_bold);
+        ImGui::PushFont(font_bold);
         ImGui::Text(s.data());
         ImGui::PopFont();
     }
@@ -1039,7 +1044,7 @@ namespace img_aligner
         if (!ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
             return;
 
-        ImGui::SetNextWindowContentSize({ 400.f * state.ui_scale, 0.f });
+        ImGui::SetNextWindowContentSize({ 400.f * ui_scale, 0.f });
         if (!ImGui::BeginTooltip())
             return;
 
@@ -1159,6 +1164,19 @@ namespace img_aligner
             );
         }
 
+        // add UI pass commands if needed
+        if (run_ui_pass_next_frame && ui_pass != nullptr)
+        {
+            run_ui_pass_next_frame = false;
+            ui_pass->record_commands(
+                frame_data.CommandBuffer,
+                state.imgui_vk_window_data.FrameIndex,
+                ui_pass->images()[selected_image_idx],
+                image_viewer_exposure,
+                image_viewer_use_flim
+            );
+        }
+
         // add command to begin the render pass
         {
             VkRenderPassBeginInfo info{};
@@ -1265,14 +1283,11 @@ namespace img_aligner
             (window_data.SemaphoreIndex + 1) % window_data.SemaphoreCount;
     }
 
-    void App::update_grid_warper_ui_image()
+    uint32_t App::next_frame_idx()
     {
-        grid_warper->run_ui_pass(
-            state.selected_image_idx,
-            state.image_viewer_exposure,
-            state.image_viewer_use_flim,
-            0
-        );
+        return
+            (state.imgui_vk_window_data.FrameIndex + 1)
+            % state.imgui_vk_window_data.ImageCount;
     }
 
     static void glfw_error_callback(int error, const char* description)

@@ -61,9 +61,6 @@ namespace img_aligner
     static constexpr auto FONT_BOLD_PATH = "./fonts/Outfit-Bold.ttf";
 
     static constexpr bool DEBUG_MODE = true;
-    static constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
-    static constexpr VkSampleCountFlagBits REQUIRE_MSAA_LEVEL =
-        VK_SAMPLE_COUNT_1_BIT;
 
     // total number of threads that create or submit command buffers
     static constexpr size_t N_THREADS = 2;
@@ -72,16 +69,6 @@ namespace img_aligner
     {
         GLFWwindow* window = nullptr;
         ImGuiIO* io = nullptr;
-        ImFont* font = nullptr;
-        ImFont* font_bold = nullptr;
-
-        float ui_scale = 1.f;
-        bool ui_scale_updated = false;
-
-        int selected_image_idx = 0;
-        float image_viewer_zoom = 1.f;
-        float image_viewer_exposure = 0.f;
-        bool image_viewer_use_flim = false;
 
         bv::ContextPtr context = nullptr;
         bv::DebugMessengerPtr debug_messenger = nullptr;
@@ -94,7 +81,7 @@ namespace img_aligner
 
         bv::MemoryBankPtr mem_bank = nullptr;
 
-        // command pools for each thread
+        // command pools for each thread (size: N_THREADS)
         std::vector<bv::CommandPoolPtr> cmd_pools;
         std::vector<bv::CommandPoolPtr> transient_cmd_pools;
 

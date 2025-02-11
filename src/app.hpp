@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common.hpp"
+#include "ui_pass.hpp"
 #include "grid_warp.hpp"
 
 namespace img_aligner
@@ -14,6 +15,20 @@ namespace img_aligner
 
     private:
         AppState state;
+
+        ImFont* font = nullptr;
+        ImFont* font_bold = nullptr;
+
+        float ui_scale = 1.f;
+        bool ui_scale_updated = false;
+
+        int selected_image_idx = 0;
+        float image_viewer_zoom = 1.f;
+        float image_viewer_exposure = 0.f;
+        bool image_viewer_use_flim = false;
+
+        std::unique_ptr<UiPass> ui_pass = nullptr;
+        bool run_ui_pass_next_frame = false;
 
         grid_warp::Params grid_warp_params;
         std::unique_ptr<grid_warp::GridWarper> grid_warper = nullptr;
@@ -34,6 +49,7 @@ namespace img_aligner
         void create_imgui_descriptor_pool();
         void init_imgui_vk_window_data();
         void init_imgui();
+        void recreate_ui_pass();
 
         void layout_controls();
         void layout_misc();
@@ -56,7 +72,7 @@ namespace img_aligner
         void render_frame(ImDrawData* draw_data);
         void present_frame();
 
-        void update_grid_warper_ui_image();
+        uint32_t next_frame_idx();
 
     };
 
