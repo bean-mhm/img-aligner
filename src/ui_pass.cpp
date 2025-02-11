@@ -22,13 +22,11 @@ namespace img_aligner
     UiPass::UiPass(
         AppState& state,
         uint32_t max_width,
-        uint32_t max_height,
-        uint32_t max_frames_in_flight
+        uint32_t max_height
     )
         : state(state),
         _max_width(max_width),
-        _max_height(max_height),
-        _max_frames_in_flight(max_frames_in_flight)
+        _max_height(max_height)
     {
         // create sampler
         sampler = bv::Sampler::create(
@@ -53,56 +51,46 @@ namespace img_aligner
             }
         );
 
-        // create display images
+        // create display image
+        create_image(
+            state,
+            _max_width,
+            _max_height,
+            1,
+            VK_SAMPLE_COUNT_1_BIT,
+            UI_FORMAT,
+            VK_IMAGE_TILING_OPTIMAL,
+
+            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
+            | VK_IMAGE_USAGE_SAMPLED_BIT,
+
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            display_img,
+            display_img_mem
+        );
+        display_img_view = create_image_view(
+            state,
+            display_img,
+            UI_FORMAT,
+            VK_IMAGE_ASPECT_COLOR_BIT,
+            1
+        );
         auto cmd_buf = begin_single_time_commands(state, true, 0);
-        for (size_t i = 0; i < _max_frames_in_flight; i++)
-        {
-            display_images.push_back(nullptr);
-            display_image_mems.push_back(nullptr);
-            display_image_views.push_back(nullptr);
-
-            create_image(
-                state,
-                _max_width,
-                _max_height,
-                1,
-                VK_SAMPLE_COUNT_1_BIT,
-                UI_FORMAT,
-                VK_IMAGE_TILING_OPTIMAL,
-
-                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
-                | VK_IMAGE_USAGE_SAMPLED_BIT,
-
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                display_images.back(),
-                display_image_mems.back()
-            );
-            display_image_views.back() = create_image_view(
-                state,
-                display_images.back(),
-                UI_FORMAT,
-                VK_IMAGE_ASPECT_COLOR_BIT,
-                1
-            );
-            transition_image_layout(
-                cmd_buf,
-                display_images.back(),
-                VK_IMAGE_LAYOUT_UNDEFINED,
-                VK_IMAGE_LAYOUT_GENERAL,
-                1
-            );
-        }
+        transition_image_layout(
+            cmd_buf,
+            display_img,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_GENERAL,
+            1
+        );
         end_single_time_commands(state, cmd_buf, true);
 
-        // create descriptor sets for ImGui::Image()
-        for (size_t i = 0; i < _max_frames_in_flight; i++)
-        {
-            imgui_descriptor_sets.push_back(ImGui_ImplVulkan_AddTexture(
-                sampler->handle(),
-                display_image_views[i]->handle(),
-                VK_IMAGE_LAYOUT_GENERAL
-            ));
-        }
+        // create descriptor set for ImGui::Image()
+        imgui_descriptor_set = ImGui_ImplVulkan_AddTexture(
+            sampler->handle(),
+            display_img_view->handle(),
+            VK_IMAGE_LAYOUT_GENERAL
+        );
 
         // descriptor set layout
         {
@@ -191,21 +179,18 @@ namespace img_aligner
             );
         }
 
-        // framebuffers
-        for (size_t i = 0; i < _max_frames_in_flight; i++)
-        {
-            framebufs.push_back(bv::Framebuffer::create(
-                state.device,
-                bv::FramebufferConfig{
-                    .flags = 0,
-                    .render_pass = render_pass,
-                    .attachments = { display_image_views[i] },
-                    .width = _max_width,
-                    .height = _max_height,
-                    .layers = 1
-                }
-            ));
-        }
+        // framebuffer
+        framebuf = bv::Framebuffer::create(
+            state.device,
+            bv::FramebufferConfig{
+                .flags = 0,
+                .render_pass = render_pass,
+                .attachments = { display_img_view },
+                .width = _max_width,
+                .height = _max_height,
+                .layers = 1
+            }
+        );
 
         // pipeline layout
         {
@@ -372,28 +357,29 @@ namespace img_aligner
                 }
             );
         }
+
+        // fence
+        fence = bv::Fence::create(state.device, 0);
     }
 
     UiPass::~UiPass()
     {
         clear_images();
 
+        fence = nullptr;
         graphics_pipeline = nullptr;
         pipeline_layout = nullptr;
-        framebufs.clear();
+        framebuf = nullptr;
         render_pass = nullptr;
 
         descriptor_pool = nullptr;
         descriptor_set_layout = nullptr;
 
-        for (VkDescriptorSet ds : imgui_descriptor_sets)
-        {
-            ImGui_ImplVulkan_RemoveTexture(ds);
-        }
+        ImGui_ImplVulkan_RemoveTexture(imgui_descriptor_set);
 
-        display_images.clear();
-        display_image_mems.clear();
-        display_image_views.clear();
+        display_img = nullptr;
+        display_img_mem = nullptr;
+        display_img_view = nullptr;
     }
 
     const UiImageInfo& UiPass::add_image(
@@ -466,9 +452,7 @@ namespace img_aligner
         _images.clear();
     }
 
-    void UiPass::record_commands(
-        VkCommandBuffer cmd_buf,
-        size_t frame_idx,
+    void UiPass::run(
         const UiImageInfo& image,
         float exposure,
         bool use_flim
@@ -481,10 +465,15 @@ namespace img_aligner
             );
         }
 
+        bv::CommandBufferPtr cmd_buf = bv::CommandPool::allocate_buffer(
+            state.cmd_pools[0],
+            VK_COMMAND_BUFFER_LEVEL_PRIMARY
+        );
+        cmd_buf->begin(0);
+
         VkClearValue clear_val{};
         clear_val.color = { { 0.f, 0.f, 0.f, 0.f } };
 
-        const auto& framebuf = framebufs.at(frame_idx);
         VkRenderPassBeginInfo render_pass_info{
             .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
             .pNext = nullptr,
@@ -501,20 +490,20 @@ namespace img_aligner
             .pClearValues = &clear_val
         };
         vkCmdBeginRenderPass(
-            cmd_buf,
+            cmd_buf->handle(),
             &render_pass_info,
             VK_SUBPASS_CONTENTS_INLINE
         );
 
         vkCmdBindPipeline(
-            cmd_buf,
+            cmd_buf->handle(),
             VK_PIPELINE_BIND_POINT_GRAPHICS,
             graphics_pipeline->handle()
         );
 
         auto vk_descriptor_set = image.ui_pass_ds->handle();
         vkCmdBindDescriptorSets(
-            cmd_buf,
+            cmd_buf->handle(),
             VK_PIPELINE_BIND_POINT_GRAPHICS,
             pipeline_layout->handle(),
             0,
@@ -530,7 +519,7 @@ namespace img_aligner
             .single_channel = image.single_channel ? 1 : 0
         };
         vkCmdPushConstants(
-            cmd_buf,
+            cmd_buf->handle(),
             pipeline_layout->handle(),
             VK_SHADER_STAGE_FRAGMENT_BIT,
             0,
@@ -539,14 +528,14 @@ namespace img_aligner
         );
 
         vkCmdDraw(
-            cmd_buf,
+            cmd_buf->handle(),
             6,
             1,
             0,
             0
         );
 
-        vkCmdEndRenderPass(cmd_buf);
+        vkCmdEndRenderPass(cmd_buf->handle());
 
         VkImageMemoryBarrier display_img_memory_barrier{
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -557,7 +546,7 @@ namespace img_aligner
             .newLayout = VK_IMAGE_LAYOUT_GENERAL,
             .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .image = display_images.at(frame_idx)->handle(),
+            .image = display_img->handle(),
             .subresourceRange = VkImageSubresourceRange{
                 .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
                 .baseMipLevel = 0,
@@ -567,7 +556,7 @@ namespace img_aligner
             }
         };
         vkCmdPipelineBarrier(
-            cmd_buf,
+            cmd_buf->handle(),
             VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
             0,
@@ -575,16 +564,24 @@ namespace img_aligner
             0, nullptr,
             1, &display_img_memory_barrier
         );
+
+        cmd_buf->end();
+
+        {
+            std::scoped_lock lock(state.queue_mutex);
+            state.queue->submit({}, {}, { cmd_buf }, {}, fence);
+        }
+        fence->wait();
+        fence->reset();
     }
 
     void UiPass::draw_imgui_image(
-        uint32_t frame_idx,
         const UiImageInfo& image,
         float scale
     ) const
     {
         ImGui::Image(
-            (ImTextureID)imgui_descriptor_sets.at(frame_idx),
+            (ImTextureID)imgui_descriptor_set,
             ImVec2(
                 (float)image.width * scale,
                 (float)image.height * scale

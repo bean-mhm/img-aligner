@@ -27,11 +27,11 @@ namespace img_aligner
         float image_viewer_exposure = 0.f;
         bool image_viewer_use_flim = false;
 
-        std::unique_ptr<UiPass> ui_pass = nullptr;
-        bool run_ui_pass_next_frame = false;
-
         grid_warp::Params grid_warp_params;
         std::unique_ptr<grid_warp::GridWarper> grid_warper = nullptr;
+
+        std::unique_ptr<UiPass> ui_pass = nullptr;
+        bool need_to_run_ui_pass = false;
 
         void init();
         void main_loop();
@@ -71,8 +71,6 @@ namespace img_aligner
 
         void render_frame(ImDrawData* draw_data);
         void present_frame();
-
-        uint32_t next_frame_idx();
 
     };
 

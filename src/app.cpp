@@ -133,6 +133,7 @@ namespace img_aligner
 
     void App::cleanup()
     {
+        ui_pass = nullptr;
         grid_warper = nullptr;
 
         state.device->wait_idle();
@@ -591,8 +592,7 @@ namespace img_aligner
         ui_pass = std::make_unique<UiPass>(
             state,
             (uint32_t)8000,
-            (uint32_t)8000,
-            state.imgui_vk_window_data.ImageCount
+            (uint32_t)8000
         );
 
         if (grid_warper != nullptr)
@@ -605,7 +605,7 @@ namespace img_aligner
             selected_image_idx = 0;
         }
 
-        run_ui_pass_next_frame = true;
+        need_to_run_ui_pass = true;
     }
 
     void App::layout_controls()
@@ -784,7 +784,7 @@ namespace img_aligner
             false
         ))
         {
-            run_ui_pass_next_frame = true;
+            need_to_run_ui_pass = true;
         }
 
         const auto& sel_img_info =
@@ -838,14 +838,14 @@ namespace img_aligner
                 ImGuiSliderFlags_NoRoundToFormat
             ))
             {
-                run_ui_pass_next_frame = true;
+                need_to_run_ui_pass = true;
             }
 
             ImGui::SameLine();
             if (ImGui::Button("R##image_exposure_reset"))
             {
                 image_viewer_exposure = 0.f;
-                run_ui_pass_next_frame = true;
+                need_to_run_ui_pass = true;
             }
         }
 
@@ -855,14 +855,13 @@ namespace img_aligner
         ImGui::SameLine();
         if (ImGui::Checkbox("flim", &image_viewer_use_flim))
         {
-            run_ui_pass_next_frame = true;
+            need_to_run_ui_pass = true;
         }
 
         ImGui::NewLine();
 
         // image
         ui_pass->draw_imgui_image(
-            next_frame_idx(),
             ui_pass->images()[selected_image_idx],
             image_viewer_zoom
         );
@@ -1054,6 +1053,19 @@ namespace img_aligner
 
     void App::render_frame(ImDrawData* draw_data)
     {
+        // run UI pass if needed
+        if (need_to_run_ui_pass
+            && ui_pass != nullptr
+            && selected_image_idx < ui_pass->images().size())
+        {
+            need_to_run_ui_pass = false;
+            ui_pass->run(
+                ui_pass->images()[selected_image_idx],
+                image_viewer_exposure,
+                image_viewer_use_flim
+            );
+        }
+
         // get reference to the window data to make the code more readable
         auto& window_data = state.imgui_vk_window_data;
 
@@ -1164,19 +1176,6 @@ namespace img_aligner
             );
         }
 
-        // add UI pass commands if needed
-        if (run_ui_pass_next_frame && ui_pass != nullptr)
-        {
-            run_ui_pass_next_frame = false;
-            ui_pass->record_commands(
-                frame_data.CommandBuffer,
-                state.imgui_vk_window_data.FrameIndex,
-                ui_pass->images()[selected_image_idx],
-                image_viewer_exposure,
-                image_viewer_use_flim
-            );
-        }
-
         // add command to begin the render pass
         {
             VkRenderPassBeginInfo info{};
@@ -1281,13 +1280,6 @@ namespace img_aligner
 
         window_data.SemaphoreIndex =
             (window_data.SemaphoreIndex + 1) % window_data.SemaphoreCount;
-    }
-
-    uint32_t App::next_frame_idx()
-    {
-        return
-            (state.imgui_vk_window_data.FrameIndex + 1)
-            % state.imgui_vk_window_data.ImageCount;
     }
 
     static void glfw_error_callback(int error, const char* description)
