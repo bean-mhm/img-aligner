@@ -1,6 +1,7 @@
 #include "common.hpp"
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+#define NOMINMAX
 #include <Windows.h>
 #endif
 
@@ -558,6 +559,133 @@ namespace img_aligner
             1,
             &copy_region
         );
+    }
+
+    void create_texture(
+        AppState& state,
+        uint32_t width,
+        uint32_t height,
+        VkFormat format,
+        void* pixels,
+        size_t size_bytes,
+        bool mipmapped,
+        size_t thread_idx,
+        bv::ImagePtr& out_img,
+        bv::MemoryChunkPtr& out_img_mem,
+        bv::ImageViewPtr& out_imgview
+    )
+    {
+        if (width < 1 || height < 1)
+        {
+            throw std::invalid_argument(
+                "texture size must be at least 1 in each dimension"
+            );
+        }
+        if (size_bytes < 1)
+        {
+            throw std::invalid_argument(
+                "texture pixel data size must be at least 1 byte"
+            );
+        }
+
+        // create staging buffer and upload pixel data to it
+        bv::BufferPtr staging_buf;
+        bv::MemoryChunkPtr staging_buf_mem;
+        create_buffer(
+            state,
+            size_bytes,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+            | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+
+            staging_buf,
+            staging_buf_mem
+        );
+        std::copy(
+            (uint8_t*)pixels,
+            (uint8_t*)pixels + size_bytes,
+            (uint8_t*)staging_buf_mem->mapped()
+        );
+        staging_buf_mem->flush();
+
+        // base and target images use the original resolution with mipmapping
+
+        uint32_t mip_levels = 1;
+        if (mipmapped)
+        {
+            mip_levels = round_log2(std::max(width, height));
+        };
+
+        create_image(
+            state,
+            width,
+            height,
+            mip_levels,
+            VK_SAMPLE_COUNT_1_BIT,
+            format,
+            VK_IMAGE_TILING_OPTIMAL,
+
+            VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT
+            | VK_IMAGE_USAGE_SAMPLED_BIT,
+
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            out_img,
+            out_img_mem
+        );
+        out_imgview = create_image_view(
+            state,
+            out_img,
+            format,
+            VK_IMAGE_ASPECT_COLOR_BIT,
+            mip_levels
+        );
+
+        auto cmd_buf = begin_single_time_commands(state, true, thread_idx);
+
+        transition_image_layout(
+            cmd_buf,
+            out_img,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            mip_levels
+        );
+
+        copy_buffer_to_image(
+            cmd_buf,
+            staging_buf,
+            out_img,
+            0
+        );
+
+        if (mipmapped)
+        {
+            // generate mipmaps which will also transitions the image to
+            // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.
+            generate_mipmaps(
+                state,
+                cmd_buf,
+                out_img,
+                false,
+                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                VK_ACCESS_SHADER_READ_BIT
+            );
+        }
+        else
+        {
+            transition_image_layout(
+                cmd_buf,
+                out_img,
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                mip_levels
+            );
+        }
+
+        end_single_time_commands(state, cmd_buf, true);
+
+        staging_buf = nullptr;
+        staging_buf_mem = nullptr;
     }
 
 }

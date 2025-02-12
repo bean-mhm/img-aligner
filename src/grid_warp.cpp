@@ -39,13 +39,57 @@ namespace img_aligner::grid_warp
         size_t thread_idx
     )
         : state(state),
-        img_width(params.img_width),
-        img_height(params.img_height)
+        base_imgview(params.base_imgview),
+        target_imgview(params.target_imgview)
     {
+        if (base_imgview.expired())
+        {
+            throw std::invalid_argument("provided base image view has expired");
+        }
+        if (target_imgview.expired())
+        {
+            throw std::invalid_argument(
+                "provided target image view has expired"
+            );
+        }
+
+        auto base_imgview_locked = base_imgview.lock();
+        auto target_imgview_locked = target_imgview.lock();
+
+        if (base_imgview_locked->image().expired())
+        {
+            throw std::invalid_argument(
+                "provided base image view's parent image has expired"
+            );
+        }
+        if (target_imgview_locked->image().expired())
+        {
+            throw std::invalid_argument(
+                "provided target image view's parent image has expired"
+            );
+        }
+
+        auto base_extent = base_imgview_locked->image().lock()->config().extent;
+        auto target_extent =
+            target_imgview_locked->image().lock()->config().extent;
+
+        if (base_extent.width != target_extent.width
+            || base_extent.height != target_extent.height)
+        {
+            throw std::invalid_argument(std::format(
+                "provided base and target images must have the same resolution "
+                "instead of {}x{} and {}x{} respectively.",
+                base_extent.width, base_extent.height,
+                target_extent.width, target_extent.height
+            ).c_str());
+        }
+
+        img_width = base_extent.width;
+        img_height = base_extent.height;
         if (img_width < 1 || img_height < 1)
         {
             throw std::invalid_argument(
-                "image resolution must be at least 1 in every axis"
+                "image resolution must be at least 1 pixel in every axis"
             );
         }
 
@@ -116,11 +160,7 @@ namespace img_aligner::grid_warp
             padded_grid_res_y++;
 
         create_vertex_and_index_buffer_and_generate_vertices(thread_idx);
-        create_sampler_and_images(
-            params.base_img_pixels_rgba,
-            params.target_img_pixels_rgba,
-            thread_idx
-        );
+        create_sampler_and_images(thread_idx);
         create_avg_difference_buffer();
         create_passes();
     }
@@ -153,14 +193,6 @@ namespace img_aligner::grid_warp
 
         index_buf = nullptr;
         index_buf_mem = nullptr;
-
-        base_img = nullptr;
-        base_img_mem = nullptr;
-        base_imgview = nullptr;
-
-        target_img = nullptr;
-        target_img_mem = nullptr;
-        target_imgview = nullptr;
 
         warped_img = nullptr;
         warped_img_mem = nullptr;
@@ -207,24 +239,6 @@ namespace img_aligner::grid_warp
 
     void GridWarper::add_images_to_ui_pass(UiPass& ui_pass)
     {
-        ui_pass.add_image(
-            base_imgview,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            "Base Image",
-            base_img->config().extent.width,
-            base_img->config().extent.height,
-            false
-        );
-
-        ui_pass.add_image(
-            target_imgview,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            "Target Image",
-            target_img->config().extent.width,
-            target_img->config().extent.height,
-            false
-        );
-
         ui_pass.add_image(
             warped_imgview,
             VK_IMAGE_LAYOUT_GENERAL,
@@ -385,59 +399,8 @@ namespace img_aligner::grid_warp
         vertex_buf_mem->flush();
     }
 
-    void GridWarper::create_sampler_and_images(
-        std::span<float> base_img_pixels_rgba,
-        std::span<float> target_img_pixels_rgba,
-        size_t thread_idx
-    )
+    void GridWarper::create_sampler_and_images(size_t thread_idx)
     {
-        // calculate the size of each of the base and target images in bytes
-        static constexpr uint32_t n_channels = 4;
-        static constexpr uint32_t n_bytes_per_channel = sizeof(float);
-        VkDeviceSize img_size_bytes =
-            img_width * img_height
-            * n_channels * n_bytes_per_channel;
-
-        // create staging buffer and upload pixel data to it
-
-        bv::BufferPtr staging_buf;
-        bv::MemoryChunkPtr staging_buf_mem;
-
-        if (base_img_pixels_rgba.size_bytes() != img_size_bytes
-            || target_img_pixels_rgba.size_bytes() != img_size_bytes)
-        {
-            throw std::invalid_argument(std::format(
-                "provided pixel data doesn't have the expected size of {} "
-                "bytes",
-                img_size_bytes
-            ).c_str());
-        }
-
-        create_buffer(
-            state,
-            img_size_bytes * 2, // * 2 cuz we store base and target images
-            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
-            | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-
-            staging_buf,
-            staging_buf_mem
-        );
-
-        void* mapped = staging_buf_mem->mapped();
-        std::copy(
-            (uint8_t*)base_img_pixels_rgba.data(),
-            (uint8_t*)base_img_pixels_rgba.data() + img_size_bytes,
-            (uint8_t*)mapped
-        );
-        std::copy(
-            (uint8_t*)target_img_pixels_rgba.data(),
-            (uint8_t*)target_img_pixels_rgba.data() + img_size_bytes,
-            (uint8_t*)mapped + img_size_bytes
-        );
-        staging_buf_mem->flush();
-
         // create sampler
         sampler = bv::Sampler::create(
             state.device,
@@ -465,72 +428,6 @@ namespace img_aligner::grid_warp
         auto cmd_buf = begin_single_time_commands(state, true, thread_idx);
 
         // create images and image views, and transition layouts
-
-        // base and target images use the original resolution with mipmapping
-
-        uint32_t mip_levels = round_log2(std::max(img_width, img_height));
-
-        create_image(
-            state,
-            img_width,
-            img_height,
-            mip_levels,
-            VK_SAMPLE_COUNT_1_BIT,
-            RGBA_FORMAT,
-            VK_IMAGE_TILING_OPTIMAL,
-
-            VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT
-            | VK_IMAGE_USAGE_SAMPLED_BIT,
-
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-            base_img,
-            base_img_mem
-        );
-        base_imgview = create_image_view(
-            state,
-            base_img,
-            RGBA_FORMAT,
-            VK_IMAGE_ASPECT_COLOR_BIT,
-            mip_levels
-        );
-        transition_image_layout(
-            cmd_buf,
-            base_img,
-            VK_IMAGE_LAYOUT_UNDEFINED,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            mip_levels
-        );
-
-        create_image(
-            state,
-            img_width,
-            img_height,
-            mip_levels,
-            VK_SAMPLE_COUNT_1_BIT,
-            RGBA_FORMAT,
-            VK_IMAGE_TILING_OPTIMAL,
-
-            VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT
-            | VK_IMAGE_USAGE_SAMPLED_BIT,
-
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-            target_img,
-            target_img_mem
-        );
-        target_imgview = create_image_view(
-            state,
-            target_img,
-            RGBA_FORMAT,
-            VK_IMAGE_ASPECT_COLOR_BIT,
-            mip_levels
-        );
-        transition_image_layout(
-            cmd_buf,
-            target_img,
-            VK_IMAGE_LAYOUT_UNDEFINED,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            mip_levels
-        );
 
         // warped image uses intermediate resolution with no mipmapping. it's
         // a color attachment but also sampled in the difference pass.
@@ -642,44 +539,8 @@ namespace img_aligner::grid_warp
             difference_mip_levels
         );
 
-        // copy image data from the staging buffer to the base and target images
-        copy_buffer_to_image(
-            cmd_buf,
-            staging_buf,
-            base_img,
-            0
-        );
-        copy_buffer_to_image(
-            cmd_buf,
-            staging_buf,
-            target_img,
-            img_size_bytes
-        );
-
-        // generate mipmaps for base and target images which will also
-        // transition them to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.
-        generate_mipmaps(
-            state,
-            cmd_buf,
-            base_img,
-            false,
-            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-            VK_ACCESS_SHADER_READ_BIT
-        );
-        generate_mipmaps(
-            state,
-            cmd_buf,
-            target_img,
-            false,
-            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-            VK_ACCESS_SHADER_READ_BIT
-        );
-
         // end, submit, and wait for the command buffer
         end_single_time_commands(state, cmd_buf, true);
-
-        staging_buf = nullptr;
-        staging_buf_mem = nullptr;
     }
 
     void GridWarper::create_avg_difference_buffer()

@@ -33,6 +33,38 @@ namespace img_aligner
         create_imgui_descriptor_pool();
         init_imgui_vk_window_data();
         init_imgui();
+
+        // generate fake test image for base and target images
+        uint32_t test_image_width = 1920;
+        uint32_t test_image_height = 1080;
+        std::vector<float> test_image_data(
+            test_image_width * test_image_height * 4
+        );
+        for (uint32_t y = 0; y < test_image_height; y++)
+        {
+            for (uint32_t x = 0; x < test_image_width; x++)
+            {
+                float u = ((float)x + .5f) / (float)test_image_width;
+                float v = ((float)y + .5f) / (float)test_image_height;
+
+                uint32_t red_idx = (x + y * test_image_width) * 4;
+                test_image_data[red_idx + 0] = std::pow(u, 1.f / 2.2f);
+                test_image_data[red_idx + 1] = std::pow(v, 1.f / 2.2f);
+                test_image_data[red_idx + 2] =
+                    std::pow(std::cos(30.f * u) * .1f + .1f, 1.f / 2.2f);
+                test_image_data[red_idx + 3] = 1.f;
+            }
+        }
+        recreate_base_image(
+            test_image_width,
+            test_image_height,
+            { test_image_data.data(), test_image_data.size() }
+        );
+        recreate_target_image(
+            test_image_width,
+            test_image_height,
+            { test_image_data.data(), test_image_data.size() }
+        );
     }
 
     void App::main_loop()
@@ -116,6 +148,20 @@ namespace img_aligner
             layout_image_viewer();
             ImGui::PopFont();
 
+            // update UI pass' display image if needed
+            if (need_to_run_ui_pass
+                && ui_pass != nullptr
+                && ui_pass->images().size() > 0
+                && selected_image_idx < ui_pass->images().size())
+            {
+                need_to_run_ui_pass = false;
+                ui_pass->run(
+                    ui_pass->images()[selected_image_idx],
+                    image_viewer_exposure,
+                    image_viewer_use_flim
+                );
+            }
+
             // render
             ImGui::Render();
             ImDrawData* draw_data = ImGui::GetDrawData();
@@ -135,6 +181,14 @@ namespace img_aligner
     {
         ui_pass = nullptr;
         grid_warper = nullptr;
+
+        base_img = nullptr;
+        base_img_mem = nullptr;
+        base_imgview = nullptr;
+
+        target_img = nullptr;
+        target_img_mem = nullptr;
+        target_imgview = nullptr;
 
         state.device->wait_idle();
 
@@ -588,12 +642,47 @@ namespace img_aligner
 
     void App::recreate_ui_pass()
     {
-        // TODO_use_max_base_or_target_img_width;
-        ui_pass = std::make_unique<UiPass>(
-            state,
-            (uint32_t)8000,
-            (uint32_t)8000
-        );
+        uint32_t max_width = 1;
+        uint32_t max_height = 1;
+        if (base_img != nullptr)
+        {
+            max_width = std::max(max_width, base_img->config().extent.width);
+            max_height = std::max(max_height, base_img->config().extent.height);
+        }
+        if (target_img != nullptr)
+        {
+            max_width = std::max(max_width, target_img->config().extent.width);
+            max_height = std::max(
+                max_height,
+                target_img->config().extent.height
+            );
+        }
+
+        ui_pass = std::make_unique<UiPass>(state, max_width, max_height);
+
+        if (base_img != nullptr)
+        {
+            ui_pass->add_image(
+                base_imgview,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                "Base Image",
+                base_img->config().extent.width,
+                base_img->config().extent.height,
+                false
+            );
+        }
+
+        if (target_img != nullptr)
+        {
+            ui_pass->add_image(
+                target_imgview,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                "Target Image",
+                target_img->config().extent.width,
+                target_img->config().extent.height,
+                false
+            );
+        }
 
         if (grid_warper != nullptr)
         {
@@ -606,6 +695,60 @@ namespace img_aligner
         }
 
         need_to_run_ui_pass = true;
+    }
+
+    void App::recreate_base_image(
+        uint32_t width,
+        uint32_t height,
+        std::span<float> pixels_rgba
+    )
+    {
+        if (pixels_rgba.size() != (size_t)width * (size_t)height * (size_t)4)
+        {
+            throw std::invalid_argument(
+                "provided pixel data doesn't have the expected size"
+            );
+        }
+        create_texture(
+            state,
+            width,
+            height,
+            RGBA_FORMAT,
+            pixels_rgba.data(),
+            pixels_rgba.size_bytes(),
+            true,
+            0,
+            base_img,
+            base_img_mem,
+            base_imgview
+        );
+    }
+
+    void App::recreate_target_image(
+        uint32_t width,
+        uint32_t height,
+        std::span<float> pixels_rgba
+    )
+    {
+        if (pixels_rgba.size() != (size_t)width * (size_t)height * (size_t)4)
+        {
+            throw std::invalid_argument(
+                "provided pixel data doesn't have the expected size"
+            );
+        }
+        create_texture(
+            state,
+            width,
+            height,
+            RGBA_FORMAT,
+            pixels_rgba.data(),
+            pixels_rgba.size_bytes(),
+            true,
+            0,
+            target_img,
+            target_img_mem,
+            target_imgview
+        );
     }
 
     void App::layout_controls()
@@ -683,46 +826,49 @@ namespace img_aligner
 
         if (ImGui::Button("Start Alignin'##Controls"))
         {
-            // generate fake test image
-            uint32_t test_image_width = 320;
-            uint32_t test_image_height = 180;
-            std::vector<float> test_image_data(
-                test_image_width * test_image_height * 4
-            );
-            for (uint32_t y = 0; y < test_image_height; y++)
+            try
             {
-                for (uint32_t x = 0; x < test_image_width; x++)
+                if (!base_img)
                 {
-                    float u = ((float)x + .5f) / (float)test_image_width;
-                    float v = ((float)y + .5f) / (float)test_image_height;
-
-                    uint32_t red_idx = (x + y * test_image_width) * 4;
-                    test_image_data[red_idx + 0] = std::pow(u, 1.f / 2.2f);
-                    test_image_data[red_idx + 1] = std::pow(v, 1.f / 2.2f);
-                    test_image_data[red_idx + 2] =
-                        std::pow(std::cos(30.f * u) * .1f + .1f, 1.f / 2.2f);
-                    test_image_data[red_idx + 3] = 1.f;
+                    throw std::string("You haven't loaded a base image yet.");
                 }
+                if (!target_img)
+                {
+                    throw std::string("You haven't loaded a target image yet.");
+                }
+
+                uint32_t base_img_width = base_img->config().extent.width;
+                uint32_t base_img_height = base_img->config().extent.height;
+                uint32_t target_img_width = target_img->config().extent.width;
+                uint32_t target_img_height = target_img->config().extent.height;
+
+                if (base_img_width != target_img_width
+                    || base_img_height != target_img_height)
+                {
+                    throw std::string(
+                        "Base and target images must have the same resolution."
+                    );
+                }
+
+                grid_warp_params.base_imgview = base_imgview;
+                grid_warp_params.target_imgview = base_imgview;
+
+                grid_warper = std::make_unique<grid_warp::GridWarper>(
+                    state,
+                    grid_warp_params,
+                    0
+                );
+
+                grid_warper->run_grid_warp_pass(false, 0);
+                grid_warper->run_difference_pass(0);
+
+                recreate_ui_pass();
             }
-            grid_warp_params.img_width = test_image_width;
-            grid_warp_params.img_height = test_image_height;
-            grid_warp_params.base_img_pixels_rgba = std::span<float>(
-                test_image_data.data(), test_image_data.size()
-            );
-            grid_warp_params.target_img_pixels_rgba = std::span<float>(
-                test_image_data.data(), test_image_data.size()
-            );
-
-            grid_warper = std::make_unique<grid_warp::GridWarper>(
-                state,
-                grid_warp_params,
-                0
-            );
-
-            grid_warper->run_grid_warp_pass(false, 0);
-            grid_warper->run_difference_pass(0);
-
-            recreate_ui_pass();
+            catch (std::string s)
+            {
+                //TODO_show_imgui_dialog;
+                throw std::exception(s.c_str());
+            }
         }
 
         ImGui::End();
@@ -765,7 +911,7 @@ namespace img_aligner
     {
         ImGui::Begin("Image Viewer", 0, ImGuiWindowFlags_HorizontalScrollbar);
 
-        if (!ui_pass || !grid_warper)
+        if (!ui_pass || ui_pass->images().size() < 1)
         {
             ImGui::End();
             return;
@@ -1053,19 +1199,6 @@ namespace img_aligner
 
     void App::render_frame(ImDrawData* draw_data)
     {
-        // run UI pass if needed
-        if (need_to_run_ui_pass
-            && ui_pass != nullptr
-            && selected_image_idx < ui_pass->images().size())
-        {
-            need_to_run_ui_pass = false;
-            ui_pass->run(
-                ui_pass->images()[selected_image_idx],
-                image_viewer_exposure,
-                image_viewer_use_flim
-            );
-        }
-
         // get reference to the window data to make the code more readable
         auto& window_data = state.imgui_vk_window_data;
 

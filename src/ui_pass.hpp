@@ -102,7 +102,6 @@ namespace img_aligner
         ) const;
 
     private:
-        static constexpr VkFormat UI_FORMAT = VK_FORMAT_R16G16B16A16_SFLOAT;
         static constexpr uint32_t MAX_UI_IMAGES = 32;
 
         AppState& state;
@@ -118,7 +117,7 @@ namespace img_aligner
         // image is using the maximum width and height to fit every image.
         bv::ImagePtr display_img;
         bv::MemoryChunkPtr display_img_mem;
-        bv::ImageViewPtr display_img_view;
+        bv::ImageViewPtr display_imgview;
 
         // descriptor set for ImGui::Image() to display the display image
         VkDescriptorSet imgui_descriptor_set;

@@ -27,6 +27,16 @@ namespace img_aligner
         float image_viewer_exposure = 0.f;
         bool image_viewer_use_flim = false;
 
+        // base image, mipmapped
+        bv::ImagePtr base_img = nullptr;
+        bv::MemoryChunkPtr base_img_mem = nullptr;
+        bv::ImageViewPtr base_imgview = nullptr;
+
+        // target image, mipmapped
+        bv::ImagePtr target_img = nullptr;
+        bv::MemoryChunkPtr target_img_mem = nullptr;
+        bv::ImageViewPtr target_imgview = nullptr;
+
         grid_warp::Params grid_warp_params;
         std::unique_ptr<grid_warp::GridWarper> grid_warper = nullptr;
 
@@ -49,7 +59,18 @@ namespace img_aligner
         void create_imgui_descriptor_pool();
         void init_imgui_vk_window_data();
         void init_imgui();
+
         void recreate_ui_pass();
+        void recreate_base_image(
+            uint32_t width,
+            uint32_t height,
+            std::span<float> pixels_rgba
+        );
+        void recreate_target_image(
+            uint32_t width,
+            uint32_t height,
+            std::span<float> pixels_rgba
+        );
 
         void layout_controls();
         void layout_misc();

@@ -35,10 +35,9 @@ namespace img_aligner::grid_warp
 
     struct Params
     {
-        uint32_t img_width = 1;
-        uint32_t img_height = 1;
-        std::span<float> base_img_pixels_rgba;
-        std::span<float> target_img_pixels_rgba;
+        bv::ImageViewWPtr base_imgview;
+        bv::ImageViewWPtr target_imgview;
+
         uint32_t grid_res_smallest_axis = 12;
         float grid_padding = .25f;
         uint32_t intermediate_res_smallest_axis = 800;
@@ -71,11 +70,7 @@ namespace img_aligner::grid_warp
         void create_vertex_and_index_buffer_and_generate_vertices(
             size_t thread_idx
         );
-        void create_sampler_and_images(
-            std::span<float> base_img_pixels_rgba,
-            std::span<float> target_img_pixels_rgba,
-            size_t thread_idx
-        );
+        void create_sampler_and_images(size_t thread_idx);
         void create_avg_difference_buffer();
         void create_passes();
 
@@ -86,11 +81,13 @@ namespace img_aligner::grid_warp
         bv::CommandBufferPtr create_difference_pass_cmd_buf(size_t thread_idx);
 
     private:
-        static constexpr VkFormat RGBA_FORMAT = VK_FORMAT_R32G32B32A32_SFLOAT;
-        static constexpr VkFormat R_FORMAT = VK_FORMAT_R32_SFLOAT;
-
         AppState& state;
 
+        // base and target images provided in the constructor
+        bv::ImageViewWPtr base_imgview;
+        bv::ImageViewWPtr target_imgview;
+
+        // size of the base and target images
         uint32_t img_width = 1;
         uint32_t img_height = 1;
 
@@ -116,18 +113,6 @@ namespace img_aligner::grid_warp
 
         // the one sampler we use for all images
         bv::SamplerPtr sampler = nullptr;
-
-        // base image at original resolution, mipmapped
-        bv::ImagePtr base_img = nullptr;
-        bv::MemoryChunkPtr base_img_mem = nullptr;
-        bv::ImageViewPtr base_imgview = nullptr;
-
-        // target image at original resolution, mipmapped. the target image is
-        // only used to calculate the difference (error) between the warped
-        // image and the target image.
-        bv::ImagePtr target_img = nullptr;
-        bv::MemoryChunkPtr target_img_mem = nullptr;
-        bv::ImageViewPtr target_imgview = nullptr;
 
         // grid warped image at intermediate resolution, no mipmapping. the base
         // image will be rendered to this image but it'll be downsampled and
@@ -162,8 +147,8 @@ namespace img_aligner::grid_warp
 
         // NOTE: there are 2 types of passes:
         // 1. grid warp pass
-        //    - renders to warped_img or final_img (we make 2 framebuffers and
-        //      use the appropriate one).
+        //    - renders to warped_img or warped_hires_img (we make 2
+        //      framebuffers and use the appropriate one).
         //    - samples base_img
         //    - uses the grid vertex buffer
         // 2. difference pass

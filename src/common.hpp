@@ -60,6 +60,11 @@ namespace img_aligner
     static constexpr auto FONT_PATH = "./fonts/Outfit-Regular.ttf";
     static constexpr auto FONT_BOLD_PATH = "./fonts/Outfit-Bold.ttf";
 
+    static constexpr VkFormat RGBA_FORMAT = VK_FORMAT_R32G32B32A32_SFLOAT;
+    static constexpr VkFormat R_FORMAT = VK_FORMAT_R32_SFLOAT;
+    static constexpr VkFormat UI_DISPLAY_IMG_FORMAT =
+        VK_FORMAT_R16G16B16A16_SFLOAT;
+
     static constexpr bool DEBUG_MODE = true;
 
     // total number of threads that create or submit command buffers
@@ -206,6 +211,20 @@ namespace img_aligner
         bv::BufferPtr src,
         bv::BufferPtr dst,
         VkDeviceSize size
+    );
+
+    void create_texture(
+        AppState& state,
+        uint32_t width,
+        uint32_t height,
+        VkFormat format,
+        void* pixels,
+        size_t size_bytes,
+        bool mipmapped,
+        size_t thread_idx,
+        bv::ImagePtr& out_img,
+        bv::MemoryChunkPtr& out_img_mem,
+        bv::ImageViewPtr& out_imgview
     );
 
 }

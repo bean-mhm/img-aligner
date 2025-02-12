@@ -58,7 +58,7 @@ namespace img_aligner
             _max_height,
             1,
             VK_SAMPLE_COUNT_1_BIT,
-            UI_FORMAT,
+            UI_DISPLAY_IMG_FORMAT,
             VK_IMAGE_TILING_OPTIMAL,
 
             VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
@@ -68,10 +68,10 @@ namespace img_aligner
             display_img,
             display_img_mem
         );
-        display_img_view = create_image_view(
+        display_imgview = create_image_view(
             state,
             display_img,
-            UI_FORMAT,
+            UI_DISPLAY_IMG_FORMAT,
             VK_IMAGE_ASPECT_COLOR_BIT,
             1
         );
@@ -88,7 +88,7 @@ namespace img_aligner
         // create descriptor set for ImGui::Image()
         imgui_descriptor_set = ImGui_ImplVulkan_AddTexture(
             sampler->handle(),
-            display_img_view->handle(),
+            display_imgview->handle(),
             VK_IMAGE_LAYOUT_GENERAL
         );
 
@@ -133,7 +133,7 @@ namespace img_aligner
         {
             bv::Attachment color_attachment{
                 .flags = 0,
-                .format = UI_FORMAT,
+                .format = UI_DISPLAY_IMG_FORMAT,
                 .samples = VK_SAMPLE_COUNT_1_BIT,
                 .load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
                 .store_op = VK_ATTACHMENT_STORE_OP_STORE,
@@ -185,7 +185,7 @@ namespace img_aligner
             bv::FramebufferConfig{
                 .flags = 0,
                 .render_pass = render_pass,
-                .attachments = { display_img_view },
+                .attachments = { display_imgview },
                 .width = _max_width,
                 .height = _max_height,
                 .layers = 1
@@ -379,7 +379,7 @@ namespace img_aligner
 
         display_img = nullptr;
         display_img_mem = nullptr;
-        display_img_view = nullptr;
+        display_imgview = nullptr;
     }
 
     const UiImageInfo& UiPass::add_image(
