@@ -14,6 +14,8 @@ namespace img_aligner
         void run();
 
     private:
+        static constexpr auto ERROR_DIALOG_TITLE = "Error";
+
         AppState state;
 
         ImFont* font = nullptr;
@@ -26,6 +28,8 @@ namespace img_aligner
         float image_viewer_zoom = 1.f;
         float image_viewer_exposure = 0.f;
         bool image_viewer_use_flim = false;
+
+        std::vector<std::string> current_errors;
 
         // base image, mipmapped
         bv::ImagePtr base_img = nullptr;
@@ -89,6 +93,8 @@ namespace img_aligner
             bool full_width
         );
         void imgui_tooltip(std::string_view s);
+        void imgui_dialogs();
+        ImVec2 dialog_button_size();
 
         void render_frame(ImDrawData* draw_data);
         void present_frame();

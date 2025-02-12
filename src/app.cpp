@@ -35,8 +35,8 @@ namespace img_aligner
         init_imgui();
 
         // generate fake test image for base and target images
-        uint32_t test_image_width = 1920;
-        uint32_t test_image_height = 1080;
+        uint32_t test_image_width = 1280;
+        uint32_t test_image_height = 720;
         std::vector<float> test_image_data(
             test_image_width * test_image_height * 4
         );
@@ -863,13 +863,17 @@ namespace img_aligner
                 grid_warper->run_difference_pass(0);
 
                 recreate_ui_pass();
+
+                //TODO_make_function_recreate_grid_warper_and_handle_excep;
             }
             catch (std::string s)
             {
-                //TODO_show_imgui_dialog;
-                throw std::exception(s.c_str());
+                current_errors.push_back(s);
+                ImGui::OpenPopup(ERROR_DIALOG_TITLE);
             }
         }
+
+        imgui_dialogs();
 
         ImGui::End();
     }
@@ -1195,6 +1199,43 @@ namespace img_aligner
 
         ImGui::TextWrapped(s.data());
         ImGui::EndTooltip();
+    }
+
+    void App::imgui_dialogs()
+    {
+        // error dialog
+        if (ImGui::BeginPopupModal(
+            ERROR_DIALOG_TITLE,
+            nullptr,
+            ImGuiWindowFlags_AlwaysAutoResize
+        ))
+        {
+            std::string s;
+            for (size_t i = 0; i < current_errors.size(); i++)
+            {
+                if (i != 0)
+                {
+                    s += "\n";
+                }
+                s += current_errors[i];
+            }
+            ImGui::Text(s.c_str());
+
+            if (ImGui::Button("OK##error_dialog", dialog_button_size()))
+            {
+                current_errors.clear();
+                ImGui::CloseCurrentPopup();
+            }
+
+            ImGui::NewLine();
+
+            ImGui::EndPopup();
+        }
+    }
+
+    ImVec2 App::dialog_button_size()
+    {
+        return { 300.f * ui_scale, 28.f * ui_scale };
     }
 
     void App::render_frame(ImDrawData* draw_data)
