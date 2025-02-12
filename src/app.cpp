@@ -65,6 +65,8 @@ namespace img_aligner
             test_image_height,
             { test_image_data.data(), test_image_data.size() }
         );
+
+        recreate_ui_pass();
     }
 
     void App::main_loop()
@@ -863,8 +865,6 @@ namespace img_aligner
                 grid_warper->run_difference_pass(0);
 
                 recreate_ui_pass();
-
-                //TODO_make_function_recreate_grid_warper_and_handle_excep;
             }
             catch (std::string s)
             {
