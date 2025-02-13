@@ -1,5 +1,8 @@
 #include "app.hpp"
 
+#include "ImfRgbaFile.h"
+#include "ImfArray.h"
+
 namespace img_aligner
 {
 
@@ -33,40 +36,6 @@ namespace img_aligner
         create_imgui_descriptor_pool();
         init_imgui_vk_window_data();
         init_imgui();
-
-        // generate fake test image for base and target images
-        uint32_t test_image_width = 1280;
-        uint32_t test_image_height = 720;
-        std::vector<float> test_image_data(
-            test_image_width * test_image_height * 4
-        );
-        for (uint32_t y = 0; y < test_image_height; y++)
-        {
-            for (uint32_t x = 0; x < test_image_width; x++)
-            {
-                float u = ((float)x + .5f) / (float)test_image_width;
-                float v = ((float)y + .5f) / (float)test_image_height;
-
-                uint32_t red_idx = (x + y * test_image_width) * 4;
-                test_image_data[red_idx + 0] = std::pow(u, 1.f / 2.2f);
-                test_image_data[red_idx + 1] = std::pow(v, 1.f / 2.2f);
-                test_image_data[red_idx + 2] =
-                    std::pow(std::cos(30.f * u) * .1f + .1f, 1.f / 2.2f);
-                test_image_data[red_idx + 3] = 1.f;
-            }
-        }
-        recreate_base_image(
-            test_image_width,
-            test_image_height,
-            { test_image_data.data(), test_image_data.size() }
-        );
-        recreate_target_image(
-            test_image_width,
-            test_image_height,
-            { test_image_data.data(), test_image_data.size() }
-        );
-
-        recreate_ui_pass();
     }
 
     void App::main_loop()
@@ -724,6 +693,7 @@ namespace img_aligner
             base_img_mem,
             base_imgview
         );
+        recreate_ui_pass();
     }
 
     void App::recreate_target_image(
@@ -751,6 +721,7 @@ namespace img_aligner
             target_img_mem,
             target_imgview
         );
+        recreate_ui_pass();
     }
 
     void App::layout_controls()
@@ -761,7 +732,70 @@ namespace img_aligner
 
         if (ImGui::Button("Load Base Image##Controls"))
         {
-            std::cout << "load base\n";
+            std::string filename =
+                "X:\\Projects\\0dev\\0NotMine\\Testing_Imagery\\"
+                "red_xmas_rec709.exr";
+
+            try
+            {
+                if (!std::filesystem::exists(filename))
+                {
+                    throw std::exception("file doesn't exist");
+                }
+                if (std::filesystem::is_directory(filename))
+                {
+                    throw std::exception(
+                        "provided path is a directory, not a file"
+                    );
+                }
+
+                Imf::RgbaInputFile f(filename.c_str());
+                Imath::Box2i dw = f.dataWindow();
+                int32_t width = dw.max.x - dw.min.x + 1;
+                int32_t height = dw.max.y - dw.min.y + 1;
+
+                std::vector<Imf::Rgba> pixels(width * height);
+
+                f.setFrameBuffer(pixels.data(), 1, width);
+                f.readPixels(dw.min.y, dw.max.y);
+
+                std::vector<float> pixels_f32(width * height * 4);
+                for (int32_t y = 0; y < height; y++)
+                {
+                    for (int32_t x = 0; x < width; x++)
+                    {
+                        int32_t pixel_idx = x + y * width;
+                        int32_t red_idx = pixel_idx * 4;
+
+                        int32_t flipped_pixel_idx =
+                            x + (height - y - 1) * width;
+
+                        pixels_f32[red_idx + 0] =
+                            (float)pixels[flipped_pixel_idx].r;
+                        pixels_f32[red_idx + 1] =
+                            (float)pixels[flipped_pixel_idx].g;
+                        pixels_f32[red_idx + 2] =
+                            (float)pixels[flipped_pixel_idx].b;
+                        pixels_f32[red_idx + 3] =
+                            (float)pixels[flipped_pixel_idx].a;
+                    }
+                }
+
+                recreate_base_image(
+                    width,
+                    height,
+                    { pixels_f32.data(), pixels_f32.size() }
+                );
+            }
+            catch (const std::exception& e)
+            {
+                current_errors.push_back(std::format(
+                    "Failed to load OpenEXR image from file \"{}\": {}",
+                    filename,
+                    e.what()
+                ));
+                ImGui::OpenPopup(ERROR_DIALOG_TITLE);
+            }
         }
 
         if (ImGui::Button("Load Target Image##Controls"))
@@ -1203,6 +1237,15 @@ namespace img_aligner
 
     void App::imgui_dialogs()
     {
+        ImGui::SetNextWindowPos(
+            {
+                .5f * (float)state.imgui_vk_window_data.Width,
+                .5f * (float)state.imgui_vk_window_data.Height
+            },
+            0,
+            { .5f, .5f }
+        );
+
         // error dialog
         if (ImGui::BeginPopupModal(
             ERROR_DIALOG_TITLE,
@@ -1215,27 +1258,25 @@ namespace img_aligner
             {
                 if (i != 0)
                 {
-                    s += "\n";
+                    s += '\n';
                 }
                 s += current_errors[i];
             }
-            ImGui::Text(s.c_str());
 
+            ImGui::TextWrapped(s.c_str());
+            ImGui::NewLine();
             if (ImGui::Button("OK##error_dialog", dialog_button_size()))
             {
                 current_errors.clear();
                 ImGui::CloseCurrentPopup();
             }
-
-            ImGui::NewLine();
-
             ImGui::EndPopup();
         }
     }
 
     ImVec2 App::dialog_button_size()
     {
-        return { 300.f * ui_scale, 28.f * ui_scale };
+        return { 350.f * ui_scale, 30.f * ui_scale };
     }
 
     void App::render_frame(ImDrawData* draw_data)
