@@ -717,6 +717,7 @@ namespace img_aligner
                 base_imgview
             ))
             {
+                grid_warper = nullptr;
                 recreate_ui_pass();
                 ui_pass_select_image(BASE_IMAGE_NAME);
             }
@@ -730,6 +731,7 @@ namespace img_aligner
                 target_imgview
             ))
             {
+                grid_warper = nullptr;
                 recreate_ui_pass();
                 ui_pass_select_image(TARGET_IMAGE_NAME);
             }
@@ -794,6 +796,7 @@ namespace img_aligner
 
         if (ImGui::Button("Start Alignin'##Controls"))
         {
+            grid_warper = nullptr;
             try
             {
                 if (!base_img)
@@ -819,7 +822,7 @@ namespace img_aligner
                 }
 
                 grid_warp_params.base_imgview = base_imgview;
-                grid_warp_params.target_imgview = base_imgview;
+                grid_warp_params.target_imgview = target_imgview;
 
                 grid_warper = std::make_unique<grid_warp::GridWarper>(
                     state,
@@ -829,14 +832,13 @@ namespace img_aligner
 
                 grid_warper->run_grid_warp_pass(false, 0);
                 grid_warper->run_difference_pass(0);
-
-                recreate_ui_pass();
             }
             catch (std::string s)
             {
                 current_errors.push_back(s);
                 ImGui::OpenPopup(ERROR_DIALOG_TITLE);
             }
+            recreate_ui_pass();
         }
 
         imgui_dialogs();
