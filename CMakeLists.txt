@@ -38,8 +38,13 @@ set(OPENEXR_INSTALL off)
 set(OPENEXR_INSTALL_TOOLS off)
 set(OPENEXR_BUILD_TOOLS off)
 set(OPENEXR_BUILD_EXAMPLES off)
-target_include_directories(img-aligner PUBLIC openexr/src/lib/OpenEXR)
+target_include_directories(img-aligner PUBLIC openexr/src/lib)
 target_link_libraries(img-aligner PUBLIC OpenEXR)
+
+# Native File Dialog Extended
+add_subdirectory(nativefiledialog-extended)
+target_include_directories(img-aligner PUBLIC nativefiledialog-extended/src/include)
+target_link_libraries(img-aligner PRIVATE nfd)
 
 # macro to make a directory if it doesn't exist (at build time)
 if(MSVC OR MSYS OR MINGW OR WIN32)

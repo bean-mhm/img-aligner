@@ -1,7 +1,9 @@
 #include "app.hpp"
 
-#include "ImfRgbaFile.h"
-#include "ImfArray.h"
+#include "OpenEXR/ImfRgbaFile.h"
+#include "OpenEXR/ImfArray.h"
+
+#include "nfd.hpp"
 
 namespace img_aligner
 {
@@ -25,6 +27,7 @@ namespace img_aligner
 
     void App::init()
     {
+        NFD_Init();
         init_window();
         init_context();
         setup_debug_messenger();
@@ -150,6 +153,8 @@ namespace img_aligner
 
     void App::cleanup()
     {
+        NFD_Quit();
+
         ui_pass = nullptr;
         grid_warper = nullptr;
 
@@ -668,7 +673,10 @@ namespace img_aligner
         need_to_run_ui_pass = true;
     }
 
-    void App::recreate_base_image(
+    void App::recreate_image(
+        bv::ImagePtr& img,
+        bv::MemoryChunkPtr& img_mem,
+        bv::ImageViewPtr& imgview,
         uint32_t width,
         uint32_t height,
         std::span<float> pixels_rgba
@@ -689,39 +697,10 @@ namespace img_aligner
             pixels_rgba.size_bytes(),
             true,
             0,
-            base_img,
-            base_img_mem,
-            base_imgview
+            img,
+            img_mem,
+            imgview
         );
-        recreate_ui_pass();
-    }
-
-    void App::recreate_target_image(
-        uint32_t width,
-        uint32_t height,
-        std::span<float> pixels_rgba
-    )
-    {
-        if (pixels_rgba.size() != (size_t)width * (size_t)height * (size_t)4)
-        {
-            throw std::invalid_argument(
-                "provided pixel data doesn't have the expected size"
-            );
-        }
-        create_texture(
-            state,
-            width,
-            height,
-            RGBA_FORMAT,
-            pixels_rgba.data(),
-            pixels_rgba.size_bytes(),
-            true,
-            0,
-            target_img,
-            target_img_mem,
-            target_imgview
-        );
-        recreate_ui_pass();
     }
 
     void App::layout_controls()
@@ -732,75 +711,28 @@ namespace img_aligner
 
         if (ImGui::Button("Load Base Image##Controls"))
         {
-            std::string filename =
-                "X:\\Projects\\0dev\\0NotMine\\Testing_Imagery\\"
-                "red_xmas_rec709.exr";
-
-            try
+            if (browse_and_load_image(
+                base_img,
+                base_img_mem,
+                base_imgview
+            ))
             {
-                if (!std::filesystem::exists(filename))
-                {
-                    throw std::exception("file doesn't exist");
-                }
-                if (std::filesystem::is_directory(filename))
-                {
-                    throw std::exception(
-                        "provided path is a directory, not a file"
-                    );
-                }
-
-                Imf::RgbaInputFile f(filename.c_str());
-                Imath::Box2i dw = f.dataWindow();
-                int32_t width = dw.max.x - dw.min.x + 1;
-                int32_t height = dw.max.y - dw.min.y + 1;
-
-                std::vector<Imf::Rgba> pixels(width * height);
-
-                f.setFrameBuffer(pixels.data(), 1, width);
-                f.readPixels(dw.min.y, dw.max.y);
-
-                std::vector<float> pixels_f32(width * height * 4);
-                for (int32_t y = 0; y < height; y++)
-                {
-                    for (int32_t x = 0; x < width; x++)
-                    {
-                        int32_t pixel_idx = x + y * width;
-                        int32_t red_idx = pixel_idx * 4;
-
-                        int32_t flipped_pixel_idx =
-                            x + (height - y - 1) * width;
-
-                        pixels_f32[red_idx + 0] =
-                            (float)pixels[flipped_pixel_idx].r;
-                        pixels_f32[red_idx + 1] =
-                            (float)pixels[flipped_pixel_idx].g;
-                        pixels_f32[red_idx + 2] =
-                            (float)pixels[flipped_pixel_idx].b;
-                        pixels_f32[red_idx + 3] =
-                            (float)pixels[flipped_pixel_idx].a;
-                    }
-                }
-
-                recreate_base_image(
-                    width,
-                    height,
-                    { pixels_f32.data(), pixels_f32.size() }
-                );
-            }
-            catch (const std::exception& e)
-            {
-                current_errors.push_back(std::format(
-                    "Failed to load OpenEXR image from file \"{}\": {}",
-                    filename,
-                    e.what()
-                ));
-                ImGui::OpenPopup(ERROR_DIALOG_TITLE);
+                recreate_ui_pass();
+                ui_pass_select_image(BASE_IMAGE_NAME);
             }
         }
 
         if (ImGui::Button("Load Target Image##Controls"))
         {
-            std::cout << "load target\n";
+            if (browse_and_load_image(
+                target_img,
+                target_img_mem,
+                target_imgview
+            ))
+            {
+                recreate_ui_pass();
+                ui_pass_select_image(TARGET_IMAGE_NAME);
+            }
         }
 
         imgui_div();
@@ -1495,6 +1427,117 @@ namespace img_aligner
 
         window_data.SemaphoreIndex =
             (window_data.SemaphoreIndex + 1) % window_data.SemaphoreCount;
+    }
+
+    bool App::browse_and_load_image(
+        bv::ImagePtr& img,
+        bv::MemoryChunkPtr& img_mem,
+        bv::ImageViewPtr& imgview
+    )
+    {
+        nfdu8char_t* nfd_filename;
+        nfdopendialogu8args_t args{ 0 };
+        nfdu8filteritem_t filters[1] = { { "OpenEXR", "exr" } };
+        args.filterList = filters;
+        args.filterCount = sizeof(filters) / sizeof(nfdu8filteritem_t);
+        nfdresult_t result = NFD_OpenDialogU8_With(&nfd_filename, &args);
+        if (result == NFD_OKAY)
+        {
+            std::string filename(nfd_filename);
+            NFD_FreePathU8(nfd_filename);
+
+            try
+            {
+                if (!std::filesystem::exists(filename))
+                {
+                    throw std::exception("file doesn't exist");
+                }
+                if (std::filesystem::is_directory(filename))
+                {
+                    throw std::exception(
+                        "provided path is a directory, not a file"
+                    );
+                }
+
+                Imf::RgbaInputFile f(filename.c_str());
+                Imath::Box2i dw = f.dataWindow();
+                int32_t width = dw.max.x - dw.min.x + 1;
+                int32_t height = dw.max.y - dw.min.y + 1;
+
+                std::vector<Imf::Rgba> pixels(width * height);
+
+                f.setFrameBuffer(pixels.data(), 1, width);
+                f.readPixels(dw.min.y, dw.max.y);
+
+                std::vector<float> pixels_f32(width * height * 4);
+                for (int32_t y = 0; y < height; y++)
+                {
+                    for (int32_t x = 0; x < width; x++)
+                    {
+                        int32_t pixel_idx = x + y * width;
+                        int32_t red_idx = pixel_idx * 4;
+
+                        int32_t flipped_pixel_idx =
+                            x + (height - y - 1) * width;
+
+                        pixels_f32[red_idx + 0] =
+                            (float)pixels[flipped_pixel_idx].r;
+                        pixels_f32[red_idx + 1] =
+                            (float)pixels[flipped_pixel_idx].g;
+                        pixels_f32[red_idx + 2] =
+                            (float)pixels[flipped_pixel_idx].b;
+                        pixels_f32[red_idx + 3] =
+                            (float)pixels[flipped_pixel_idx].a;
+                    }
+                }
+
+                recreate_image(
+                    img,
+                    img_mem,
+                    imgview,
+                    width,
+                    height,
+                    { pixels_f32.data(), pixels_f32.size() }
+                );
+
+                return true;
+            }
+            catch (const std::exception& e)
+            {
+                current_errors.push_back(std::format(
+                    "Failed to load OpenEXR image from file \"{}\": {}",
+                    filename,
+                    e.what()
+                ));
+                ImGui::OpenPopup(ERROR_DIALOG_TITLE);
+            }
+        }
+        else if (result == NFD_CANCEL)
+        {
+            // user pressed cancel
+        }
+        else if (result == NFD_ERROR)
+        {
+            current_errors.push_back(std::format(
+                "Native File Dialog: {}",
+                NFD_GetError()
+            ));
+            ImGui::OpenPopup(ERROR_DIALOG_TITLE);
+        }
+
+        return false;
+    }
+
+    void App::ui_pass_select_image(std::string_view name)
+    {
+        for (size_t i = 0; i < ui_pass->images().size(); i++)
+        {
+            if (ui_pass->images()[i].name == name)
+            {
+                selected_image_idx = i;
+                break;
+            }
+        }
     }
 
     static void glfw_error_callback(int error, const char* description)

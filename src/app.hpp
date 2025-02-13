@@ -15,6 +15,8 @@ namespace img_aligner
 
     private:
         static constexpr auto ERROR_DIALOG_TITLE = "Error";
+        static constexpr auto BASE_IMAGE_NAME = "Base Image";
+        static constexpr auto TARGET_IMAGE_NAME = "Target Image";
 
         AppState state;
 
@@ -65,12 +67,10 @@ namespace img_aligner
         void init_imgui();
 
         void recreate_ui_pass();
-        void recreate_base_image(
-            uint32_t width,
-            uint32_t height,
-            std::span<float> pixels_rgba
-        );
-        void recreate_target_image(
+        void recreate_image(
+            bv::ImagePtr& img,
+            bv::MemoryChunkPtr& img_mem,
+            bv::ImageViewPtr& imgview,
             uint32_t width,
             uint32_t height,
             std::span<float> pixels_rgba
@@ -98,6 +98,14 @@ namespace img_aligner
 
         void render_frame(ImDrawData* draw_data);
         void present_frame();
+
+        bool browse_and_load_image(
+            bv::ImagePtr& img,
+            bv::MemoryChunkPtr& img_mem,
+            bv::ImageViewPtr& imgview
+        );
+
+        void ui_pass_select_image(std::string_view name);
 
     };
 
