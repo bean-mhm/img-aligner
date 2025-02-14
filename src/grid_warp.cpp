@@ -234,7 +234,15 @@ namespace img_aligner::grid_warp
         dfp_fence->wait();
         dfp_fence->reset();
 
-        return *avg_difference_buf_mapped;
+        // the difference is averaged over the square resolution of the
+        // difference image but we expect the averaged value over the
+        // intermediate resolution (the bottom left corner of the difference
+        // image) so this fixes that.
+        float avg = *avg_difference_buf_mapped;
+        float sum =
+            avg * (float)(difference_res_square * difference_res_square);
+        avg = sum / (float)(intermediate_res_x * intermediate_res_y);
+        return avg;
     }
 
     void GridWarper::add_images_to_ui_pass(UiPass& ui_pass)
