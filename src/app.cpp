@@ -743,19 +743,16 @@ namespace img_aligner
         if (ImGui::InputScalar(
             "Grid Resolution##Controls",
             ImGuiDataType_U32,
-            &grid_warp_params.grid_res_smallest_axis
+            &grid_warp_params.grid_res_area
         ))
         {
-            grid_warp_params.grid_res_smallest_axis = std::clamp(
-                grid_warp_params.grid_res_smallest_axis,
-                (uint32_t)0,
-                (uint32_t)1024
+            grid_warp_params.grid_res_area = std::clamp(
+                grid_warp_params.grid_res_area,
+                (uint32_t)1,
+                (uint32_t)(8192u * 8192u)
             );
         }
-        imgui_tooltip(
-            "Resolution of the warping grid in the smallest axis (width "
-            "or height)"
-        );
+        imgui_tooltip("Area of the warping grid resolution");
 
         if (ImGui::InputFloat(
             "Grid Padding##Controls",
@@ -765,7 +762,7 @@ namespace img_aligner
             grid_warp_params.grid_padding = std::clamp(
                 grid_warp_params.grid_padding,
                 0.f,
-                .5f
+                .75f
             );
         }
         imgui_tooltip(
@@ -778,20 +775,19 @@ namespace img_aligner
         if (ImGui::InputScalar(
             "Intermediate Resolution##Controls",
             ImGuiDataType_U32,
-            &grid_warp_params.intermediate_res_smallest_axis
+            &grid_warp_params.intermediate_res_area
         ))
         {
-            grid_warp_params.intermediate_res_smallest_axis = std::clamp(
-                grid_warp_params.intermediate_res_smallest_axis,
+            grid_warp_params.intermediate_res_area = std::clamp(
+                grid_warp_params.intermediate_res_area,
                 (uint32_t)1,
-                (uint32_t)16384
+                (uint32_t)(16384u * 16384u)
             );
         }
         imgui_tooltip(
             "The images are temporarily downsampled throughout the "
             "optimization process to improve computation speed. This value "
-            "defines the maximum intermediate image resolution in the smallest "
-            "axis (width or height)."
+            "defines the area of the intermediate image resolution."
         );
 
         if (ImGui::Button("Start Alignin'##Controls"))

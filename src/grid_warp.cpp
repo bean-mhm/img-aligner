@@ -93,64 +93,68 @@ namespace img_aligner::grid_warp
             );
         }
 
-        uint32_t image_res_min = std::min(img_width, img_height);
-        uint32_t image_res_max = std::max(img_width, img_height);
-        double aspect_ratio = (double)image_res_max / (double)image_res_min;
-
         // figure out the intermediate resolution
-        uint32_t actual_intermediate_res = std::clamp(
-            params.intermediate_res_smallest_axis,
+
+        double area_fac =
+            (double)params.intermediate_res_area
+            / (double)(img_width * img_height);
+        double size_fac = std::clamp(std::sqrt(area_fac), 0., 1.);
+
+        intermediate_res_x = (uint32_t)std::floor(size_fac * (double)img_width);
+        intermediate_res_y =
+            (uint32_t)std::floor(size_fac * (double)img_height);
+
+        intermediate_res_x = std::clamp(
+            intermediate_res_x,
             (uint32_t)1,
-            image_res_min
+            img_width
         );
-        if (img_width < img_height)
-        {
-            intermediate_res_x = actual_intermediate_res;
-            intermediate_res_y = (uint32_t)std::ceil(
-                (double)actual_intermediate_res * aspect_ratio
-            );
-        }
-        else
-        {
-            intermediate_res_y = actual_intermediate_res;
-            intermediate_res_x = (uint32_t)std::ceil(
-                (double)actual_intermediate_res * aspect_ratio
-            );
-        }
+        intermediate_res_y = std::clamp(
+            intermediate_res_y,
+            (uint32_t)1,
+            img_height
+        );
 
         // figure out the grid resolution
-        if (params.grid_res_smallest_axis < 1)
-        {
-            grid_res_x = 1;
-            grid_res_y = 1;
-        }
-        else if (img_width < img_height)
-        {
-            grid_res_x = params.grid_res_smallest_axis;
-            grid_res_y = (uint32_t)std::ceil(
-                (double)params.grid_res_smallest_axis * aspect_ratio
-            );
-        }
-        else
-        {
-            grid_res_y = params.grid_res_smallest_axis;
-            grid_res_x = (uint32_t)std::ceil(
-                (double)params.grid_res_smallest_axis * aspect_ratio
-            );
-        }
+
+        area_fac =
+            (double)params.grid_res_area
+            / (double)(intermediate_res_x * intermediate_res_y);
+        size_fac = std::clamp(std::sqrt(area_fac), 0., .5);
+
+        grid_res_x =
+            (uint32_t)std::floor(size_fac * (double)intermediate_res_x);
+        grid_res_y =
+            (uint32_t)std::floor(size_fac * (double)intermediate_res_y);
+
+        grid_res_x = std::clamp(
+            grid_res_x,
+            (uint32_t)1,
+            intermediate_res_x
+        );
+        grid_res_y = std::clamp(
+            grid_res_y,
+            (uint32_t)1,
+            intermediate_res_y
+        );
 
         // figure out the padded grid resolution. basically we add a border on
         // the outside for padding. without the bordering cells, we might get
         // black empty spaces in the warped image.
-        double actual_grid_padding = (double)std::max(params.grid_padding, 0.f);
-        uint32_t grid_res_max = std::max(grid_res_x, grid_res_y);
+
+        double actual_grid_padding = std::max((double)params.grid_padding, 0.);
+        double grid_res_diagonal = std::sqrt(
+            (double)((grid_res_x * grid_res_x) + (grid_res_y * grid_res_y))
+        );
+
+        double absolute_padding_in_cells =
+            2. * actual_grid_padding * grid_res_diagonal;
+
         padded_grid_res_x = (uint32_t)std::ceil(
-            (double)grid_res_x
-            + (2. * actual_grid_padding * (double)grid_res_max)
+            (double)grid_res_x + absolute_padding_in_cells
         );
         padded_grid_res_y = (uint32_t)std::ceil(
-            (double)grid_res_y
-            + (2. * actual_grid_padding * (double)grid_res_max)
+            (double)grid_res_y + absolute_padding_in_cells
         );
 
         // padded resolution must be original resolution plus an even number
@@ -158,6 +162,18 @@ namespace img_aligner::grid_warp
             padded_grid_res_x++;
         if ((padded_grid_res_y - grid_res_y) % 2 != 0)
             padded_grid_res_y++;
+
+        std::cout << std::format(
+            "interm: {} x {}\n"
+            "grid res: {} x {}\n"
+            "padded: {} x {}\n\n",
+            intermediate_res_x,
+            intermediate_res_y,
+            grid_res_x,
+            grid_res_y,
+            padded_grid_res_x,
+            padded_grid_res_y
+        );
 
         create_vertex_and_index_buffer_and_generate_vertices(thread_idx);
         create_sampler_and_images(thread_idx);

@@ -38,9 +38,10 @@ namespace img_aligner::grid_warp
         bv::ImageViewWPtr base_imgview;
         bv::ImageViewWPtr target_imgview;
 
-        uint32_t grid_res_smallest_axis = 12;
+        uint32_t grid_res_area = 256;
         float grid_padding = .25f;
-        uint32_t intermediate_res_smallest_axis = 800;
+
+        uint32_t intermediate_res_area = 920000;
     };
 
     class GridWarper
