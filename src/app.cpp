@@ -740,10 +740,11 @@ namespace img_aligner
         imgui_div();
         imgui_bold("OPTIMIZATION");
 
-        if (ImGui::InputScalar(
+        if (ImGui::DragScalar(
             "Grid Resolution##Controls",
             ImGuiDataType_U32,
-            &grid_warp_params.grid_res_area
+            &grid_warp_params.grid_res_area,
+            .8f
         ))
         {
             grid_warp_params.grid_res_area = std::clamp(
@@ -754,15 +755,18 @@ namespace img_aligner
         }
         imgui_tooltip("Area of the warping grid resolution");
 
-        if (ImGui::InputFloat(
+        if (ImGui::DragFloat(
             "Grid Padding##Controls",
-            &grid_warp_params.grid_padding
+            &grid_warp_params.grid_padding,
+            .002f,
+            0.f,
+            1.f
         ))
         {
             grid_warp_params.grid_padding = std::clamp(
                 grid_warp_params.grid_padding,
                 0.f,
-                .75f
+                1.f
             );
         }
         imgui_tooltip(
@@ -772,10 +776,11 @@ namespace img_aligner
             "resolution."
         );
 
-        if (ImGui::InputScalar(
+        if (ImGui::DragScalar(
             "Intermediate Resolution##Controls",
             ImGuiDataType_U32,
-            &grid_warp_params.intermediate_res_area
+            &grid_warp_params.intermediate_res_area,
+            1200.f
         ))
         {
             grid_warp_params.intermediate_res_area = std::clamp(
@@ -1157,11 +1162,13 @@ namespace img_aligner
         if (!ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
             return;
 
-        ImGui::SetNextWindowContentSize({ 400.f * ui_scale, 0.f });
         if (!ImGui::BeginTooltip())
             return;
 
+        ImGui::PushTextWrapPos(400.f * ui_scale);
         ImGui::TextWrapped(s.data());
+        ImGui::PopTextWrapPos();
+
         ImGui::EndTooltip();
     }
 
