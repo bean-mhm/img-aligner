@@ -114,6 +114,16 @@ namespace img_aligner
     // right) until it reaches 0.
     uint32_t round_log2(uint32_t n);
 
+    constexpr ImVec2 imvec_from_glm(const glm::vec2& v)
+    {
+        return { v.x, v.y };
+    }
+
+    constexpr glm::vec2 imvec_to_glm(const ImVec2& v)
+    {
+        return { v.x, v.y };
+    }
+
     // if use_transfer_pool is true, the command buffer will be allocated
     // from transfer_cmd_pool instead of cmd_pool. transfer_cmd_pool has the
     // VK_COMMAND_POOL_CREATE_TRANSIENT_BIT flag enabled which might be of

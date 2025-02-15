@@ -31,6 +31,8 @@ namespace img_aligner
         float image_viewer_exposure = 0.f;
         bool image_viewer_use_flim = false;
 
+        bool preview_grid = false;
+
         std::vector<std::string> current_errors;
 
         // base image, mipmapped

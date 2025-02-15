@@ -67,6 +67,21 @@ namespace img_aligner::grid_warp
 
         void add_images_to_ui_pass(UiPass& ui_pass);
 
+        constexpr const uint32_t get_padded_grid_res_x() const
+        {
+            return padded_grid_res_x;
+        }
+
+        constexpr const uint32_t get_padded_grid_res_y() const
+        {
+            return padded_grid_res_y;
+        }
+
+        const GridVertex* get_vertices() const
+        {
+            return vertex_buf_mapped;
+        }
+
     private:
         void create_vertex_and_index_buffer_and_generate_vertices(
             size_t thread_idx

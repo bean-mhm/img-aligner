@@ -776,6 +776,13 @@ namespace img_aligner
             "resolution."
         );
 
+        ImGui::Checkbox("Preview Grid", &preview_grid);
+        imgui_tooltip(
+            "Preview the grid lines (including padding). This will only work "
+            "if the base and target images are loaded and have identical "
+            "resolutions."
+        );
+
         if (ImGui::DragScalar(
             "Intermediate Resolution##Controls",
             ImGuiDataType_U32,
@@ -977,13 +984,82 @@ namespace img_aligner
             need_to_run_ui_pass = true;
         }
 
-        ImGui::NewLine();
-
         // image
         ui_pass->draw_imgui_image(
             ui_pass->images()[selected_image_idx],
             image_viewer_zoom
         );
+
+        // get the 4 corners of the last item which is the image (bl = bottom
+        // left, tr = top right, etc.). make sure to remove the offset caused
+        // by the image border.
+        glm::vec2 image_tl = imvec_to_glm(ImGui::GetItemRectMin()) + 1.f;
+        glm::vec2 image_br = imvec_to_glm(ImGui::GetItemRectMax()) - 2.f;
+        glm::vec2 image_tr{ image_br.x, image_tl.y };
+        glm::vec2 image_bl{ image_tl.x, image_br.y };
+        glm::vec2 image_span = image_tr - image_bl;
+
+        // preview grid lines
+        if (preview_grid && grid_warper != nullptr)
+        {
+            ImDrawList* draw_list = ImGui::GetWindowDrawList();
+
+            uint32_t padded_res_x = grid_warper->get_padded_grid_res_x();
+            uint32_t padded_res_y = grid_warper->get_padded_grid_res_y();
+            const grid_warp::GridVertex* vertices = grid_warper->get_vertices();
+
+            const ImU32 line_col = ImGui::ColorConvertFloat4ToU32(
+                { .65f, .65f, .65f, .7f }
+            );
+            const ImU32 line_col_outside = ImGui::ColorConvertFloat4ToU32(
+                { .8f, .8f, .8f, .05f }
+            );
+            float line_thickness = 1.f;
+
+            // remember that the number of vertices is
+            // (padded_res_x + 1) * (padded_res_y + 1) to cover all edges.
+            uint32_t stride_y = padded_res_x + 1;
+            for (uint32_t y = 0; y <= padded_res_y; y++)
+            {
+                for (uint32_t x = 0; x <= padded_res_x; x++)
+                {
+                    const auto& vert = vertices[x + y * stride_y];
+                    const auto& vert_right = vertices[(x + 1) + y * stride_y];
+                    const auto& vert_up = vertices[x + (y + 1) * stride_y];
+
+                    bool is_outside =
+                        vert.orig_pos.x < 0.f || vert.orig_pos.y < 0.f
+                        || vert.orig_pos.x > 1.f || vert.orig_pos.y > 1.f;
+
+                    if (x < padded_res_x)
+                    {
+                        draw_list->AddLine(
+                            imvec_from_glm(
+                                image_bl + image_span * vert.warped_pos
+                            ),
+                            imvec_from_glm(
+                                image_bl + image_span * vert_right.warped_pos
+                            ),
+                            is_outside ? line_col_outside : line_col,
+                            line_thickness
+                        );
+                    }
+                    if (y < padded_res_y)
+                    {
+                        draw_list->AddLine(
+                            imvec_from_glm(
+                                image_bl + image_span * vert.warped_pos
+                            ),
+                            imvec_from_glm(
+                                image_bl + image_span * vert_up.warped_pos
+                            ),
+                            is_outside ? line_col_outside : line_col,
+                            line_thickness
+                        );
+                    }
+                }
+            }
+        }
 
         ImGui::End();
     }
