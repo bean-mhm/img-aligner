@@ -124,6 +124,11 @@ namespace img_aligner
         return { v.x, v.y };
     }
 
+    constexpr bool vec2_is_outside_01(const glm::vec2& v)
+    {
+        return v.x < 0.f || v.y < 0.f || v.x > 1.f || v.y > 1.f;
+    }
+
     // if use_transfer_pool is true, the command buffer will be allocated
     // from transfer_cmd_pool instead of cmd_pool. transfer_cmd_pool has the
     // VK_COMMAND_POOL_CREATE_TRANSIENT_BIT flag enabled which might be of

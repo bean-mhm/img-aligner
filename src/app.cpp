@@ -1024,15 +1024,14 @@ namespace img_aligner
                 for (uint32_t x = 0; x <= padded_res_x; x++)
                 {
                     const auto& vert = vertices[x + y * stride_y];
-                    const auto& vert_right = vertices[(x + 1) + y * stride_y];
-                    const auto& vert_up = vertices[x + (y + 1) * stride_y];
-
-                    bool is_outside =
-                        vert.orig_pos.x < 0.f || vert.orig_pos.y < 0.f
-                        || vert.orig_pos.x > 1.f || vert.orig_pos.y > 1.f;
-
                     if (x < padded_res_x)
                     {
+                        auto& vert_right = vertices[(x + 1) + y * stride_y];
+
+                        bool is_outside =
+                            vec2_is_outside_01(vert.orig_pos)
+                            || vec2_is_outside_01(vert_right.orig_pos);
+
                         draw_list->AddLine(
                             imvec_from_glm(
                                 image_bl + image_span * vert.warped_pos
@@ -1046,6 +1045,12 @@ namespace img_aligner
                     }
                     if (y < padded_res_y)
                     {
+                        auto& vert_up = vertices[x + (y + 1) * stride_y];
+
+                        bool is_outside =
+                            vec2_is_outside_01(vert.orig_pos)
+                            || vec2_is_outside_01(vert_up.orig_pos);
+
                         draw_list->AddLine(
                             imvec_from_glm(
                                 image_bl + image_span * vert.warped_pos
