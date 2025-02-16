@@ -163,15 +163,27 @@ namespace img_aligner::grid_warp
 
         // NOTE: there are 2 types of passes:
         // 1. grid warp pass
+        //    - samples base_img
         //    - renders to warped_img or warped_hires_img (we make 2
         //      framebuffers and use the appropriate one).
-        //    - samples base_img
         //    - uses the grid vertex buffer
         // 2. difference pass
-        //    - renders to difference_img
         //    - samples warped_img and target_img
+        //    - calculates the logarithmic difference pixel-wise
+        //    - renders to difference_img
         //    - does not use a vertex buffer. instead, generates vertices for a
         //      "full-screen" quad in the vertex shader.
+        //    - we mipmap the difference image down to 1x1 to get the average
+        //      difference ("mean error").
+        //    - the difference image has a square resolution of the upper power
+        //      of 2 of the intermediate resolution's largest dimension. for
+        //      example, if the intermediate resolution is 200x500 the
+        //      resolution of the difference image will be 512x512. this is done
+        //      to avoid inaccuracies in the average difference caused by
+        //      bilinear interpolation. of course, this introduces extra black
+        //      pixels in the result that affect the average difference, so
+        //      we make sure to correct for that when reading the average value
+        //      from the last mip level which is 1x1.
 
         // grid warp pass: descriptor stuff
         bv::DescriptorSetLayoutPtr gwp_descriptor_set_layout = nullptr;
