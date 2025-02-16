@@ -703,6 +703,63 @@ namespace img_aligner
         );
     }
 
+    void App::recreate_grid_warper(bool ui_mode)
+    {
+        grid_warper = nullptr;
+        try
+        {
+            if (!base_img)
+            {
+                throw std::string("You haven't loaded a base image yet.");
+            }
+            if (!target_img)
+            {
+                throw std::string("You haven't loaded a target image yet.");
+            }
+
+            uint32_t base_img_width = base_img->config().extent.width;
+            uint32_t base_img_height = base_img->config().extent.height;
+            uint32_t target_img_width = target_img->config().extent.width;
+            uint32_t target_img_height = target_img->config().extent.height;
+
+            if (base_img_width != target_img_width
+                || base_img_height != target_img_height)
+            {
+                throw std::string(
+                    "Base and target images must have the same resolution."
+                );
+            }
+
+            grid_warp_params.base_imgview = base_imgview;
+            grid_warp_params.target_imgview = target_imgview;
+
+            grid_warper = std::make_unique<grid_warp::GridWarper>(
+                state,
+                grid_warp_params,
+                0
+            );
+
+            grid_warper->run_grid_warp_pass(false, 0);
+            grid_warper->run_difference_pass(0);
+        }
+        catch (std::string s)
+        {
+            if (ui_mode)
+            {
+                current_errors.push_back(s);
+                ImGui::OpenPopup(ERROR_DIALOG_TITLE);
+            }
+            else
+            {
+                throw std::runtime_error(s.c_str());
+            }
+        }
+        if (ui_mode)
+        {
+            recreate_ui_pass();
+        }
+    }
+
     void App::layout_controls()
     {
         ImGui::Begin("Controls");
@@ -752,6 +809,10 @@ namespace img_aligner
                 (uint32_t)1,
                 (uint32_t)(8192u * 8192u)
             );
+            if (grid_warper != nullptr)
+            {
+                recreate_grid_warper(true);
+            }
         }
         imgui_tooltip("Area of the warping grid resolution");
 
@@ -768,6 +829,10 @@ namespace img_aligner
                 0.f,
                 1.f
             );
+            if (grid_warper != nullptr)
+            {
+                recreate_grid_warper(true);
+            }
         }
         imgui_tooltip(
             "The actual grid used for warping has extra added borders to "
@@ -776,12 +841,14 @@ namespace img_aligner
             "resolution."
         );
 
+        ImGui::BeginDisabled(!grid_warper);
         ImGui::Checkbox("Preview Grid", &preview_grid);
         imgui_tooltip(
             "Preview the grid lines (including padding). This will only work "
             "if the base and target images are loaded and have identical "
             "resolutions."
         );
+        ImGui::EndDisabled();
 
         if (ImGui::DragScalar(
             "Intermediate Resolution##Controls",
@@ -795,6 +862,10 @@ namespace img_aligner
                 (uint32_t)1,
                 (uint32_t)(16384u * 16384u)
             );
+            if (grid_warper != nullptr)
+            {
+                recreate_grid_warper(true);
+            }
         }
         imgui_tooltip(
             "The images are temporarily downsampled throughout the "
@@ -804,49 +875,7 @@ namespace img_aligner
 
         if (ImGui::Button("Start Alignin'##Controls"))
         {
-            grid_warper = nullptr;
-            try
-            {
-                if (!base_img)
-                {
-                    throw std::string("You haven't loaded a base image yet.");
-                }
-                if (!target_img)
-                {
-                    throw std::string("You haven't loaded a target image yet.");
-                }
-
-                uint32_t base_img_width = base_img->config().extent.width;
-                uint32_t base_img_height = base_img->config().extent.height;
-                uint32_t target_img_width = target_img->config().extent.width;
-                uint32_t target_img_height = target_img->config().extent.height;
-
-                if (base_img_width != target_img_width
-                    || base_img_height != target_img_height)
-                {
-                    throw std::string(
-                        "Base and target images must have the same resolution."
-                    );
-                }
-
-                grid_warp_params.base_imgview = base_imgview;
-                grid_warp_params.target_imgview = target_imgview;
-
-                grid_warper = std::make_unique<grid_warp::GridWarper>(
-                    state,
-                    grid_warp_params,
-                    0
-                );
-
-                grid_warper->run_grid_warp_pass(false, 0);
-                grid_warper->run_difference_pass(0);
-            }
-            catch (std::string s)
-            {
-                current_errors.push_back(s);
-                ImGui::OpenPopup(ERROR_DIALOG_TITLE);
-            }
-            recreate_ui_pass();
+            recreate_grid_warper(true);
         }
 
         imgui_dialogs();
@@ -1075,7 +1104,7 @@ namespace img_aligner
         ImGuiStyle& style = ImGui::GetStyle();
 
         style.Alpha = 1.0;
-        style.DisabledAlpha = 1.0;
+        style.DisabledAlpha = 0.5;
         style.WindowPadding = ImVec2(12.0, 12.0);
         style.WindowRounding = 4.0;
         style.WindowBorderSize = 0.0;
@@ -1089,13 +1118,13 @@ namespace img_aligner
         style.FramePadding = ImVec2(11.0, 6.0);
         style.FrameRounding = 3.0;
         style.FrameBorderSize = 1.0;
-        style.ItemSpacing = ImVec2(12.0, 6.0);
+        style.ItemSpacing = ImVec2(7.0, 5.0);
         style.ItemInnerSpacing = ImVec2(6.0, 3.0);
-        style.CellPadding = ImVec2(12.0, 6.0);
+        style.CellPadding = ImVec2(8.0, 5.0);
         style.IndentSpacing = 20.0;
         style.ColumnsMinSpacing = 6.0;
         style.ScrollbarSize = 12.0;
-        style.ScrollbarRounding = 20.0;
+        style.ScrollbarRounding = 100.0;
         style.GrabMinSize = 28.0;
         style.GrabRounding = 20.0;
         style.TabRounding = 4.0;
@@ -1107,7 +1136,7 @@ namespace img_aligner
 
         style.Colors[ImGuiCol_Text] = ImVec4(1.0, 1.0, 1.0, 1.0);
         style.Colors[ImGuiCol_TextDisabled] = ImVec4(0.3625971674919128, 0.3366090059280396, 0.4470588266849518, 1.0);
-        style.Colors[ImGuiCol_WindowBg] = ImVec4(0.08998643606901169, 0.0688353031873703, 0.1587982773780823, 1.0);
+        style.Colors[ImGuiCol_WindowBg] = ImVec4(0.08638960868120193, 0.07073255628347397, 0.1373390555381775, 1.0);
         style.Colors[ImGuiCol_ChildBg] = ImVec4(0.07058823853731155, 0.05098039284348488, 0.1294117718935013, 1.0);
         style.Colors[ImGuiCol_PopupBg] = ImVec4(0.1274803578853607, 0.1039600074291229, 0.2039215713739395, 1.0);
         style.Colors[ImGuiCol_Border] = ImVec4(1.0, 1.0, 1.0, 0.0313725508749485);

@@ -77,6 +77,7 @@ namespace img_aligner
             uint32_t height,
             std::span<float> pixels_rgba
         );
+        void recreate_grid_warper(bool ui_mode);
 
         void layout_controls();
         void layout_misc();
