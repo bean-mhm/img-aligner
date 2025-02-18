@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <optional>
 #include <chrono>
+#include <random>
 #include <stdexcept>
 #include <cmath>
 #include <cstdlib>
@@ -113,6 +114,20 @@ namespace img_aligner
     // how many times an integer can be divided by 2 (or bit-shifted to the
     // right) until it reaches 0.
     uint32_t round_log2(uint32_t n);
+
+    // linear interpolation
+    template<typename V, std::floating_point T>
+    T lerp(const V& a, const V& b, T t)
+    {
+        return a + t * (b - a);
+    }
+
+    template<typename T, T(*exp_fn)(T) = std::exp>
+    T unnormalized_gaussian(T standard_deviation, T x)
+    {
+        T a = x / standard_deviation;
+        return exp_fn((T)(-.5) * a * a);
+    }
 
     constexpr ImVec2 imvec_from_glm(const glm::vec2& v)
     {
