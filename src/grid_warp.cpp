@@ -39,6 +39,7 @@ namespace img_aligner::grid_warp
         size_t thread_idx
     )
         : state(state),
+        rng(params.rng_seed),
         base_imgview(params.base_imgview),
         target_imgview(params.target_imgview)
     {
@@ -176,6 +177,7 @@ namespace img_aligner::grid_warp
         );
 
         create_vertex_and_index_buffer_and_generate_vertices(thread_idx);
+        make_copy_of_vertices();
         create_sampler_and_images(thread_idx);
         create_avg_difference_buffer();
         create_passes();
@@ -258,6 +260,8 @@ namespace img_aligner::grid_warp
         float sum =
             avg * (float)(difference_res_square * difference_res_square);
         avg = sum / (float)(intermediate_res_x * intermediate_res_y);
+
+        last_avg_difference = avg;
         return avg;
     }
 
@@ -293,6 +297,99 @@ namespace img_aligner::grid_warp
         );
     }
 
+    bool GridWarper::optimize(size_t thread_idx)
+    {
+        // keep track of the difference before we warp the grid
+        if (!last_avg_difference)
+        {
+            run_difference_pass(thread_idx);
+        }
+        float old_diff = *last_avg_difference;
+
+        // make a copy of the vertices in case we decide to undo the
+        // displacement
+        make_copy_of_vertices();
+
+        std::uniform_real_distribution<float> dist(0.f, 1.f);
+
+        // warp vertices based on an unnormalized gaussian distribution
+
+        // gaussian center
+        glm::vec2 center{
+            dist(rng) * (float)intermediate_res_x,
+            dist(rng) * (float)intermediate_res_y
+        };
+
+        // radius = standard deviation
+
+        float min_radius = std::max(
+            (float)intermediate_res_x / (float)grid_res_x,
+            (float)intermediate_res_y / (float)grid_res_y
+        );
+        float max_radius = .5f * (float)std::max(
+            intermediate_res_x,
+            intermediate_res_y
+        );
+
+        float log_min_radius = std::log(min_radius);
+        float log_max_radius = std::log(max_radius);
+
+        float log_radius = lerp(
+            log_min_radius,
+            log_max_radius,
+            dist(rng)
+        );
+        float radius = std::exp(log_radius);
+
+        // strength
+        float strength = (.001f * dist(rng)) * radius;
+
+        // direction
+        float angle = glm::tau<float>() * dist(rng);
+        glm::vec2 direction{ std::cos(angle), std::sin(angle) };
+
+        // move vertices
+        uint32_t stride_y = padded_grid_res_x + 1;
+        for (uint32_t y = 0; y < padded_grid_res_y; y++)
+        {
+            for (uint32_t x = 0; x < padded_grid_res_x; x++)
+            {
+                auto& vert = vertex_buf_mapped[x + y * stride_y];
+
+                // position in pixel space
+                auto pos = vert.warped_pos * glm::vec2{
+                    (float)intermediate_res_x,
+                    (float)intermediate_res_y
+                };
+
+                // displace (warp)
+                float displacement = strength * unnormalized_gaussian(
+                    radius,
+                    glm::distance(pos, center)
+                );
+                pos += displacement * direction;
+
+                // convert from pixel space back to normalized space
+                vert.warped_pos = pos / glm::vec2{
+                    (float)intermediate_res_x,
+                    (float)intermediate_res_y
+                };
+            }
+        }
+
+        // see if the displacement did any good (decreased difference)
+        run_grid_warp_pass(false, thread_idx);
+        float new_diff = run_difference_pass(thread_idx);
+
+        // if it increased the difference, undo the displacement
+        if (new_diff > old_diff)
+        {
+            restore_copy_of_vertices();
+            return false;
+        }
+        return true;
+    }
+
     void GridWarper::create_vertex_and_index_buffer_and_generate_vertices(
         size_t thread_idx
     )
@@ -301,7 +398,7 @@ namespace img_aligner::grid_warp
         // (padded_grid_res_x + 1) by (padded_grid_res_y + 1) to account for
         // vertices at the edges. for example, for a 2x2 grid we would need 3x3
         // vertices.
-        uint32_t n_vertices = (padded_grid_res_x + 1) * (padded_grid_res_y + 1);
+        n_vertices = (padded_grid_res_x + 1) * (padded_grid_res_y + 1);
         uint32_t vertices_size_bytes = n_vertices * sizeof(GridVertex);
 
         // create vertex buffer and map its memory
@@ -326,9 +423,9 @@ namespace img_aligner::grid_warp
 
             std::vector<uint32_t> indices;
             indices.reserve(n_triangle_vertices);
-            for (int32_t y = 0; y < (int32_t)padded_grid_res_y; y++)
+            for (uint32_t y = 0; y < padded_grid_res_y; y++)
             {
-                for (int32_t x = 0; x < (int32_t)padded_grid_res_x; x++)
+                for (uint32_t x = 0; x < padded_grid_res_x; x++)
                 {
                     // index of bottom left, bottom right, top left and top
                     // right vertices
@@ -421,6 +518,31 @@ namespace img_aligner::grid_warp
             }
         }
         vertex_buf_mem->flush();
+    }
+
+    void GridWarper::make_copy_of_vertices()
+    {
+        vertices_copy.resize(n_vertices);
+        std::copy(
+            vertex_buf_mapped,
+            vertex_buf_mapped + n_vertices,
+            vertices_copy.data()
+        );
+    }
+
+    void GridWarper::restore_copy_of_vertices()
+    {
+        if (vertices_copy.size() != n_vertices)
+        {
+            throw std::runtime_error(
+                "the vertices copy vector doesn't have the expected size"
+            );
+        }
+        std::copy(
+            vertices_copy.data(),
+            vertices_copy.data() + vertices_copy.size(),
+            vertex_buf_mapped
+        );
     }
 
     void GridWarper::create_sampler_and_images(size_t thread_idx)

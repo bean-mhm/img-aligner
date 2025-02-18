@@ -42,6 +42,8 @@ namespace img_aligner::grid_warp
         float grid_padding = .25f;
 
         uint32_t intermediate_res_area = 920000;
+
+        uint32_t rng_seed = 8191;
     };
 
     class GridWarper
@@ -82,10 +84,23 @@ namespace img_aligner::grid_warp
             return vertex_buf_mapped;
         }
 
+        // displace the grid vertices using an unnormalized gaussian
+        // distribution with randomly generated center point, radius (standard
+        // deviation), displacement direction and strength. the grid warp and
+        // difference passes will then be run. if the displacement caused the
+        // average difference (mean error) to increase, we will undo the
+        // displacement and return false, otherwise we'll keep the changes and
+        // return true. ideally, you would call this many times in a row to
+        // minimize the difference between the warped image and the target
+        // image.
+        bool optimize(size_t thread_idx);
+
     private:
         void create_vertex_and_index_buffer_and_generate_vertices(
             size_t thread_idx
         );
+        void make_copy_of_vertices();
+        void restore_copy_of_vertices();
         void create_sampler_and_images(size_t thread_idx);
         void create_avg_difference_buffer();
         void create_passes();
@@ -98,6 +113,7 @@ namespace img_aligner::grid_warp
 
     private:
         AppState& state;
+        std::mt19937 rng;
 
         // base and target images provided in the constructor
         bv::ImageViewWPtr base_imgview;
@@ -116,11 +132,18 @@ namespace img_aligner::grid_warp
         uint32_t padded_grid_res_x = 1;
         uint32_t padded_grid_res_y = 1;
 
+        std::optional<float> last_avg_difference;
+
         // vertex buffer for the grid vertices, host-visible and host-coherent
         // because we'll keep moving the vertices in every iteration.
+        uint32_t n_vertices = 0;
         bv::BufferPtr vertex_buf = nullptr;
         bv::MemoryChunkPtr vertex_buf_mem = nullptr;
         GridVertex* vertex_buf_mapped = nullptr;
+
+        // vector to contain a copy of the vertices, ONLY used when undoing
+        // grid displacement in case it increased the difference.
+        std::vector<GridVertex> vertices_copy;
 
         // index buffer for the grid vertices
         uint32_t n_triangle_vertices = 0;

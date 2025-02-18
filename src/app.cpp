@@ -878,6 +878,15 @@ namespace img_aligner
             recreate_grid_warper(true);
         }
 
+        if (ImGui::Button("Optimize##Controls") && grid_warper != nullptr)
+        {
+            for (size_t i = 0; i < 10; i++)
+            {
+                grid_warper->optimize(0);
+            }
+            need_to_run_ui_pass = true;
+        }
+
         imgui_dialogs();
 
         ImGui::End();
