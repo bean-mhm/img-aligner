@@ -10,6 +10,7 @@
 #include <span>
 #include <memory>
 #include <mutex>
+#include <thread>
 #include <unordered_map>
 #include <set>
 #include <limits>

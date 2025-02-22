@@ -7,6 +7,13 @@
 namespace img_aligner
 {
 
+    // this defines what UI controls to show
+    enum class UiControlsMode
+    {
+        Settings, // show controls for grid warper settings
+        Optimizing // show details on the optimization process + cancel button
+    };
+
     class App
     {
     public:
@@ -19,21 +26,6 @@ namespace img_aligner
         static constexpr auto TARGET_IMAGE_NAME = "Target Image";
 
         AppState state;
-
-        ImFont* font = nullptr;
-        ImFont* font_bold = nullptr;
-
-        float ui_scale = 1.f;
-        bool ui_scale_updated = false;
-
-        int selected_image_idx = 0;
-        float image_viewer_zoom = 1.f;
-        float image_viewer_exposure = 0.f;
-        bool image_viewer_use_flim = false;
-
-        bool preview_grid = false;
-
-        std::vector<std::string> current_errors;
 
         // base image, mipmapped
         bv::ImagePtr base_img = nullptr;
@@ -48,14 +40,37 @@ namespace img_aligner
         grid_warp::Params grid_warp_params;
         std::unique_ptr<grid_warp::GridWarper> grid_warper = nullptr;
 
-        std::unique_ptr<UiPass> ui_pass = nullptr;
-        bool need_to_run_ui_pass = false;
-
         void init();
         void main_loop();
         void cleanup();
 
     private:
+        // exclusively UI-related
+
+        ImFont* font = nullptr;
+        ImFont* font_bold = nullptr;
+
+        // list of errors to display in the error dialog
+        std::vector<std::string> current_errors;
+
+        // used for displaying linear (HDR) images in the UI
+        std::unique_ptr<UiPass> ui_pass = nullptr;
+        bool need_to_run_ui_pass = false;
+
+        UiControlsMode ui_controls_mode = UiControlsMode::Settings;
+
+        float ui_scale = 1.f;
+        bool ui_scale_updated = false;
+
+        int selected_image_idx = 0;
+        float image_viewer_zoom = 1.f;
+        float image_viewer_exposure = 0.f;
+        bool image_viewer_use_flim = false;
+
+        bool preview_grid = false;
+
+    private:
+        // initialization functions
         void init_window();
         void init_context();
         void setup_debug_messenger();
@@ -68,7 +83,7 @@ namespace img_aligner
         void init_imgui_vk_window_data();
         void init_imgui();
 
-        void recreate_ui_pass();
+    private:
         void recreate_image(
             bv::ImagePtr& img,
             bv::MemoryChunkPtr& img_mem,
@@ -77,7 +92,20 @@ namespace img_aligner
             uint32_t height,
             std::span<float> pixels_rgba
         );
+
+        void load_image(
+            std::string_view filename,
+            bv::ImagePtr& img,
+            bv::MemoryChunkPtr& img_mem,
+            bv::ImageViewPtr& imgview
+        );
+
         void recreate_grid_warper(bool ui_mode);
+
+    private:
+        // exclusively UI-related
+
+        void recreate_ui_pass();
 
         void layout_controls();
         void layout_misc();

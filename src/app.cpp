@@ -616,63 +616,6 @@ namespace img_aligner
         update_ui_scale_reload_fonts_and_style();
     }
 
-    void App::recreate_ui_pass()
-    {
-        uint32_t max_width = 1;
-        uint32_t max_height = 1;
-        if (base_img != nullptr)
-        {
-            max_width = std::max(max_width, base_img->config().extent.width);
-            max_height = std::max(max_height, base_img->config().extent.height);
-        }
-        if (target_img != nullptr)
-        {
-            max_width = std::max(max_width, target_img->config().extent.width);
-            max_height = std::max(
-                max_height,
-                target_img->config().extent.height
-            );
-        }
-
-        ui_pass = std::make_unique<UiPass>(state, max_width, max_height);
-
-        if (base_img != nullptr)
-        {
-            ui_pass->add_image(
-                base_imgview,
-                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                "Base Image",
-                base_img->config().extent.width,
-                base_img->config().extent.height,
-                false
-            );
-        }
-
-        if (target_img != nullptr)
-        {
-            ui_pass->add_image(
-                target_imgview,
-                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                "Target Image",
-                target_img->config().extent.width,
-                target_img->config().extent.height,
-                false
-            );
-        }
-
-        if (grid_warper != nullptr)
-        {
-            grid_warper->add_images_to_ui_pass(*ui_pass);
-        }
-
-        if (selected_image_idx >= ui_pass->images().size())
-        {
-            selected_image_idx = 0;
-        }
-
-        need_to_run_ui_pass = true;
-    }
-
     void App::recreate_image(
         bv::ImagePtr& img,
         bv::MemoryChunkPtr& img_mem,
@@ -700,6 +643,66 @@ namespace img_aligner
             img,
             img_mem,
             imgview
+        );
+    }
+
+    void App::load_image(
+        std::string_view filename,
+        bv::ImagePtr& img,
+        bv::MemoryChunkPtr& img_mem,
+        bv::ImageViewPtr& imgview
+    )
+    {
+        if (!std::filesystem::exists(filename))
+        {
+            throw std::exception("file doesn't exist");
+        }
+        if (std::filesystem::is_directory(filename))
+        {
+            throw std::exception(
+                "provided path is a directory, not a file"
+            );
+        }
+
+        Imf::RgbaInputFile f(filename.data());
+        Imath::Box2i dw = f.dataWindow();
+        int32_t width = dw.max.x - dw.min.x + 1;
+        int32_t height = dw.max.y - dw.min.y + 1;
+
+        std::vector<Imf::Rgba> pixels(width * height);
+
+        f.setFrameBuffer(pixels.data(), 1, width);
+        f.readPixels(dw.min.y, dw.max.y);
+
+        std::vector<float> pixels_f32(width * height * 4);
+        for (int32_t y = 0; y < height; y++)
+        {
+            for (int32_t x = 0; x < width; x++)
+            {
+                int32_t pixel_idx = x + y * width;
+                int32_t red_idx = pixel_idx * 4;
+
+                int32_t flipped_pixel_idx =
+                    x + (height - y - 1) * width;
+
+                pixels_f32[red_idx + 0] =
+                    (float)pixels[flipped_pixel_idx].r;
+                pixels_f32[red_idx + 1] =
+                    (float)pixels[flipped_pixel_idx].g;
+                pixels_f32[red_idx + 2] =
+                    (float)pixels[flipped_pixel_idx].b;
+                pixels_f32[red_idx + 3] =
+                    (float)pixels[flipped_pixel_idx].a;
+            }
+        }
+
+        recreate_image(
+            img,
+            img_mem,
+            imgview,
+            width,
+            height,
+            { pixels_f32.data(), pixels_f32.size() }
         );
     }
 
@@ -758,6 +761,63 @@ namespace img_aligner
         {
             recreate_ui_pass();
         }
+    }
+
+    void App::recreate_ui_pass()
+    {
+        uint32_t max_width = 1;
+        uint32_t max_height = 1;
+        if (base_img != nullptr)
+        {
+            max_width = std::max(max_width, base_img->config().extent.width);
+            max_height = std::max(max_height, base_img->config().extent.height);
+        }
+        if (target_img != nullptr)
+        {
+            max_width = std::max(max_width, target_img->config().extent.width);
+            max_height = std::max(
+                max_height,
+                target_img->config().extent.height
+            );
+        }
+
+        ui_pass = std::make_unique<UiPass>(state, max_width, max_height);
+
+        if (base_img != nullptr)
+        {
+            ui_pass->add_image(
+                base_imgview,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                "Base Image",
+                base_img->config().extent.width,
+                base_img->config().extent.height,
+                false
+            );
+        }
+
+        if (target_img != nullptr)
+        {
+            ui_pass->add_image(
+                target_imgview,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                "Target Image",
+                target_img->config().extent.width,
+                target_img->config().extent.height,
+                false
+            );
+        }
+
+        if (grid_warper != nullptr)
+        {
+            grid_warper->add_images_to_ui_pass(*ui_pass);
+        }
+
+        if (selected_image_idx >= ui_pass->images().size())
+        {
+            selected_image_idx = 0;
+        }
+
+        need_to_run_ui_pass = true;
     }
 
     void App::layout_controls()
@@ -1572,58 +1632,7 @@ namespace img_aligner
 
             try
             {
-                if (!std::filesystem::exists(filename))
-                {
-                    throw std::exception("file doesn't exist");
-                }
-                if (std::filesystem::is_directory(filename))
-                {
-                    throw std::exception(
-                        "provided path is a directory, not a file"
-                    );
-                }
-
-                Imf::RgbaInputFile f(filename.c_str());
-                Imath::Box2i dw = f.dataWindow();
-                int32_t width = dw.max.x - dw.min.x + 1;
-                int32_t height = dw.max.y - dw.min.y + 1;
-
-                std::vector<Imf::Rgba> pixels(width * height);
-
-                f.setFrameBuffer(pixels.data(), 1, width);
-                f.readPixels(dw.min.y, dw.max.y);
-
-                std::vector<float> pixels_f32(width * height * 4);
-                for (int32_t y = 0; y < height; y++)
-                {
-                    for (int32_t x = 0; x < width; x++)
-                    {
-                        int32_t pixel_idx = x + y * width;
-                        int32_t red_idx = pixel_idx * 4;
-
-                        int32_t flipped_pixel_idx =
-                            x + (height - y - 1) * width;
-
-                        pixels_f32[red_idx + 0] =
-                            (float)pixels[flipped_pixel_idx].r;
-                        pixels_f32[red_idx + 1] =
-                            (float)pixels[flipped_pixel_idx].g;
-                        pixels_f32[red_idx + 2] =
-                            (float)pixels[flipped_pixel_idx].b;
-                        pixels_f32[red_idx + 3] =
-                            (float)pixels[flipped_pixel_idx].a;
-                    }
-                }
-
-                recreate_image(
-                    img,
-                    img_mem,
-                    imgview,
-                    width,
-                    height,
-                    { pixels_f32.data(), pixels_f32.size() }
-                );
-
+                load_image(filename, img, img_mem, imgview);
                 return true;
             }
             catch (const std::exception& e)
