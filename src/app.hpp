@@ -40,6 +40,12 @@ namespace img_aligner
         grid_warp::Params grid_warp_params;
         std::unique_ptr<grid_warp::GridWarper> grid_warper = nullptr;
 
+        // grid warper optimization thread
+        std::unique_ptr<std::jthread> optimization_thread = nullptr;
+        bool optimization_thread_stop = false;
+        std::shared_mutex optimization_mutex;
+        std::atomic_bool need_the_optimization_mutex = false;
+
         void init();
         void main_loop();
         void cleanup();
@@ -78,7 +84,6 @@ namespace img_aligner
         void pick_physical_device();
         void create_logical_device();
         void create_memory_bank();
-        void create_command_pools();
         void create_imgui_descriptor_pool();
         void init_imgui_vk_window_data();
         void init_imgui();
@@ -100,7 +105,13 @@ namespace img_aligner
             bv::ImageViewPtr& imgview
         );
 
-        void recreate_grid_warper(bool ui_mode);
+        bool try_recreate_grid_warper(
+            bool ui_mode,
+            std::string* out_error = nullptr
+        );
+
+        void start_optimization();
+        void stop_optimization();
 
     private:
         // exclusively UI-related

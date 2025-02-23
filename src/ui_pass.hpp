@@ -50,7 +50,7 @@ namespace img_aligner
     class UiPass
     {
     public:
-        // must be called on the main thread (thread_idx=0)
+        // must be called on the main thread (THREAD_IDX_MAIN)
         UiPass(
             AppState& state,
             uint32_t max_width,
@@ -86,16 +86,16 @@ namespace img_aligner
 
         // render a given image to the display image. provided image must have
         // been created within this UI pass by calling its add_image() function.
-        // must be called on the main thread (thread_idx=0).
+        // must be called on the main thread (THREAD_IDX_MAIN).
         void run(
             const UiImageInfo& image,
             float exposure,
             bool use_flim
         );
 
-        // call ImGui::Image() with the appropraite arguments
+        // call ImGui::Image() with the appropraite arguments.
         // NOTE: the image must be already rendered to the display image by
-        // calling render().
+        // calling run().
         void draw_imgui_image(
             const UiImageInfo& image,
             float scale

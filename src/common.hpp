@@ -10,7 +10,9 @@
 #include <span>
 #include <memory>
 #include <mutex>
+#include <shared_mutex>
 #include <thread>
+#include <atomic>
 #include <unordered_map>
 #include <set>
 #include <limits>
@@ -70,8 +72,11 @@ namespace img_aligner
 
     static constexpr bool DEBUG_MODE = true;
 
-    // total number of threads that create or submit command buffers
+    // total number of threads that create and submit command buffers
     static constexpr size_t N_THREADS = 2;
+
+    static constexpr size_t THREAD_IDX_MAIN = 0;
+    static constexpr size_t THREAD_IDX_GRID_WARP_OPTIMIZATION_THREAD = 1;
 
     struct AppState
     {
@@ -89,9 +94,13 @@ namespace img_aligner
 
         bv::MemoryBankPtr mem_bank = nullptr;
 
-        // command pools for each thread (size: N_THREADS)
-        std::vector<bv::CommandPoolPtr> cmd_pools;
-        std::vector<bv::CommandPoolPtr> transient_cmd_pools;
+        // command pools for each thread
+        std::vector<bv::CommandPoolPtr> cmd_pools{ N_THREADS };
+        std::vector<bv::CommandPoolPtr> transient_cmd_pools{ N_THREADS };
+
+        // lazy initialize the command pools so they are created on the right
+        // thread.
+        const bv::CommandPoolPtr& cmd_pool(bool transient, size_t thread_idx);
 
         bv::DescriptorPoolPtr imgui_descriptor_pool = nullptr;
         uint32_t imgui_swapchain_min_image_count = 0;

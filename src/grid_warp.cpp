@@ -260,8 +260,6 @@ namespace img_aligner::grid_warp
         float sum =
             avg * (float)(difference_res_square * difference_res_square);
         avg = sum / (float)(intermediate_res_x * intermediate_res_y);
-
-        last_avg_difference = avg;
         return avg;
     }
 
@@ -302,7 +300,7 @@ namespace img_aligner::grid_warp
         // keep track of the difference before we warp the grid
         if (!last_avg_difference)
         {
-            run_difference_pass(thread_idx);
+            last_avg_difference = run_difference_pass(thread_idx);
         }
         float old_diff = *last_avg_difference;
 
@@ -386,6 +384,10 @@ namespace img_aligner::grid_warp
         {
             restore_copy_of_vertices();
             return false;
+        }
+        else
+        {
+            last_avg_difference = new_diff;
         }
         return true;
     }
@@ -1350,7 +1352,7 @@ namespace img_aligner::grid_warp
     )
     {
         bv::CommandBufferPtr cmd_buf = bv::CommandPool::allocate_buffer(
-            state.cmd_pools[thread_idx],
+            state.cmd_pool(false, thread_idx),
             VK_COMMAND_BUFFER_LEVEL_PRIMARY
         );
         cmd_buf->begin(0);
@@ -1462,7 +1464,7 @@ namespace img_aligner::grid_warp
     )
     {
         bv::CommandBufferPtr cmd_buf = bv::CommandPool::allocate_buffer(
-            state.cmd_pools[thread_idx],
+            state.cmd_pool(false, thread_idx),
             VK_COMMAND_BUFFER_LEVEL_PRIMARY
         );
         cmd_buf->begin(0);

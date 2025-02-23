@@ -8,6 +8,50 @@
 namespace img_aligner
 {
 
+    const bv::CommandPoolPtr& AppState::cmd_pool(
+        bool transient,
+        size_t thread_idx
+    )
+    {
+        if (!device || !queue)
+        {
+            throw std::runtime_error(
+                "command pool requested before device creation"
+            );
+        }
+        if (thread_idx >= N_THREADS)
+        {
+            throw std::invalid_argument("invalid thread index");
+        }
+
+        std::vector<bv::CommandPoolPtr>& pools =
+            transient ? transient_cmd_pools : cmd_pools;
+        if (pools.size() != N_THREADS)
+        {
+            throw std::logic_error(
+                "command pools vector doesn't have the expected size"
+            );
+        }
+
+        if (pools[thread_idx] == nullptr)
+        {
+            VkCommandPoolCreateFlags flags = 0;
+            if (transient)
+            {
+                flags |= VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+            }
+
+            pools[thread_idx] = bv::CommandPool::create(
+                device,
+                {
+                    .flags = flags,
+                    .queue_family_index = queue->queue_family_index()
+                }
+            );
+        }
+        return pools[thread_idx];
+    }
+
     double elapsed_sec(const std::chrono::steady_clock::time_point& t)
     {
         const auto now = std::chrono::high_resolution_clock::now();

@@ -35,7 +35,6 @@ namespace img_aligner
         pick_physical_device();
         create_logical_device();
         create_memory_bank();
-        create_command_pools();
         create_imgui_descriptor_pool();
         init_imgui_vk_window_data();
         init_imgui();
@@ -129,11 +128,30 @@ namespace img_aligner
                 && selected_image_idx < ui_pass->images().size())
             {
                 need_to_run_ui_pass = false;
-                ui_pass->run(
-                    ui_pass->images()[selected_image_idx],
-                    image_viewer_exposure,
-                    image_viewer_use_flim
-                );
+
+                if (optimization_thread != nullptr)
+                {
+                    need_the_optimization_mutex = true;
+                    optimization_mutex.lock_shared();
+
+                    ui_pass->run(
+                        ui_pass->images()[selected_image_idx],
+                        image_viewer_exposure,
+                        image_viewer_use_flim
+                    );
+
+                    optimization_mutex.unlock_shared();
+                    need_the_optimization_mutex = false;
+                    need_the_optimization_mutex.notify_all();
+                }
+                else
+                {
+                    ui_pass->run(
+                        ui_pass->images()[selected_image_idx],
+                        image_viewer_exposure,
+                        image_viewer_use_flim
+                    );
+                }
             }
 
             // render
@@ -480,27 +498,6 @@ namespace img_aligner
         state.mem_bank = bv::MemoryBank::create(state.device);
     }
 
-    void App::create_command_pools()
-    {
-        for (size_t i = 0; i < N_THREADS; i++)
-        {
-            state.cmd_pools.push_back(bv::CommandPool::create(
-                state.device,
-                {
-                    .flags = 0,
-                    .queue_family_index = state.queue->queue_family_index()
-                }
-            ));
-            state.transient_cmd_pools.push_back(bv::CommandPool::create(
-                state.device,
-                {
-                    .flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT,
-                    .queue_family_index = state.queue->queue_family_index()
-                }
-            ));
-        }
-    }
-
     void App::create_imgui_descriptor_pool()
     {
         // the example only requires a single combined image sampler descriptor
@@ -639,7 +636,7 @@ namespace img_aligner
             pixels_rgba.data(),
             pixels_rgba.size_bytes(),
             true,
-            0,
+            THREAD_IDX_MAIN,
             img,
             img_mem,
             imgview
@@ -706,9 +703,11 @@ namespace img_aligner
         );
     }
 
-    void App::recreate_grid_warper(bool ui_mode)
+    bool App::try_recreate_grid_warper(bool ui_mode, std::string* out_error)
     {
         grid_warper = nullptr;
+
+        bool failed = false;
         try
         {
             if (!base_img)
@@ -739,28 +738,94 @@ namespace img_aligner
             grid_warper = std::make_unique<grid_warp::GridWarper>(
                 state,
                 grid_warp_params,
-                0
+                THREAD_IDX_MAIN
             );
 
-            grid_warper->run_grid_warp_pass(false, 0);
-            grid_warper->run_difference_pass(0);
+            grid_warper->run_grid_warp_pass(false, THREAD_IDX_MAIN);
+            grid_warper->run_difference_pass(THREAD_IDX_MAIN);
         }
         catch (std::string s)
         {
-            if (ui_mode)
+            failed = true;
+            if (out_error)
             {
-                current_errors.push_back(s);
-                ImGui::OpenPopup(ERROR_DIALOG_TITLE);
-            }
-            else
-            {
-                throw std::runtime_error(s.c_str());
+                *out_error = s;
             }
         }
+
         if (ui_mode)
         {
             recreate_ui_pass();
         }
+
+        return !failed;
+    }
+
+    void App::start_optimization()
+    {
+        if (!grid_warper)
+        {
+            throw std::logic_error(
+                "can't do optimization if there's no grid warper"
+            );
+        }
+        if (optimization_thread != nullptr)
+        {
+            throw std::logic_error(
+                "can't start optimization if it's already running"
+            );
+        }
+
+        optimization_thread_stop = false;
+        optimization_thread = std::make_unique<std::jthread>(
+            [this]()
+            {
+                while (!optimization_thread_stop)
+                {
+                    optimization_mutex.lock();
+                    grid_warper->optimize(
+                        THREAD_IDX_GRID_WARP_OPTIMIZATION_THREAD
+                    );
+                    optimization_mutex.unlock();
+
+                    // let other threads use the lock if they need to
+                    need_the_optimization_mutex.wait(true);
+                }
+            }
+        );
+
+        ui_controls_mode = UiControlsMode::Optimizing;
+
+        // TODO switch to difference image
+
+        preview_grid = true;
+    }
+
+    void App::stop_optimization()
+    {
+        if (!grid_warper)
+        {
+            throw std::logic_error(
+                "can't do optimization if there's no grid warper"
+            );
+        }
+        if (!optimization_thread)
+        {
+            throw std::logic_error(
+                "can't stop optimization if it isn't running"
+            );
+        }
+
+        optimization_thread_stop = true;
+        optimization_thread->join();
+        optimization_thread = nullptr;
+
+        grid_warper->run_grid_warp_pass(true, THREAD_IDX_MAIN);
+
+        ui_controls_mode = UiControlsMode::Settings;
+
+        // TODO unhide warped hires image and switch to it in ui pass
+        need_to_run_ui_pass = true;
     }
 
     void App::recreate_ui_pass()
@@ -824,6 +889,8 @@ namespace img_aligner
     {
         ImGui::Begin("Controls");
 
+        ImGui::BeginDisabled(ui_controls_mode != UiControlsMode::Settings);
+
         imgui_bold("IMAGES");
 
         if (ImGui::Button("Load Base Image##Controls"))
@@ -855,7 +922,7 @@ namespace img_aligner
         }
 
         imgui_div();
-        imgui_bold("OPTIMIZATION");
+        imgui_bold("GRID WARPER");
 
         if (ImGui::DragScalar(
             "Grid Resolution##Controls",
@@ -869,10 +936,7 @@ namespace img_aligner
                 (uint32_t)1,
                 (uint32_t)(8192u * 8192u)
             );
-            if (grid_warper != nullptr)
-            {
-                recreate_grid_warper(true);
-            }
+            try_recreate_grid_warper(true);
         }
         imgui_tooltip("Area of the warping grid resolution");
 
@@ -889,10 +953,7 @@ namespace img_aligner
                 0.f,
                 1.f
             );
-            if (grid_warper != nullptr)
-            {
-                recreate_grid_warper(true);
-            }
+            try_recreate_grid_warper(true);
         }
         imgui_tooltip(
             "The actual grid used for warping has extra added borders to "
@@ -922,10 +983,7 @@ namespace img_aligner
                 (uint32_t)1,
                 (uint32_t)(16384u * 16384u)
             );
-            if (grid_warper != nullptr)
-            {
-                recreate_grid_warper(true);
-            }
+            try_recreate_grid_warper(true);
         }
         imgui_tooltip(
             "The images are temporarily downsampled throughout the "
@@ -933,18 +991,33 @@ namespace img_aligner
             "defines the area of the intermediate image resolution."
         );
 
-        if (ImGui::Button("Start Alignin'##Controls"))
-        {
-            recreate_grid_warper(true);
-        }
+        ImGui::EndDisabled();
 
-        if (ImGui::Button("Optimize##Controls") && grid_warper != nullptr)
+        imgui_div();
+        imgui_bold("OPTIMIZATION");
+
+        if (ui_controls_mode == UiControlsMode::Settings)
         {
-            for (size_t i = 0; i < 10; i++)
+            if (ImGui::Button("Start Alignin'##Controls"))
             {
-                grid_warper->optimize(0);
+                std::string s_error;
+                if (try_recreate_grid_warper(true, &s_error))
+                {
+                    start_optimization();
+                }
+                else
+                {
+                    current_errors.push_back(s_error);
+                    ImGui::OpenPopup(ERROR_DIALOG_TITLE);
+                }
             }
-            need_to_run_ui_pass = true;
+        }
+        else if (ui_controls_mode == UiControlsMode::Optimizing)
+        {
+            if (ImGui::Button("Stop##Controls"))
+            {
+                stop_optimization();
+            }
         }
 
         imgui_dialogs();
