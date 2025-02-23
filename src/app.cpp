@@ -897,8 +897,7 @@ namespace img_aligner
                 base_imgview
             ))
             {
-                grid_warper = nullptr;
-                recreate_ui_pass();
+                try_recreate_grid_warper(true);
                 ui_pass_select_image(BASE_IMAGE_NAME);
             }
         }
@@ -911,8 +910,7 @@ namespace img_aligner
                 target_imgview
             ))
             {
-                grid_warper = nullptr;
-                recreate_ui_pass();
+                try_recreate_grid_warper(true);
                 ui_pass_select_image(TARGET_IMAGE_NAME);
             }
         }
