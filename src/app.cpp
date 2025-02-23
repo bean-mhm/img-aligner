@@ -73,7 +73,7 @@ namespace img_aligner
                     state.physical_device->handle(),
                     state.device->handle(),
                     &state.imgui_vk_window_data,
-                    state.queue->queue_family_index(),
+                    state.queue_main->queue_family_index(),
                     state.context->vk_allocator_ptr(),
                     fb_width,
                     fb_height,
@@ -137,7 +137,8 @@ namespace img_aligner
                     ui_pass->run(
                         ui_pass->images()[selected_image_idx],
                         image_viewer_exposure,
-                        image_viewer_use_flim
+                        image_viewer_use_flim,
+                        state.queue_main
                     );
 
                     optimization_mutex.unlock_shared();
@@ -149,7 +150,8 @@ namespace img_aligner
                     ui_pass->run(
                         ui_pass->images()[selected_image_idx],
                         image_viewer_exposure,
-                        image_viewer_use_flim
+                        image_viewer_use_flim,
+                        state.queue_main
                     );
                 }
             }
@@ -172,6 +174,11 @@ namespace img_aligner
     void App::cleanup()
     {
         NFD_Quit();
+
+        if (optimization_thread != nullptr)
+        {
+            stop_optimization();
+        }
 
         ui_pass = nullptr;
         grid_warper = nullptr;
@@ -204,7 +211,10 @@ namespace img_aligner
         state.transient_cmd_pools.clear();
 
         state.mem_bank = nullptr;
-        state.queue = nullptr;
+
+        state.queue_main = nullptr;
+        state.queue_grid_warp_optimize = nullptr;
+
         state.device = nullptr;
         state.debug_messenger = nullptr;
         state.context = nullptr;
@@ -468,12 +478,11 @@ namespace img_aligner
         queue_requests.push_back(bv::QueueRequest{
             .flags = 0,
             .queue_family_index = graphics_present_family_idx,
-            .num_queues_to_create = 1,
-            .priorities = { 1.f }
+            .num_queues_to_create = 2,
+            .priorities = { .8f, 1.f }
             });
 
         bv::PhysicalDeviceFeatures enabled_features{};
-        enabled_features.sampler_anisotropy = true;
 
         state.device = bv::Device::create(
             state.context,
@@ -485,12 +494,16 @@ namespace img_aligner
             }
         );
 
-        state.queue =
-            bv::Device::retrieve_queue(
-                state.device,
-                graphics_present_family_idx,
-                0
-            );
+        state.queue_main = bv::Device::retrieve_queue(
+            state.device,
+            graphics_present_family_idx,
+            0
+        );
+        state.queue_grid_warp_optimize = bv::Device::retrieve_queue(
+            state.device,
+            graphics_present_family_idx,
+            1
+        );
     }
 
     void App::create_memory_bank()
@@ -568,7 +581,7 @@ namespace img_aligner
             state.physical_device->handle(),
             state.device->handle(),
             &state.imgui_vk_window_data,
-            state.queue->queue_family_index(),
+            state.queue_main->queue_family_index(),
             state.context->vk_allocator_ptr(),
             fb_width,
             fb_height,
@@ -596,8 +609,8 @@ namespace img_aligner
         init_info.Instance = state.context->vk_instance();
         init_info.PhysicalDevice = state.physical_device->handle();
         init_info.Device = state.device->handle();
-        init_info.QueueFamily = state.queue->queue_family_index();
-        init_info.Queue = state.queue->handle();
+        init_info.QueueFamily = state.queue_main->queue_family_index();
+        init_info.Queue = state.queue_main->handle();
         init_info.PipelineCache = nullptr;
         init_info.DescriptorPool = state.imgui_descriptor_pool->handle();
         init_info.RenderPass = state.imgui_vk_window_data.RenderPass;
@@ -630,6 +643,7 @@ namespace img_aligner
         }
         create_texture(
             state,
+            state.queue_main,
             width,
             height,
             RGBA_FORMAT,
@@ -736,11 +750,12 @@ namespace img_aligner
 
             grid_warper = std::make_unique<grid_warp::GridWarper>(
                 state,
-                grid_warp_params
+                grid_warp_params,
+                state.queue_main
             );
 
-            grid_warper->run_grid_warp_pass(false);
-            grid_warper->run_difference_pass();
+            grid_warper->run_grid_warp_pass(false, state.queue_main);
+            grid_warper->run_difference_pass(state.queue_main);
         }
         catch (std::string s)
         {
@@ -781,7 +796,7 @@ namespace img_aligner
                 while (!optimization_thread_stop)
                 {
                     optimization_mutex.lock();
-                    grid_warper->optimize();
+                    grid_warper->optimize(state.queue_grid_warp_optimize);
                     optimization_mutex.unlock();
 
                     // let other threads use the lock if they need to
@@ -789,12 +804,6 @@ namespace img_aligner
                 }
             }
         );
-
-        ui_controls_mode = UiControlsMode::Optimizing;
-
-        // TODO switch to difference image
-
-        preview_grid = true;
     }
 
     void App::stop_optimization()
@@ -815,13 +824,6 @@ namespace img_aligner
         optimization_thread_stop = true;
         optimization_thread->join();
         optimization_thread = nullptr;
-
-        grid_warper->run_grid_warp_pass(true);
-
-        ui_controls_mode = UiControlsMode::Settings;
-
-        // TODO unhide warped hires image and switch to it in ui pass
-        need_to_run_ui_pass = true;
     }
 
     void App::recreate_ui_pass()
@@ -842,7 +844,12 @@ namespace img_aligner
             );
         }
 
-        ui_pass = std::make_unique<UiPass>(state, max_width, max_height);
+        ui_pass = std::make_unique<UiPass>(
+            state,
+            max_width,
+            max_height,
+            state.queue_main
+        );
 
         if (base_img != nullptr)
         {
@@ -1013,6 +1020,12 @@ namespace img_aligner
                 if (try_recreate_grid_warper(true, &s_error))
                 {
                     start_optimization();
+
+                    ui_controls_mode = UiControlsMode::Optimizing;
+
+                    // TODO switch to difference image
+
+                    preview_grid = true;
                 }
                 else
                 {
@@ -1026,6 +1039,13 @@ namespace img_aligner
             if (ImGui::Button("Stop##Controls"))
             {
                 stop_optimization();
+
+                grid_warper->run_grid_warp_pass(true, state.queue_main);
+
+                ui_controls_mode = UiControlsMode::Settings;
+
+                // TODO unhide warped hires image and switch to it in ui pass
+                need_to_run_ui_pass = true;
             }
         }
 
@@ -1638,15 +1658,12 @@ namespace img_aligner
             info.signalSemaphoreCount = 1;
             info.pSignalSemaphores = &render_complete_semaphore;
 
-            {
-                std::scoped_lock lock(state.queue_mutex);
-                vk_result = vkQueueSubmit(
-                    state.queue->handle(),
-                    1,
-                    &info,
-                    frame_data.Fence
-                );
-            }
+            vk_result = vkQueueSubmit(
+                state.queue_main->handle(),
+                1,
+                &info,
+                frame_data.Fence
+            );
             if (vk_result != VK_SUCCESS)
             {
                 throw bv::Error(
@@ -1678,7 +1695,10 @@ namespace img_aligner
         info.pSwapchains = &window_data.Swapchain;
         info.pImageIndices = &window_data.FrameIndex;
 
-        VkResult vk_result = vkQueuePresentKHR(state.queue->handle(), &info);
+        VkResult vk_result = vkQueuePresentKHR(
+            state.queue_main->handle(),
+            &info
+        );
         if (vk_result == VK_ERROR_OUT_OF_DATE_KHR
             || vk_result == VK_SUBOPTIMAL_KHR)
         {

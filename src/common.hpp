@@ -83,8 +83,8 @@ namespace img_aligner
         std::optional<bv::PhysicalDevice> physical_device;
         bv::DevicePtr device = nullptr;
 
-        bv::QueuePtr queue = nullptr;
-        std::mutex queue_mutex;
+        bv::QueuePtr queue_main;
+        bv::QueuePtr queue_grid_warp_optimize;
 
         bv::MemoryBankPtr mem_bank = nullptr;
 
@@ -162,10 +162,9 @@ namespace img_aligner
     // Queue::wait_idle() will be used. if a fence is provided you'll be in
     // charge of synchronization (like waiting on the fence).
     void end_single_time_commands(
-        AppState& state,
         bv::CommandBufferPtr& cmd_buf,
-        bool lock_queue_mutex,
-        const bv::FencePtr fence = nullptr
+        const bv::QueuePtr& queue,
+        const bv::FencePtr& fence = nullptr
     );
 
     uint32_t find_memory_type_idx(
@@ -250,6 +249,7 @@ namespace img_aligner
 
     void create_texture(
         AppState& state,
+        const bv::QueuePtr& queue,
         uint32_t width,
         uint32_t height,
         VkFormat format,

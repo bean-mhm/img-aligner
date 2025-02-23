@@ -35,7 +35,8 @@ namespace img_aligner::grid_warp
 
     GridWarper::GridWarper(
         AppState& state,
-        const Params& params
+        const Params& params,
+        const bv::QueuePtr& queue
     )
         : state(state),
         rng(params.rng_seed),
@@ -175,9 +176,9 @@ namespace img_aligner::grid_warp
             padded_grid_res_y
         );
 
-        create_vertex_and_index_buffer_and_generate_vertices();
+        create_vertex_and_index_buffer_and_generate_vertices(queue);
         make_copy_of_vertices();
-        create_sampler_and_images();
+        create_sampler_and_images(queue);
         create_avg_difference_buffer();
         create_passes();
     }
@@ -230,24 +231,18 @@ namespace img_aligner::grid_warp
         avg_difference_buf_mem = nullptr;
     }
 
-    void GridWarper::run_grid_warp_pass(bool hires)
+    void GridWarper::run_grid_warp_pass(bool hires, const bv::QueuePtr& queue)
     {
         auto cmd_buf = create_grid_warp_pass_cmd_buf(hires);
-        {
-            std::scoped_lock lock(state.queue_mutex);
-            state.queue->submit({}, {}, { cmd_buf }, {}, gwp_fence);
-        }
+        queue->submit({}, {}, { cmd_buf }, {}, gwp_fence);
         gwp_fence->wait();
         gwp_fence->reset();
     }
 
-    float GridWarper::run_difference_pass()
+    float GridWarper::run_difference_pass(const bv::QueuePtr& queue)
     {
         auto cmd_buf = create_difference_pass_cmd_buf();
-        {
-            std::scoped_lock lock(state.queue_mutex);
-            state.queue->submit({}, {}, { cmd_buf }, {}, dfp_fence);
-        }
+        queue->submit({}, {}, { cmd_buf }, {}, dfp_fence);
         dfp_fence->wait();
         dfp_fence->reset();
 
@@ -294,12 +289,12 @@ namespace img_aligner::grid_warp
         );
     }
 
-    bool GridWarper::optimize()
+    bool GridWarper::optimize(const bv::QueuePtr& queue)
     {
         // keep track of the difference before we warp the grid
         if (!last_avg_difference)
         {
-            last_avg_difference = run_difference_pass();
+            last_avg_difference = run_difference_pass(queue);
         }
         float old_diff = *last_avg_difference;
 
@@ -375,8 +370,8 @@ namespace img_aligner::grid_warp
         }
 
         // see if the displacement did any good (decreased difference)
-        run_grid_warp_pass(false);
-        float new_diff = run_difference_pass();
+        run_grid_warp_pass(false, queue);
+        float new_diff = run_difference_pass(queue);
 
         // if it increased the difference, undo the displacement
         if (new_diff > old_diff)
@@ -391,7 +386,9 @@ namespace img_aligner::grid_warp
         return true;
     }
 
-    void GridWarper::create_vertex_and_index_buffer_and_generate_vertices()
+    void GridWarper::create_vertex_and_index_buffer_and_generate_vertices(
+        const bv::QueuePtr& queue
+    )
     {
         // please keep in mind that the 2D resolution of the vertex array is
         // (padded_grid_res_x + 1) by (padded_grid_res_y + 1) to account for
@@ -486,7 +483,7 @@ namespace img_aligner::grid_warp
 
             auto cmd_buf = begin_single_time_commands(state, true);
             copy_buffer(cmd_buf, staging_buf, index_buf, indices_size_bytes);
-            end_single_time_commands(state, cmd_buf, true);
+            end_single_time_commands(cmd_buf, queue);
 
             staging_buf = nullptr;
             staging_buf_mem = nullptr;
@@ -544,7 +541,7 @@ namespace img_aligner::grid_warp
         );
     }
 
-    void GridWarper::create_sampler_and_images()
+    void GridWarper::create_sampler_and_images(const bv::QueuePtr& queue)
     {
         // create sampler
         sampler = bv::Sampler::create(
@@ -685,7 +682,7 @@ namespace img_aligner::grid_warp
         );
 
         // end, submit, and wait for the command buffer
-        end_single_time_commands(state, cmd_buf, true);
+        end_single_time_commands(cmd_buf, queue);
     }
 
     void GridWarper::create_avg_difference_buffer()

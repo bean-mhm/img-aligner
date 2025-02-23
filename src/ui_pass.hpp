@@ -53,7 +53,8 @@ namespace img_aligner
         UiPass(
             AppState& state,
             uint32_t max_width,
-            uint32_t max_height
+            uint32_t max_height,
+            const bv::QueuePtr& queue
         );
         ~UiPass();
 
@@ -88,7 +89,8 @@ namespace img_aligner
         void run(
             const UiImageInfo& image,
             float exposure,
-            bool use_flim
+            bool use_flim,
+            const bv::QueuePtr& queue
         );
 
         // call ImGui::Image() with the appropraite arguments.

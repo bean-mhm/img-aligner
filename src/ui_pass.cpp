@@ -22,7 +22,8 @@ namespace img_aligner
     UiPass::UiPass(
         AppState& state,
         uint32_t max_width,
-        uint32_t max_height
+        uint32_t max_height,
+        const bv::QueuePtr& queue
     )
         : state(state),
         _max_width(max_width),
@@ -83,7 +84,7 @@ namespace img_aligner
             VK_IMAGE_LAYOUT_GENERAL,
             1
         );
-        end_single_time_commands(state, cmd_buf, true);
+        end_single_time_commands(cmd_buf, queue);
 
         // create descriptor set for ImGui::Image()
         imgui_descriptor_set = ImGui_ImplVulkan_AddTexture(
@@ -455,7 +456,8 @@ namespace img_aligner
     void UiPass::run(
         const UiImageInfo& image,
         float exposure,
-        bool use_flim
+        bool use_flim,
+        const bv::QueuePtr& queue
     )
     {
         if (image.parent_ui_pass != this)
@@ -567,10 +569,7 @@ namespace img_aligner
 
         cmd_buf->end();
 
-        {
-            std::scoped_lock lock(state.queue_mutex);
-            state.queue->submit({}, {}, { cmd_buf }, {}, fence);
-        }
+        queue->submit({}, {}, { cmd_buf }, {}, fence);
         fence->wait();
         fence->reset();
     }

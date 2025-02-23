@@ -10,7 +10,7 @@ namespace img_aligner
 
     const bv::CommandPoolPtr& AppState::cmd_pool(bool transient)
     {
-        if (!device || !queue)
+        if (!device)
         {
             throw std::runtime_error(
                 "command pool requested before device creation"
@@ -33,7 +33,7 @@ namespace img_aligner
                 device,
                 {
                     .flags = flags,
-                    .queue_family_index = queue->queue_family_index()
+                    .queue_family_index = queue_main->queue_family_index()
                 }
             );
         }
@@ -136,30 +136,19 @@ namespace img_aligner
     }
 
     void end_single_time_commands(
-        AppState& state,
         bv::CommandBufferPtr& cmd_buf,
-        bool lock_queue_mutex,
-        const bv::FencePtr fence
+        const bv::QueuePtr& queue,
+        const bv::FencePtr& fence
     )
     {
         cmd_buf->end();
-        if (lock_queue_mutex)
+
+        queue->submit({}, {}, { cmd_buf }, {}, fence);
+        if (fence == nullptr)
         {
-            std::scoped_lock lock(state.queue_mutex);
-            state.queue->submit({}, {}, { cmd_buf }, {}, fence);
-            if (fence == nullptr)
-            {
-                state.queue->wait_idle();
-            }
+            queue->wait_idle();
         }
-        else
-        {
-            state.queue->submit({}, {}, { cmd_buf }, {}, fence);
-            if (fence == nullptr)
-            {
-                state.queue->wait_idle();
-            }
-        }
+
         cmd_buf = nullptr;
     }
 
@@ -596,6 +585,7 @@ namespace img_aligner
 
     void create_texture(
         AppState& state,
+        const bv::QueuePtr& queue,
         uint32_t width,
         uint32_t height,
         VkFormat format,
@@ -714,7 +704,7 @@ namespace img_aligner
             );
         }
 
-        end_single_time_commands(state, cmd_buf, true);
+        end_single_time_commands(cmd_buf, queue);
 
         staging_buf = nullptr;
         staging_buf_mem = nullptr;

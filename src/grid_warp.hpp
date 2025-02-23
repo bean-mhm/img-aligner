@@ -51,20 +51,21 @@ namespace img_aligner::grid_warp
     public:
         GridWarper(
             AppState& state,
-            const Params& params
+            const Params& params,
+            const bv::QueuePtr& queue
         );
         ~GridWarper();
 
         // run the grid warp pass. if hires is set to true, the warped image
         // will be rendered to warped_hires_img, otherwise warped_img will be
         // used.
-        void run_grid_warp_pass(bool hires);
+        void run_grid_warp_pass(bool hires, const bv::QueuePtr& queue);
 
         // run the difference pass and return the average difference (error)
         // between warped_img and target_img. the average is calculated by
         // generating mipmaps for the difference image which has a square
         // resolution of a power of 2.
-        float run_difference_pass();
+        float run_difference_pass(const bv::QueuePtr& queue);
 
         void add_images_to_ui_pass(UiPass& ui_pass);
 
@@ -92,13 +93,15 @@ namespace img_aligner::grid_warp
         // return true. ideally, you would call this many times in a row to
         // minimize the difference between the warped image and the target
         // image.
-        bool optimize();
+        bool optimize(const bv::QueuePtr& queue);
 
     private:
-        void create_vertex_and_index_buffer_and_generate_vertices();
+        void create_vertex_and_index_buffer_and_generate_vertices(
+            const bv::QueuePtr& queue
+        );
         void make_copy_of_vertices();
         void restore_copy_of_vertices();
-        void create_sampler_and_images();
+        void create_sampler_and_images(const bv::QueuePtr& queue);
         void create_avg_difference_buffer();
         void create_passes();
 
