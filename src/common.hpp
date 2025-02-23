@@ -72,12 +72,6 @@ namespace img_aligner
 
     static constexpr bool DEBUG_MODE = true;
 
-    // total number of threads that create and submit command buffers
-    static constexpr size_t N_THREADS = 2;
-
-    static constexpr size_t THREAD_IDX_MAIN = 0;
-    static constexpr size_t THREAD_IDX_GRID_WARP_OPTIMIZATION_THREAD = 1;
-
     struct AppState
     {
         GLFWwindow* window = nullptr;
@@ -94,13 +88,14 @@ namespace img_aligner
 
         bv::MemoryBankPtr mem_bank = nullptr;
 
-        // command pools for each thread
-        std::vector<bv::CommandPoolPtr> cmd_pools{ N_THREADS };
-        std::vector<bv::CommandPoolPtr> transient_cmd_pools{ N_THREADS };
+        // command pools for every thread
+        std::unordered_map<std::thread::id, bv::CommandPoolPtr> cmd_pools;
+        std::unordered_map<std::thread::id, bv::CommandPoolPtr>
+            transient_cmd_pools;
 
         // lazy initialize the command pools so they are created on the right
-        // thread.
-        const bv::CommandPoolPtr& cmd_pool(bool transient, size_t thread_idx);
+        // thread based on std::this_thread::get_id().
+        const bv::CommandPoolPtr& cmd_pool(bool transient);
 
         bv::DescriptorPoolPtr imgui_descriptor_pool = nullptr;
         uint32_t imgui_swapchain_min_image_count = 0;
@@ -160,8 +155,7 @@ namespace img_aligner
     // interest.
     bv::CommandBufferPtr begin_single_time_commands(
         AppState& state,
-        bool use_transient_pool,
-        size_t thread_idx
+        bool use_transient_pool
     );
 
     // end and submit one-time command buffer. if no fence is provided,
@@ -262,7 +256,6 @@ namespace img_aligner
         void* pixels,
         size_t size_bytes,
         bool mipmapped,
-        size_t thread_idx,
         bv::ImagePtr& out_img,
         bv::MemoryChunkPtr& out_img_mem,
         bv::ImageViewPtr& out_imgview

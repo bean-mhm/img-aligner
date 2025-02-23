@@ -39,9 +39,9 @@ namespace img_aligner::grid_warp
         bv::ImageViewWPtr target_imgview;
 
         uint32_t grid_res_area = 256;
-        float grid_padding = .25f;
+        float grid_padding = .2f;
 
-        uint32_t intermediate_res_area = 920000;
+        uint32_t intermediate_res_area = 1000000;
 
         uint32_t rng_seed = 8191;
     };
@@ -51,21 +51,20 @@ namespace img_aligner::grid_warp
     public:
         GridWarper(
             AppState& state,
-            const Params& params,
-            size_t thread_idx
+            const Params& params
         );
         ~GridWarper();
 
         // run the grid warp pass. if hires is set to true, the warped image
         // will be rendered to warped_hires_img, otherwise warped_img will be
         // used.
-        void run_grid_warp_pass(bool hires, size_t thread_idx);
+        void run_grid_warp_pass(bool hires);
 
         // run the difference pass and return the average difference (error)
         // between warped_img and target_img. the average is calculated by
         // generating mipmaps for the difference image which has a square
         // resolution of a power of 2.
-        float run_difference_pass(size_t thread_idx);
+        float run_difference_pass();
 
         void add_images_to_ui_pass(UiPass& ui_pass);
 
@@ -93,23 +92,18 @@ namespace img_aligner::grid_warp
         // return true. ideally, you would call this many times in a row to
         // minimize the difference between the warped image and the target
         // image.
-        bool optimize(size_t thread_idx);
+        bool optimize();
 
     private:
-        void create_vertex_and_index_buffer_and_generate_vertices(
-            size_t thread_idx
-        );
+        void create_vertex_and_index_buffer_and_generate_vertices();
         void make_copy_of_vertices();
         void restore_copy_of_vertices();
-        void create_sampler_and_images(size_t thread_idx);
+        void create_sampler_and_images();
         void create_avg_difference_buffer();
         void create_passes();
 
-        bv::CommandBufferPtr create_grid_warp_pass_cmd_buf(
-            bool hires,
-            size_t thread_idx
-        );
-        bv::CommandBufferPtr create_difference_pass_cmd_buf(size_t thread_idx);
+        bv::CommandBufferPtr create_grid_warp_pass_cmd_buf(bool hires);
+        bv::CommandBufferPtr create_difference_pass_cmd_buf();
 
     private:
         AppState& state;

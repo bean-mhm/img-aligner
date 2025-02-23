@@ -636,7 +636,6 @@ namespace img_aligner
             pixels_rgba.data(),
             pixels_rgba.size_bytes(),
             true,
-            THREAD_IDX_MAIN,
             img,
             img_mem,
             imgview
@@ -737,12 +736,11 @@ namespace img_aligner
 
             grid_warper = std::make_unique<grid_warp::GridWarper>(
                 state,
-                grid_warp_params,
-                THREAD_IDX_MAIN
+                grid_warp_params
             );
 
-            grid_warper->run_grid_warp_pass(false, THREAD_IDX_MAIN);
-            grid_warper->run_difference_pass(THREAD_IDX_MAIN);
+            grid_warper->run_grid_warp_pass(false);
+            grid_warper->run_difference_pass();
         }
         catch (std::string s)
         {
@@ -783,9 +781,7 @@ namespace img_aligner
                 while (!optimization_thread_stop)
                 {
                     optimization_mutex.lock();
-                    grid_warper->optimize(
-                        THREAD_IDX_GRID_WARP_OPTIMIZATION_THREAD
-                    );
+                    grid_warper->optimize();
                     optimization_mutex.unlock();
 
                     // let other threads use the lock if they need to
@@ -820,7 +816,7 @@ namespace img_aligner
         optimization_thread->join();
         optimization_thread = nullptr;
 
-        grid_warper->run_grid_warp_pass(true, THREAD_IDX_MAIN);
+        grid_warper->run_grid_warp_pass(true);
 
         ui_controls_mode = UiControlsMode::Settings;
 
@@ -924,6 +920,7 @@ namespace img_aligner
         imgui_div();
         imgui_bold("GRID WARPER");
 
+        // grid resolution
         if (ImGui::DragScalar(
             "Grid Resolution##Controls",
             ImGuiDataType_U32,
@@ -940,6 +937,7 @@ namespace img_aligner
         }
         imgui_tooltip("Area of the warping grid resolution");
 
+        // grid padding
         if (ImGui::DragFloat(
             "Grid Padding##Controls",
             &grid_warp_params.grid_padding,
@@ -962,6 +960,7 @@ namespace img_aligner
             "resolution."
         );
 
+        // preview grid
         ImGui::BeginDisabled(!grid_warper);
         ImGui::Checkbox("Preview Grid", &preview_grid);
         imgui_tooltip(
@@ -971,6 +970,7 @@ namespace img_aligner
         );
         ImGui::EndDisabled();
 
+        // intermediate resolution
         if (ImGui::DragScalar(
             "Intermediate Resolution##Controls",
             ImGuiDataType_U32,
@@ -996,6 +996,17 @@ namespace img_aligner
         imgui_div();
         imgui_bold("OPTIMIZATION");
 
+        // RNG seed
+        ImGui::InputScalar(
+            "Seed##Controls",
+            ImGuiDataType_U32,
+            &grid_warp_params.rng_seed
+        );
+        imgui_tooltip(
+            "Seed number to use for pseudo-random number generators"
+        );
+
+        // start alignin'
         if (ui_controls_mode == UiControlsMode::Settings)
         {
             if (ImGui::Button("Start Alignin'##Controls"))
@@ -1629,12 +1640,15 @@ namespace img_aligner
             info.signalSemaphoreCount = 1;
             info.pSignalSemaphores = &render_complete_semaphore;
 
-            vk_result = vkQueueSubmit(
-                state.queue->handle(),
-                1,
-                &info,
-                frame_data.Fence
-            );
+            {
+                std::scoped_lock lock(state.queue_mutex);
+                vk_result = vkQueueSubmit(
+                    state.queue->handle(),
+                    1,
+                    &info,
+                    frame_data.Fence
+                );
+            }
             if (vk_result != VK_SUCCESS)
             {
                 throw bv::Error(

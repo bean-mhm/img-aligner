@@ -8,10 +8,7 @@
 namespace img_aligner
 {
 
-    const bv::CommandPoolPtr& AppState::cmd_pool(
-        bool transient,
-        size_t thread_idx
-    )
+    const bv::CommandPoolPtr& AppState::cmd_pool(bool transient)
     {
         if (!device || !queue)
         {
@@ -19,21 +16,12 @@ namespace img_aligner
                 "command pool requested before device creation"
             );
         }
-        if (thread_idx >= N_THREADS)
-        {
-            throw std::invalid_argument("invalid thread index");
-        }
 
-        std::vector<bv::CommandPoolPtr>& pools =
+        std::unordered_map<std::thread::id, bv::CommandPoolPtr>& pools =
             transient ? transient_cmd_pools : cmd_pools;
-        if (pools.size() != N_THREADS)
-        {
-            throw std::logic_error(
-                "command pools vector doesn't have the expected size"
-            );
-        }
 
-        if (pools[thread_idx] == nullptr)
+        auto thread_id = std::this_thread::get_id();
+        if (!pools.contains(thread_id))
         {
             VkCommandPoolCreateFlags flags = 0;
             if (transient)
@@ -41,7 +29,7 @@ namespace img_aligner
                 flags |= VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
             }
 
-            pools[thread_idx] = bv::CommandPool::create(
+            pools[thread_id] = bv::CommandPool::create(
                 device,
                 {
                     .flags = flags,
@@ -49,7 +37,7 @@ namespace img_aligner
                 }
             );
         }
-        return pools[thread_idx];
+        return pools[thread_id];
     }
 
     double elapsed_sec(const std::chrono::steady_clock::time_point& t)
@@ -136,16 +124,11 @@ namespace img_aligner
 
     bv::CommandBufferPtr begin_single_time_commands(
         AppState& state,
-        bool use_transient_pool,
-        size_t thread_idx
+        bool use_transient_pool
     )
     {
-        auto& pool = (use_transient_pool
-            ? state.transient_cmd_pools[thread_idx]
-            : state.cmd_pools[thread_idx]);
-
         auto cmd_buf = bv::CommandPool::allocate_buffer(
-            pool,
+            state.cmd_pool(use_transient_pool),
             VK_COMMAND_BUFFER_LEVEL_PRIMARY
         );
         cmd_buf->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -160,17 +143,23 @@ namespace img_aligner
     )
     {
         cmd_buf->end();
-
+        if (lock_queue_mutex)
         {
             std::scoped_lock lock(state.queue_mutex);
             state.queue->submit({}, {}, { cmd_buf }, {}, fence);
+            if (fence == nullptr)
+            {
+                state.queue->wait_idle();
+            }
         }
-
-        if (fence == nullptr)
+        else
         {
-            state.queue->wait_idle();
+            state.queue->submit({}, {}, { cmd_buf }, {}, fence);
+            if (fence == nullptr)
+            {
+                state.queue->wait_idle();
+            }
         }
-
         cmd_buf = nullptr;
     }
 
@@ -613,7 +602,6 @@ namespace img_aligner
         void* pixels,
         size_t size_bytes,
         bool mipmapped,
-        size_t thread_idx,
         bv::ImagePtr& out_img,
         bv::MemoryChunkPtr& out_img_mem,
         bv::ImageViewPtr& out_imgview
@@ -685,7 +673,7 @@ namespace img_aligner
             mip_levels
         );
 
-        auto cmd_buf = begin_single_time_commands(state, true, thread_idx);
+        auto cmd_buf = begin_single_time_commands(state, true);
 
         transition_image_layout(
             cmd_buf,

@@ -75,7 +75,7 @@ namespace img_aligner
             VK_IMAGE_ASPECT_COLOR_BIT,
             1
         );
-        auto cmd_buf = begin_single_time_commands(state, true, THREAD_IDX_MAIN);
+        auto cmd_buf = begin_single_time_commands(state, true);
         transition_image_layout(
             cmd_buf,
             display_img,
@@ -466,7 +466,7 @@ namespace img_aligner
         }
 
         bv::CommandBufferPtr cmd_buf = bv::CommandPool::allocate_buffer(
-            state.cmd_pool(false, THREAD_IDX_MAIN),
+            state.cmd_pool(false),
             VK_COMMAND_BUFFER_LEVEL_PRIMARY
         );
         cmd_buf->begin(0);
