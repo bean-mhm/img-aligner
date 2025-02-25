@@ -82,7 +82,7 @@ namespace img_aligner
         float image_viewer_exposure = 0.f;
         bool image_viewer_use_flim = false;
 
-        bool preview_grid = false;
+        bool preview_grid = true;
 
     private:
         // initialization functions
