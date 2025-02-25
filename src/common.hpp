@@ -72,6 +72,8 @@ namespace img_aligner
 
     static constexpr bool DEBUG_MODE = false;
 
+    using TimePoint = std::chrono::steady_clock::time_point;
+
     struct AppState
     {
         GLFWwindow* window = nullptr;
