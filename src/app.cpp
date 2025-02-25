@@ -899,7 +899,8 @@ namespace img_aligner
 
         imgui_bold("IMAGES");
 
-        if (ImGui::Button("Load Base Image##Controls"))
+        // load base image
+        if (ImGui::Button("Load Base Image##Controls", { -FLT_MIN, 0.f }))
         {
             if (browse_and_load_image(
                 base_img,
@@ -912,7 +913,8 @@ namespace img_aligner
             }
         }
 
-        if (ImGui::Button("Load Target Image##Controls"))
+        // load target image
+        if (ImGui::Button("Load Target Image##Controls", { -FLT_MIN, 0.f }))
         {
             if (browse_and_load_image(
                 target_img,
@@ -929,8 +931,12 @@ namespace img_aligner
         imgui_bold("GRID WARPER");
 
         // grid resolution
+        imgui_small_div();
+        ImGui::TextWrapped("Grid Resolution");
+        imgui_tooltip("Area of the warping grid resolution");
+        ImGui::SetNextItemWidth(-FLT_MIN);
         if (ImGui::DragScalar(
-            "Grid Resolution##Controls",
+            "##grid_res",
             ImGuiDataType_U32,
             &grid_warp_params.grid_res_area,
             .8f
@@ -943,15 +949,25 @@ namespace img_aligner
             );
             try_recreate_grid_warper(true);
         }
-        imgui_tooltip("Area of the warping grid resolution");
 
         // grid padding
+        imgui_small_div();
+        ImGui::TextWrapped("Grid Padding");
+        imgui_tooltip(
+            "The actual grid used for warping has extra added borders to "
+            "prevent black empty spaces when the edges get warped. This value "
+            "controls the amount of that padding proportional to the grid "
+            "resolution."
+        );
+        ImGui::SetNextItemWidth(-FLT_MIN);
         if (ImGui::DragFloat(
-            "Grid Padding##Controls",
+            "##grid_padding",
             &grid_warp_params.grid_padding,
             .002f,
             0.f,
-            1.f
+            1.f,
+            "%.2f",
+            ImGuiSliderFlags_NoRoundToFormat
         ))
         {
             grid_warp_params.grid_padding = std::clamp(
@@ -961,14 +977,9 @@ namespace img_aligner
             );
             try_recreate_grid_warper(true);
         }
-        imgui_tooltip(
-            "The actual grid used for warping has extra added borders to "
-            "prevent black empty spaces when the edges get warped. This value "
-            "controls the amount of that padding proportional to the grid "
-            "resolution."
-        );
 
         // preview grid
+        imgui_small_div();
         ImGui::BeginDisabled(!grid_warper);
         ImGui::Checkbox("Preview Grid", &preview_grid);
         imgui_tooltip(
@@ -979,11 +990,19 @@ namespace img_aligner
         ImGui::EndDisabled();
 
         // intermediate resolution
+        imgui_small_div();
+        ImGui::TextWrapped("Intermediate Resolution");
+        imgui_tooltip(
+            "The images are temporarily downsampled throughout the "
+            "optimization process to improve computation speed. This value "
+            "defines the area of the intermediate image resolution."
+        );
+        ImGui::SetNextItemWidth(-FLT_MIN);
         if (ImGui::DragScalar(
-            "Intermediate Resolution##Controls",
+            "##intermediate_res",
             ImGuiDataType_U32,
             &grid_warp_params.intermediate_res_area,
-            1200.f
+            2000.f
         ))
         {
             grid_warp_params.intermediate_res_area = std::clamp(
@@ -993,11 +1012,6 @@ namespace img_aligner
             );
             try_recreate_grid_warper(true);
         }
-        imgui_tooltip(
-            "The images are temporarily downsampled throughout the "
-            "optimization process to improve computation speed. This value "
-            "defines the area of the intermediate image resolution."
-        );
 
         ImGui::EndDisabled();
 
@@ -1005,24 +1019,31 @@ namespace img_aligner
         imgui_bold("OPTIMIZATION");
 
         // RNG seed
-        ImGui::InputScalar(
-            "Seed##Controls",
-            ImGuiDataType_U32,
-            &grid_warp_params.rng_seed
-        );
+        imgui_small_div();
+        ImGui::TextWrapped("Seed");
         imgui_tooltip(
             "Seed number to use for pseudo-random number generators"
         );
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        ImGui::InputScalar(
+            "##rng_seed",
+            ImGuiDataType_U32,
+            &grid_warp_params.rng_seed
+        );
 
         // warp strength
+        imgui_small_div();
+        ImGui::TextWrapped("Warp Strength");
+        imgui_tooltip("Maximum amount of warping in every iteration");
+        ImGui::SetNextItemWidth(-FLT_MIN);
         ImGui::DragFloat(
-            "Warp Strength##Controls",
+            "##warp_strength",
             &grid_warp_optimization_params.max_warp_strength,
-            .01f,
+            .0001f,
             .000001f,
             .1f,
             "%.6f",
-            ImGuiSliderFlags_Logarithmic
+            ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat
         );
 
         imgui_div();
@@ -1034,49 +1055,63 @@ namespace img_aligner
             "In the last 100 iterations, the average difference decreased by "
             "less than"
         );
-        ImGui::InputFloat(
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        ImGui::DragFloat(
             "##min_change_in_avg_diff",
             &grid_warp_optimization_params
             .min_change_in_avg_difference_in_100_iters,
+            .000005f,
             .000001f,
             .001f,
-            "%.6f"
+            "%.6f",
+            ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat
         );
 
-        // max iters
+        // max iterations
         imgui_small_div();
-        ImGui::TextWrapped("Max Iterations");
+        ImGui::TextWrapped("The number of iterations exceeds");
+        imgui_tooltip("0 means unlimited number of iterations");
+        ImGui::SetNextItemWidth(-FLT_MIN);
         if (ImGui::DragScalar(
             "##max_iters",
             ImGuiDataType_U32,
             &grid_warp_optimization_params.max_iters,
-            20.f
+            30.f
         ))
         {
             grid_warp_optimization_params.max_iters = std::clamp(
                 grid_warp_optimization_params.max_iters,
-                (uint32_t)10,
-                (uint32_t)1000000000
+                (uint32_t)0,
+                (uint32_t)4000000000
             );
         }
 
         // max runtime
         imgui_small_div();
         ImGui::TextWrapped("Run time exceeds (seconds)");
-        ImGui::DragFloat(
+        imgui_tooltip("0 means unlimited run time");
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        if (ImGui::DragFloat(
             "##max_runtime",
             &grid_warp_optimization_params.max_runtime_sec,
-            100.f,
-            1.f,
+            100000.f,
+            0.f,
             1000000000.f,
             "%.2f",
-            ImGuiSliderFlags_Logarithmic
-        );
+            ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat
+        ))
+        {
+            grid_warp_optimization_params.max_runtime_sec = std::max(
+                grid_warp_optimization_params.max_runtime_sec,
+                0.f
+            );
+        }
 
         // start alignin'
         imgui_small_div();
         if (ui_controls_mode == UiControlsMode::Settings)
         {
+            ImGui::SetNextItemWidth(-FLT_MIN);
             if (ImGui::Button("Start Alignin'##Controls"))
             {
                 std::string s_error;
@@ -1099,6 +1134,7 @@ namespace img_aligner
         }
         else if (ui_controls_mode == UiControlsMode::Optimizing)
         {
+            ImGui::SetNextItemWidth(-FLT_MIN);
             if (ImGui::Button("Stop##Controls"))
             {
                 stop_optimization();
@@ -1457,7 +1493,7 @@ namespace img_aligner
 
     void App::imgui_small_div()
     {
-        ImGui::Dummy({ 1.f, 5.f * ui_scale });
+        ImGui::Dummy({ 1.f, 6.f * ui_scale });
     }
 
     void App::imgui_horiz_div()
