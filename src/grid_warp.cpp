@@ -164,18 +164,6 @@ namespace img_aligner::grid_warp
         if ((padded_grid_res_y - grid_res_y) % 2 != 0)
             padded_grid_res_y++;
 
-        std::cout << std::format(
-            "interm: {} x {}\n"
-            "grid res: {} x {}\n"
-            "padded: {} x {}\n\n",
-            intermediate_res_x,
-            intermediate_res_y,
-            grid_res_x,
-            grid_res_y,
-            padded_grid_res_x,
-            padded_grid_res_y
-        );
-
         create_vertex_and_index_buffer_and_generate_vertices(queue);
         make_copy_of_vertices();
         create_sampler_and_images(queue);
