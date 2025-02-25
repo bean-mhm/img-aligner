@@ -78,6 +78,7 @@ namespace img_aligner
         bool ui_scale_updated = false;
 
         int selected_image_idx = 0;
+        bool image_viewer_fit = true;
         float image_viewer_zoom = 1.f;
         float image_viewer_exposure = 0.f;
         bool image_viewer_use_flim = false;
@@ -144,6 +145,7 @@ namespace img_aligner
             int* selected_idx,
             bool full_width
         );
+        bool imgui_button_full_width(const char* label);
         void imgui_tooltip(std::string_view s);
         void imgui_dialogs();
         ImVec2 dialog_button_size();

@@ -900,7 +900,7 @@ namespace img_aligner
         imgui_bold("IMAGES");
 
         // load base image
-        if (ImGui::Button("Load Base Image##Controls", { -FLT_MIN, 0.f }))
+        if (imgui_button_full_width("Load Base Image##Controls"))
         {
             if (browse_and_load_image(
                 base_img,
@@ -914,7 +914,7 @@ namespace img_aligner
         }
 
         // load target image
-        if (ImGui::Button("Load Target Image##Controls", { -FLT_MIN, 0.f }))
+        if (imgui_button_full_width("Load Target Image##Controls"))
         {
             if (browse_and_load_image(
                 target_img,
@@ -977,17 +977,6 @@ namespace img_aligner
             );
             try_recreate_grid_warper(true);
         }
-
-        // preview grid
-        imgui_small_div();
-        ImGui::BeginDisabled(!grid_warper);
-        ImGui::Checkbox("Preview Grid", &preview_grid);
-        imgui_tooltip(
-            "Preview the grid lines (including padding). This will only work "
-            "if the base and target images are loaded and have identical "
-            "resolutions."
-        );
-        ImGui::EndDisabled();
 
         // intermediate resolution
         imgui_small_div();
@@ -1111,8 +1100,7 @@ namespace img_aligner
         imgui_small_div();
         if (ui_controls_mode == UiControlsMode::Settings)
         {
-            ImGui::SetNextItemWidth(-FLT_MIN);
-            if (ImGui::Button("Start Alignin'##Controls"))
+            if (imgui_button_full_width("Start Alignin'##Controls"))
             {
                 std::string s_error;
                 if (try_recreate_grid_warper(true, &s_error))
@@ -1122,8 +1110,6 @@ namespace img_aligner
                     ui_controls_mode = UiControlsMode::Optimizing;
 
                     // TODO switch to difference image
-
-                    preview_grid = true;
                 }
                 else
                 {
@@ -1134,8 +1120,7 @@ namespace img_aligner
         }
         else if (ui_controls_mode == UiControlsMode::Optimizing)
         {
-            ImGui::SetNextItemWidth(-FLT_MIN);
-            if (ImGui::Button("Stop##Controls"))
+            if (imgui_button_full_width("Stop##Controls"))
             {
                 stop_optimization();
 
@@ -1178,7 +1163,7 @@ namespace img_aligner
         ).c_str());
 
         // GitHub
-        if (ImGui::Button("GitHub##Misc"))
+        if (imgui_button_full_width("GitHub##Misc"))
         {
             open_url(APP_GITHUB_URL);
         }
@@ -1244,6 +1229,10 @@ namespace img_aligner
             }
         }
 
+        // fit
+        ImGui::SameLine();
+        ImGui::Checkbox("Fit", &image_viewer_fit);
+
         imgui_horiz_div();
 
         // exposure
@@ -1283,10 +1272,32 @@ namespace img_aligner
             need_to_run_ui_pass = true;
         }
 
+        imgui_horiz_div();
+
+        // preview grid
+        ImGui::SameLine();
+        ImGui::BeginDisabled(!grid_warper);
+        ImGui::Checkbox("Preview Grid", &preview_grid);
+        imgui_tooltip(
+            "Preview the grid lines (including padding). This will only work "
+            "if the base and target images are loaded and have identical "
+            "resolutions."
+        );
+        ImGui::EndDisabled();
+
         // image
+        float image_scale = image_viewer_zoom;
+        if (image_viewer_fit)
+        {
+            auto parent_size = ImGui::GetContentRegionAvail();
+            image_scale *= .97f * (float)std::min(
+                parent_size.x / sel_img_info.width,
+                parent_size.y / sel_img_info.height
+            );
+        }
         ui_pass->draw_imgui_image(
             ui_pass->images()[selected_image_idx],
-            image_viewer_zoom
+            image_scale
         );
 
         // get the 4 corners of the last item which is the image (bl = bottom
@@ -1542,6 +1553,11 @@ namespace img_aligner
         );
     }
 
+    bool App::imgui_button_full_width(const char* label)
+    {
+        return ImGui::Button(label, { -FLT_MIN, 35.f * ui_scale });
+    }
+
     void App::imgui_tooltip(std::string_view s)
     {
         if (!ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
@@ -1598,7 +1614,7 @@ namespace img_aligner
 
     ImVec2 App::dialog_button_size()
     {
-        return { 350.f * ui_scale, 30.f * ui_scale };
+        return { 350.f * ui_scale, 35.f * ui_scale };
     }
 
     void App::render_frame(ImDrawData* draw_data)
