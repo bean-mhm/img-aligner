@@ -254,7 +254,7 @@ namespace img_aligner::grid_warp
         float sum =
             avg * (float)(difference_res_square * difference_res_square);
         avg = sum / (float)(intermediate_res_x * intermediate_res_y);
-        return avg;
+        return  avg;
     }
 
     void GridWarper::add_images_to_ui_pass(UiPass& ui_pass)
@@ -289,7 +289,10 @@ namespace img_aligner::grid_warp
         );
     }
 
-    bool GridWarper::optimize(const bv::QueuePtr& queue)
+    bool GridWarper::optimize(
+        float max_warp_strength,
+        const bv::QueuePtr& queue
+    )
     {
         // keep track of the difference before we warp the grid
         if (!last_avg_difference)
@@ -334,7 +337,7 @@ namespace img_aligner::grid_warp
         float radius = std::exp(log_radius);
 
         // strength
-        float strength = (.001f * dist(rng)) * radius;
+        float strength = (max_warp_strength * dist(rng)) * radius;
 
         // direction
         float angle = glm::tau<float>() * dist(rng);
@@ -377,12 +380,15 @@ namespace img_aligner::grid_warp
         if (new_diff > old_diff)
         {
             restore_copy_of_vertices();
+            std::cout << 0.f;
             return false;
         }
         else
         {
             last_avg_difference = new_diff;
+            std::cout << (new_diff - old_diff);
         }
+        std::cout << "   (" << *last_avg_difference << ")\n";
         return true;
     }
 

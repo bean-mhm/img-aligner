@@ -38,10 +38,10 @@ namespace img_aligner::grid_warp
         bv::ImageViewWPtr base_imgview;
         bv::ImageViewWPtr target_imgview;
 
-        uint32_t grid_res_area = 256;
+        uint32_t grid_res_area = 512;
         float grid_padding = .2f;
 
-        uint32_t intermediate_res_area = 1000000;
+        uint32_t intermediate_res_area = 1200000;
 
         uint32_t rng_seed = 8191;
     };
@@ -93,7 +93,7 @@ namespace img_aligner::grid_warp
         // return true. ideally, you would call this many times in a row to
         // minimize the difference between the warped image and the target
         // image.
-        bool optimize(const bv::QueuePtr& queue);
+        bool optimize(float max_warp_strength, const bv::QueuePtr& queue);
 
     private:
         void create_vertex_and_index_buffer_and_generate_vertices(
