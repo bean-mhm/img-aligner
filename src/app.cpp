@@ -796,7 +796,10 @@ namespace img_aligner
                 while (!optimization_thread_stop)
                 {
                     optimization_mutex.lock();
-                    grid_warper->optimize(state.queue_grid_warp_optimize);
+                    grid_warper->optimize(
+                        grid_warp_optimization_params.max_warp_strength,
+                        state.queue_grid_warp_optimize
+                    );
                     optimization_mutex.unlock();
 
                     // let other threads use the lock if they need to
@@ -1011,7 +1014,67 @@ namespace img_aligner
             "Seed number to use for pseudo-random number generators"
         );
 
+        // warp strength
+        ImGui::DragFloat(
+            "Warp Strength##Controls",
+            &grid_warp_optimization_params.max_warp_strength,
+            .01f,
+            .000001f,
+            .1f,
+            "%.6f",
+            ImGuiSliderFlags_Logarithmic
+        );
+
+        imgui_div();
+        imgui_bold("STOP IF");
+
+        // min change in avg difference in N iters
+        imgui_small_div();
+        ImGui::TextWrapped(
+            "In the last 100 iterations, the average difference decreased by "
+            "less than"
+        );
+        ImGui::InputFloat(
+            "##min_change_in_avg_diff",
+            &grid_warp_optimization_params
+            .min_change_in_avg_difference_in_100_iters,
+            .000001f,
+            .001f,
+            "%.6f"
+        );
+
+        // max iters
+        imgui_small_div();
+        ImGui::TextWrapped("Max Iterations");
+        if (ImGui::DragScalar(
+            "##max_iters",
+            ImGuiDataType_U32,
+            &grid_warp_optimization_params.max_iters,
+            20.f
+        ))
+        {
+            grid_warp_optimization_params.max_iters = std::clamp(
+                grid_warp_optimization_params.max_iters,
+                (uint32_t)10,
+                (uint32_t)1000000000
+            );
+        }
+
+        // max runtime
+        imgui_small_div();
+        ImGui::TextWrapped("Run time exceeds (seconds)");
+        ImGui::DragFloat(
+            "##max_runtime",
+            &grid_warp_optimization_params.max_runtime_sec,
+            100.f,
+            1.f,
+            1000000000.f,
+            "%.2f",
+            ImGuiSliderFlags_Logarithmic
+        );
+
         // start alignin'
+        imgui_small_div();
         if (ui_controls_mode == UiControlsMode::Settings)
         {
             if (ImGui::Button("Start Alignin'##Controls"))
@@ -1389,7 +1452,12 @@ namespace img_aligner
 
     void App::imgui_div()
     {
-        ImGui::NewLine();
+        ImGui::Dummy({ 1.f, 24.f * ui_scale });
+    }
+
+    void App::imgui_small_div()
+    {
+        ImGui::Dummy({ 1.f, 5.f * ui_scale });
     }
 
     void App::imgui_horiz_div()

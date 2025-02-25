@@ -14,6 +14,14 @@ namespace img_aligner
         Optimizing // show details on the optimization process + cancel button
     };
 
+    struct GridWarpOptimizationParams
+    {
+        float max_warp_strength = .0001f;
+        float min_change_in_avg_difference_in_100_iters = .001f;
+        uint32_t max_iters = 10000;
+        float max_runtime_sec = 600.f;
+    };
+
     class App
     {
     public:
@@ -38,6 +46,7 @@ namespace img_aligner
         bv::ImageViewPtr target_imgview = nullptr;
 
         grid_warp::Params grid_warp_params;
+        GridWarpOptimizationParams grid_warp_optimization_params;
         std::unique_ptr<grid_warp::GridWarper> grid_warper = nullptr;
 
         // grid warper optimization thread
@@ -126,6 +135,7 @@ namespace img_aligner
         void update_ui_scale_reload_fonts_and_style();
 
         void imgui_div();
+        void imgui_small_div();
         void imgui_horiz_div();
         void imgui_bold(std::string_view s);
         bool imgui_combo(
