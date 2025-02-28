@@ -121,6 +121,25 @@ namespace img_aligner
             layout_image_viewer();
             ImGui::PopFont();
 
+            // update UI pass and make a new copy of the grid vertices when
+            // optimizing at the specified interval.
+            if (is_optimizing)
+            {
+                bool interval_reached =
+                    elapsed_sec(last_ui_update_when_optimizing_time) >
+                    GRID_WARP_OPTIMIZATION_UI_UPDATE_INTERVAL;
+
+                if (interval_reached)
+                {
+                    need_to_run_ui_pass = true;
+
+                    copy_grid_vertices_for_ui_preview();
+
+                    last_ui_update_when_optimizing_time =
+                        std::chrono::high_resolution_clock::now();
+                }
+            }
+
             // update UI pass' display image if needed
             if (need_to_run_ui_pass
                 && ui_pass != nullptr
@@ -129,7 +148,7 @@ namespace img_aligner
             {
                 need_to_run_ui_pass = false;
 
-                if (optimization_thread != nullptr)
+                if (is_optimizing)
                 {
                     need_the_optimization_mutex = true;
                     optimization_mutex.lock_shared();
@@ -175,7 +194,7 @@ namespace img_aligner
     {
         NFD_Quit();
 
-        if (optimization_thread != nullptr)
+        if (is_optimizing)
         {
             stop_optimization();
         }
@@ -719,6 +738,7 @@ namespace img_aligner
     bool App::try_recreate_grid_warper(bool ui_mode, std::string* out_error)
     {
         grid_warper = nullptr;
+        optimization_info = GridWarpOptimizationInfo{};
 
         bool failed = false;
         try
@@ -771,6 +791,11 @@ namespace img_aligner
             recreate_ui_pass();
         }
 
+        if (grid_warper != nullptr)
+        {
+            copy_grid_vertices_for_ui_preview();
+        }
+
         return !failed;
     }
 
@@ -782,12 +807,16 @@ namespace img_aligner
                 "can't do optimization if there's no grid warper"
             );
         }
-        if (optimization_thread != nullptr)
+        if (is_optimizing)
         {
             throw std::logic_error(
                 "can't start optimization if it's already running"
             );
         }
+
+        is_optimizing = true;
+        optimization_info.start_time =
+            std::chrono::high_resolution_clock::now();
 
         optimization_thread_stop = false;
         optimization_thread = std::make_unique<std::jthread>(
@@ -796,15 +825,73 @@ namespace img_aligner
                 while (!optimization_thread_stop)
                 {
                     optimization_mutex.lock();
-                    grid_warper->optimize(
-                        grid_warp_optimization_params.max_warp_strength,
+
+                    bool decreased_cost = grid_warper->optimize(
+                        optimization_params.max_warp_strength,
                         state.queue_grid_warp_optimize
                     );
-                    optimization_mutex.unlock();
+
+
+                    // update optimization info
+                    optimization_info_mutex.lock();
+
+                    // update the number of iterations
+                    optimization_info.n_iters++;
+                    if (decreased_cost)
+                    {
+                        optimization_info.n_good_iters++;
+                    }
+
+                    // update cost history
+                    if (grid_warper->get_last_cost().has_value())
+                    {
+                        optimization_info.cost_history.push_back(
+                            *grid_warper->get_last_cost()
+                        );
+                    }
+
+                    // update min. change in cost in last N iters
+                    if (optimization_info.cost_history.size() >
+                        grid_warp::N_ITERS_TO_CHECK_CHANGE_IN_COST)
+                    {
+                        optimization_info.change_in_cost_in_last_n_iters =
+                            optimization_info.cost_history[
+                                optimization_info.cost_history.size() - 1
+                                    - grid_warp::N_ITERS_TO_CHECK_CHANGE_IN_COST
+                            ]
+                            - optimization_info.cost_history.back();
+                    }
+
+                    // stop condition: min. change in cost in last N iters
+                    if (optimization_info.change_in_cost_in_last_n_iters <
+                        optimization_params.min_change_in_cost_in_last_n_iters)
+                    {
+                        optimization_thread_stop = true;
+                    }
+
+                    // stop condition: max iters
+                    if (optimization_params.max_iters > 0
+                        && optimization_info.n_iters > optimization_params
+                        .max_iters)
+                    {
+                        optimization_thread_stop = true;
+                    }
+
+                    // stop condition: max run time
+                    if (optimization_params.max_runtime_sec > 0.f
+                        && elapsed_sec(optimization_info.start_time) >
+                        optimization_params.max_runtime_sec)
+                    {
+                        optimization_thread_stop = true;
+                    }
+
+                    optimization_info_mutex.unlock();
 
                     // let other threads use the lock if they need to
+                    optimization_mutex.unlock();
                     need_the_optimization_mutex.wait(true);
                 }
+                is_optimizing = false;
             }
         );
     }
@@ -817,16 +904,24 @@ namespace img_aligner
                 "can't do optimization if there's no grid warper"
             );
         }
-        if (!optimization_thread)
+        if (!is_optimizing)
         {
             throw std::logic_error(
                 "can't stop optimization if it isn't running"
+            );
+        }
+        if (!optimization_thread)
+        {
+            throw std::logic_error(
+                "can't stop optimization if there's no optimization thread"
             );
         }
 
         optimization_thread_stop = true;
         optimization_thread->join();
         optimization_thread = nullptr;
+
+        is_optimizing = false;
     }
 
     void App::recreate_ui_pass()
@@ -891,11 +986,43 @@ namespace img_aligner
         need_to_run_ui_pass = true;
     }
 
+    void App::copy_grid_vertices_for_ui_preview()
+    {
+        if (!grid_warper)
+        {
+            throw std::logic_error(
+                "can't copy grid vertices if there's no grid warper"
+            );
+        }
+
+        // copying this boolean to avoid synchronization headaches
+        bool should_lock = is_optimizing;
+        if (should_lock)
+        {
+            need_the_optimization_mutex = true;
+            optimization_mutex.lock_shared();
+        }
+
+        grid_vertices_copy_for_ui_preview.resize(grid_warper->get_n_vertices());
+        std::copy(
+            grid_warper->get_vertices(),
+            grid_warper->get_vertices() + grid_warper->get_n_vertices(),
+            grid_vertices_copy_for_ui_preview.data()
+        );
+
+        if (should_lock)
+        {
+            optimization_mutex.unlock_shared();
+            need_the_optimization_mutex = false;
+            need_the_optimization_mutex.notify_all();
+        }
+    }
+
     void App::layout_controls()
     {
         ImGui::Begin("Controls");
 
-        ImGui::BeginDisabled(ui_controls_mode != UiControlsMode::Settings);
+        ImGui::BeginDisabled(is_optimizing);
 
         imgui_bold("IMAGES");
 
@@ -1002,8 +1129,6 @@ namespace img_aligner
             try_recreate_grid_warper(true);
         }
 
-        ImGui::EndDisabled();
-
         imgui_div();
         imgui_bold("OPTIMIZATION");
 
@@ -1027,7 +1152,7 @@ namespace img_aligner
         ImGui::SetNextItemWidth(-FLT_MIN);
         ImGui::DragFloat(
             "##warp_strength",
-            &grid_warp_optimization_params.max_warp_strength,
+            &optimization_params.max_warp_strength,
             .0001f,
             .000001f,
             .1f,
@@ -1038,17 +1163,16 @@ namespace img_aligner
         imgui_div();
         imgui_bold("STOP IF");
 
-        // min change in avg difference in N iters
+        // min change in cost in N iters
         imgui_small_div();
-        ImGui::TextWrapped(
-            "In the last 100 iterations, the average difference decreased by "
-            "less than"
-        );
+        ImGui::TextWrapped(std::format(
+            "In the last {} iterations, the cost decreased by less than",
+            grid_warp::N_ITERS_TO_CHECK_CHANGE_IN_COST
+        ).c_str());
         ImGui::SetNextItemWidth(-FLT_MIN);
         ImGui::DragFloat(
-            "##min_change_in_avg_diff",
-            &grid_warp_optimization_params
-            .min_change_in_avg_difference_in_100_iters,
+            "##min_change_in_cost_in_last_n_iters",
+            &optimization_params.min_change_in_cost_in_last_n_iters,
             .000005f,
             .000001f,
             .001f,
@@ -1064,12 +1188,12 @@ namespace img_aligner
         if (ImGui::DragScalar(
             "##max_iters",
             ImGuiDataType_U32,
-            &grid_warp_optimization_params.max_iters,
+            &optimization_params.max_iters,
             30.f
         ))
         {
-            grid_warp_optimization_params.max_iters = std::clamp(
-                grid_warp_optimization_params.max_iters,
+            optimization_params.max_iters = std::clamp(
+                optimization_params.max_iters,
                 (uint32_t)0,
                 (uint32_t)4000000000
             );
@@ -1082,7 +1206,7 @@ namespace img_aligner
         ImGui::SetNextItemWidth(-FLT_MIN);
         if (ImGui::DragFloat(
             "##max_runtime",
-            &grid_warp_optimization_params.max_runtime_sec,
+            &optimization_params.max_runtime_sec,
             100000.f,
             0.f,
             1000000000.f,
@@ -1090,35 +1214,35 @@ namespace img_aligner
             ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat
         ))
         {
-            grid_warp_optimization_params.max_runtime_sec = std::max(
-                grid_warp_optimization_params.max_runtime_sec,
+            optimization_params.max_runtime_sec = std::max(
+                optimization_params.max_runtime_sec,
                 0.f
             );
         }
 
+        ImGui::EndDisabled();
+
         // start alignin'
         imgui_small_div();
-        if (ui_controls_mode == UiControlsMode::Settings)
+        if (!is_optimizing)
         {
             if (imgui_button_full_width("Start Alignin'##Controls"))
             {
                 std::string s_error;
-                if (try_recreate_grid_warper(true, &s_error))
-                {
-                    start_optimization();
-
-                    ui_controls_mode = UiControlsMode::Optimizing;
-
-                    // TODO switch to difference image
-                }
-                else
+                if (!grid_warper && !try_recreate_grid_warper(true, &s_error))
                 {
                     current_errors.push_back(s_error);
                     ImGui::OpenPopup(ERROR_DIALOG_TITLE);
                 }
+                else
+                {
+                    start_optimization();
+
+                    // TODO switch to difference image
+                }
             }
         }
-        else if (ui_controls_mode == UiControlsMode::Optimizing)
+        else
         {
             if (imgui_button_full_width("Stop##Controls"))
             {
@@ -1126,10 +1250,75 @@ namespace img_aligner
 
                 grid_warper->run_grid_warp_pass(true, state.queue_main);
 
-                ui_controls_mode = UiControlsMode::Settings;
-
                 // TODO unhide warped hires image and switch to it in ui pass
                 need_to_run_ui_pass = true;
+            }
+        }
+
+        if (is_optimizing)
+        {
+            std::scoped_lock lock(optimization_info_mutex);
+
+            imgui_div();
+            imgui_bold("STATS");
+
+            ImGui::TextWrapped(std::format(
+                "Elapsed: {:.1f} s",
+                elapsed_sec(optimization_info.start_time)
+            ).c_str());
+
+            ImGui::TextWrapped(std::format(
+                "Total Iterations: {}",
+                optimization_info.n_iters
+            ).c_str());
+
+            ImGui::TextWrapped(std::format(
+                "Good Iterations: {} ({:.1f}%%)",
+                optimization_info.n_good_iters,
+                100.f * (float)optimization_info.n_good_iters
+                / (float)optimization_info.n_iters
+            ).c_str());
+            imgui_tooltip(
+                "The number of iterations where the cost decreased (instead of "
+                "staying still)"
+            );
+
+            if (optimization_info.change_in_cost_in_last_n_iters >= FLT_MAX)
+            {
+                ImGui::TextWrapped("Change in Cost: -");
+            }
+            else
+            {
+                ImGui::TextWrapped(std::format(
+                    "Change in Cost: {:.7f}",
+                    optimization_info.change_in_cost_in_last_n_iters
+                ).c_str());
+            }
+            imgui_tooltip(std::format(
+                "How much the cost decreased in the last {} iterations",
+                grid_warp::N_ITERS_TO_CHECK_CHANGE_IN_COST
+            ).c_str());
+
+            if (!optimization_info.cost_history.empty())
+            {
+                ImGui::TextWrapped(std::format(
+                    "Cost: {:.7f}",
+                    optimization_info.cost_history.back()
+                ).c_str());
+
+                ImGui::PlotLines(
+                    "##",
+                    optimization_info.cost_history.data(),
+                    (int)optimization_info.cost_history.size(),
+                    0,
+                    "##",
+                    FLT_MAX,
+                    FLT_MAX,
+                    ImVec2{
+                        -FLT_MIN,
+                        200.f * ui_scale
+                    }
+                );
             }
         }
 
@@ -1312,11 +1501,21 @@ namespace img_aligner
         // preview grid lines
         if (preview_grid && grid_warper != nullptr)
         {
+            // update the copy of the vertices if it has the wrong size
+            bool size_mismatch =
+                grid_vertices_copy_for_ui_preview.size()
+                != grid_warper->get_n_vertices();
+            if (size_mismatch)
+            {
+                copy_grid_vertices_for_ui_preview();
+            }
+
             ImDrawList* draw_list = ImGui::GetWindowDrawList();
 
             uint32_t padded_res_x = grid_warper->get_padded_grid_res_x();
             uint32_t padded_res_y = grid_warper->get_padded_grid_res_y();
-            const grid_warp::GridVertex* vertices = grid_warper->get_vertices();
+            const grid_warp::GridVertex* vertices =
+                grid_vertices_copy_for_ui_preview.data();
 
             const ImU32 line_col = ImGui::ColorConvertFloat4ToU32(
                 { .65f, .65f, .65f, .7f }
@@ -1516,7 +1715,7 @@ namespace img_aligner
     void App::imgui_bold(std::string_view s)
     {
         ImGui::PushFont(font_bold);
-        ImGui::Text(s.data());
+        ImGui::TextWrapped(s.data());
         ImGui::PopFont();
     }
 

@@ -7,19 +7,23 @@
 namespace img_aligner
 {
 
-    // this defines what UI controls to show
-    enum class UiControlsMode
-    {
-        Settings, // show controls for grid warper settings
-        Optimizing // show details on the optimization process + cancel button
-    };
-
     struct GridWarpOptimizationParams
     {
         float max_warp_strength = .0001f;
-        float min_change_in_avg_difference_in_100_iters = .001f;
+        float min_change_in_cost_in_last_n_iters = .00001f;
         uint32_t max_iters = 10000;
         float max_runtime_sec = 600.f;
+    };
+
+    struct GridWarpOptimizationInfo
+    {
+        size_t n_iters = 0; // num. total iterations
+        size_t n_good_iters = 0; // num. iterations where the cost decreased
+
+        std::vector<float> cost_history;
+        float change_in_cost_in_last_n_iters = FLT_MAX;
+
+        TimePoint start_time;
     };
 
     class App
@@ -45,15 +49,27 @@ namespace img_aligner
         bv::MemoryChunkPtr target_img_mem = nullptr;
         bv::ImageViewPtr target_imgview = nullptr;
 
+        // grid warper params and itself
         grid_warp::Params grid_warp_params;
-        GridWarpOptimizationParams grid_warp_optimization_params;
         std::unique_ptr<grid_warp::GridWarper> grid_warper = nullptr;
 
-        // grid warper optimization thread
+        // grid warp optimization thread
+        bool is_optimizing = false;
         std::unique_ptr<std::jthread> optimization_thread = nullptr;
         bool optimization_thread_stop = false;
         std::shared_mutex optimization_mutex;
         std::atomic_bool need_the_optimization_mutex = false;
+
+        // grid warp optimization stuff
+        GridWarpOptimizationParams optimization_params;
+        GridWarpOptimizationInfo optimization_info;
+        std::shared_mutex optimization_info_mutex;
+
+        // copy of the grid vertices to use for grid preview in the UI
+        std::vector<grid_warp::GridVertex> grid_vertices_copy_for_ui_preview;
+
+        // last time we updated the UI stuff when optimization is running.
+        TimePoint last_ui_update_when_optimizing_time;
 
         void init();
         void main_loop();
@@ -71,8 +87,6 @@ namespace img_aligner
         // used for displaying linear (HDR) images in the UI
         std::unique_ptr<UiPass> ui_pass = nullptr;
         bool need_to_run_ui_pass = false;
-
-        UiControlsMode ui_controls_mode = UiControlsMode::Settings;
 
         float ui_scale = 1.f;
         bool ui_scale_updated = false;
@@ -127,6 +141,7 @@ namespace img_aligner
         // exclusively UI-related
 
         void recreate_ui_pass();
+        void copy_grid_vertices_for_ui_preview();
 
         void layout_controls();
         void layout_misc();
