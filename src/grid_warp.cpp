@@ -234,10 +234,8 @@ namespace img_aligner::grid_warp
         dfp_fence->wait();
         dfp_fence->reset();
 
-        // the difference is averaged over the square resolution of the
-        // difference image but we expect the averaged value over the
-        // intermediate resolution (the bottom left corner of the difference
-        // image) so this fixes that.
+        // TODO use other mip levels
+
         float avg = *avg_difference_buf_mapped;
         float sum =
             avg * (float)(difference_res_square * difference_res_square);
@@ -282,12 +280,12 @@ namespace img_aligner::grid_warp
         const bv::QueuePtr& queue
     )
     {
-        // keep track of the difference before we warp the grid
-        if (!last_avg_difference)
+        // keep track of the cost
+        if (!last_cost)
         {
-            last_avg_difference = run_difference_pass(queue);
+            last_cost = run_difference_pass(queue);
         }
-        float old_diff = *last_avg_difference;
+        float old_cost = *last_cost;
 
         // make a copy of the vertices in case we decide to undo the
         // displacement
@@ -360,23 +358,20 @@ namespace img_aligner::grid_warp
             }
         }
 
-        // see if the displacement did any good (decreased difference)
+        // see if the displacement did any good (decreased the cost)
         run_grid_warp_pass(false, queue);
-        float new_diff = run_difference_pass(queue);
+        float new_cost = run_difference_pass(queue);
 
-        // if it increased the difference, undo the displacement
-        if (new_diff > old_diff)
+        // if it increased the cost, undo the displacement
+        if (new_cost > old_cost)
         {
             restore_copy_of_vertices();
-            std::cout << 0.f;
             return false;
         }
         else
         {
-            last_avg_difference = new_diff;
-            std::cout << (new_diff - old_diff);
+            last_cost = new_cost;
         }
-        std::cout << "   (" << *last_avg_difference << ")\n";
         return true;
     }
 
@@ -1556,6 +1551,7 @@ namespace img_aligner::grid_warp
 
         // copy the last mip level (which is 1x1) to the average difference
         // buffer.
+        // TODO_decide_level
         VkBufferImageCopy copy_region{
             .bufferOffset = 0,
             .bufferRowLength = 0,

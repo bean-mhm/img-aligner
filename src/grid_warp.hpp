@@ -6,6 +6,8 @@
 namespace img_aligner::grid_warp
 {
 
+    static constexpr size_t N_ITERS_TO_CHECK_CHANGE_IN_COST = 100;
+
     struct GridVertex
     {
         // the positions below are all normalized in the 0 to 1 range but they
@@ -39,7 +41,7 @@ namespace img_aligner::grid_warp
         bv::ImageViewWPtr target_imgview;
 
         uint32_t grid_res_area = 512;
-        float grid_padding = .2f;
+        float grid_padding = .1f;
 
         uint32_t intermediate_res_area = 1200000;
 
@@ -61,10 +63,15 @@ namespace img_aligner::grid_warp
         // used.
         void run_grid_warp_pass(bool hires, const bv::QueuePtr& queue);
 
-        // run the difference pass and return the average difference (error)
-        // between warped_img and target_img. the average is calculated by
-        // generating mipmaps for the difference image which has a square
-        // resolution of a power of 2.
+        // run the difference pass and return the cost based on the difference
+        // between warped_img and target_img. we first generate mipmaps for the
+        // difference image which has a square resolution of a power of 2. then,
+        // we use one of the smallest mip levels (like 16x16) and find the
+        // maximum difference value in the pixels at that mip level. if we just
+        // used the average difference value (which is found in the last mip
+        // level of resolution 1x1) the algorithm could introduce local
+        // differences while still decreasing the average (global) difference
+        // which is bad.
         float run_difference_pass(const bv::QueuePtr& queue);
 
         void add_images_to_ui_pass(UiPass& ui_pass);
@@ -84,15 +91,24 @@ namespace img_aligner::grid_warp
             return vertex_buf_mapped;
         }
 
+        constexpr uint32_t get_n_vertices() const
+        {
+            return n_vertices;
+        }
+
+        constexpr const std::optional<float>& get_last_cost() const
+        {
+            return last_cost;
+        }
+
         // displace the grid vertices using an unnormalized gaussian
         // distribution with randomly generated center point, radius (standard
         // deviation), displacement direction and strength. the grid warp and
         // difference passes will then be run. if the displacement caused the
-        // average difference (mean error) to increase, we will undo the
-        // displacement and return false, otherwise we'll keep the changes and
-        // return true. ideally, you would call this many times in a row to
-        // minimize the difference between the warped image and the target
-        // image.
+        // cost to increase, we will undo the displacement and return false,
+        // otherwise we'll keep the changes and return true. ideally, you would
+        // call this many times in a row to minimize the difference between the
+        // warped image and the target image.
         bool optimize(float max_warp_strength, const bv::QueuePtr& queue);
 
     private:
@@ -129,7 +145,7 @@ namespace img_aligner::grid_warp
         uint32_t padded_grid_res_x = 1;
         uint32_t padded_grid_res_y = 1;
 
-        std::optional<float> last_avg_difference;
+        std::optional<float> last_cost;
 
         // vertex buffer for the grid vertices, host-visible and host-coherent
         // because we'll keep moving the vertices in every iteration.
@@ -139,7 +155,7 @@ namespace img_aligner::grid_warp
         GridVertex* vertex_buf_mapped = nullptr;
 
         // vector to contain a copy of the vertices, ONLY used when undoing
-        // grid displacement in case it increased the difference.
+        // grid displacement in case it increased the cost.
         std::vector<GridVertex> vertices_copy;
 
         // index buffer for the grid vertices
@@ -174,9 +190,7 @@ namespace img_aligner::grid_warp
         bv::ImageViewPtr difference_imgview_first_mip = nullptr;
 
         // the average difference buffer is a host-visible buffer into which we
-        // copy the last mip level of the difference image which contains a
-        // single float value representing the average difference (error)
-        // between warped_img and target_img.
+        // copy one of the last mip levels of the difference image.
         bv::BufferPtr avg_difference_buf = nullptr;
         bv::MemoryChunkPtr avg_difference_buf_mem = nullptr;
         float* avg_difference_buf_mapped = nullptr;
@@ -193,17 +207,16 @@ namespace img_aligner::grid_warp
         //    - renders to difference_img
         //    - does not use a vertex buffer. instead, generates vertices for a
         //      "full-screen" quad in the vertex shader.
-        //    - we mipmap the difference image down to 1x1 to get the average
-        //      difference ("mean error").
+        //    - we mipmap the difference image down to 1x1 and read one of the
+        //      last mip levels to the average difference buffer.
         //    - the difference image has a square resolution of the upper power
         //      of 2 of the intermediate resolution's largest dimension. for
         //      example, if the intermediate resolution is 200x500 the
         //      resolution of the difference image will be 512x512. this is done
-        //      to avoid inaccuracies in the average difference caused by
-        //      bilinear interpolation. of course, this introduces extra black
-        //      pixels in the result that affect the average difference, so
-        //      we make sure to correct for that when reading the average value
-        //      from the last mip level which is 1x1.
+        //      to avoid inaccuracies caused by bilinear interpolation. of
+        //      course, this introduces extra black pixels in the result that
+        //      affect the average difference, so we make sure to correct for
+        //      that.
 
         // grid warp pass: descriptor stuff
         bv::DescriptorSetLayoutPtr gwp_descriptor_set_layout = nullptr;
