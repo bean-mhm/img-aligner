@@ -40,6 +40,8 @@
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 
+#include "circular_buffer.hpp"
+
 // access element in 2D array with row-major ordering
 #define ACCESS_2D(arr, ix, iy, res_x) ((arr)[(ix) + (iy) * (res_x)])
 #define INDEX_2D(ix, iy, res_x) ((ix) + (iy) * (res_x))
@@ -71,6 +73,11 @@ namespace img_aligner
         VK_FORMAT_R16G16B16A16_SFLOAT;
 
     static constexpr bool DEBUG_MODE = false;
+
+    // the interval at which to run the UI pass and make a new copy of the grid
+    // vertices for previewing in the UI, when grid warp optimization is
+    // running.
+    static constexpr float GRID_WARP_OPTIMIZATION_UI_UPDATE_INTERVAL = .7f;
 
     using TimePoint = std::chrono::steady_clock::time_point;
 
