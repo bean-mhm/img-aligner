@@ -780,6 +780,7 @@ namespace img_aligner
         catch (std::string s)
         {
             failed = true;
+            grid_warper = nullptr;
             if (out_error)
             {
                 *out_error = s;
@@ -1029,28 +1030,38 @@ namespace img_aligner
         // load base image
         if (imgui_button_full_width("Load Base Image##Controls"))
         {
+            grid_warper = nullptr;
             if (browse_and_load_image(
                 base_img,
                 base_img_mem,
                 base_imgview
             ))
             {
-                try_recreate_grid_warper(true);
+                recreate_ui_pass();
                 ui_pass_select_image(BASE_IMAGE_NAME);
+            }
+            else
+            {
+                recreate_ui_pass();
             }
         }
 
         // load target image
         if (imgui_button_full_width("Load Target Image##Controls"))
         {
+            grid_warper = nullptr;
             if (browse_and_load_image(
                 target_img,
                 target_img_mem,
                 target_imgview
             ))
             {
-                try_recreate_grid_warper(true);
+                recreate_ui_pass();
                 ui_pass_select_image(TARGET_IMAGE_NAME);
+            }
+            else
+            {
+                recreate_ui_pass();
             }
         }
 
@@ -1074,7 +1085,9 @@ namespace img_aligner
                 (uint32_t)1,
                 (uint32_t)(8192u * 8192u)
             );
-            try_recreate_grid_warper(true);
+
+            grid_warper = nullptr;
+            recreate_ui_pass();
         }
 
         // grid padding
@@ -1102,7 +1115,9 @@ namespace img_aligner
                 0.f,
                 1.f
             );
-            try_recreate_grid_warper(true);
+
+            grid_warper = nullptr;
+            recreate_ui_pass();
         }
 
         // intermediate resolution
@@ -1126,7 +1141,21 @@ namespace img_aligner
                 (uint32_t)1,
                 (uint32_t)(16384u * 16384u)
             );
-            try_recreate_grid_warper(true);
+
+            grid_warper = nullptr;
+            recreate_ui_pass();
+        }
+
+        // create grid warper
+        imgui_small_div();
+        if (!grid_warper && imgui_button_full_width("Recreate Grid Warper"))
+        {
+            std::string s_error;
+            if (!grid_warper && !try_recreate_grid_warper(true, &s_error))
+            {
+                current_errors.push_back(s_error);
+                ImGui::OpenPopup(ERROR_DIALOG_TITLE);
+            }
         }
 
         imgui_div();
@@ -1222,27 +1251,9 @@ namespace img_aligner
 
         ImGui::EndDisabled();
 
-        // start alignin'
+        // start alignin' / stop
         imgui_small_div();
-        if (!is_optimizing)
-        {
-            if (imgui_button_full_width("Start Alignin'##Controls"))
-            {
-                std::string s_error;
-                if (!grid_warper && !try_recreate_grid_warper(true, &s_error))
-                {
-                    current_errors.push_back(s_error);
-                    ImGui::OpenPopup(ERROR_DIALOG_TITLE);
-                }
-                else
-                {
-                    start_optimization();
-
-                    // TODO switch to difference image
-                }
-            }
-        }
-        else
+        if (is_optimizing)
         {
             if (imgui_button_full_width("Stop##Controls"))
             {
@@ -1253,6 +1264,18 @@ namespace img_aligner
                 // TODO unhide warped hires image and switch to it in ui pass
                 need_to_run_ui_pass = true;
             }
+        }
+        else
+        {
+            ImGui::BeginDisabled(!grid_warper);
+            if (imgui_button_full_width("Start Alignin'##Controls")
+                && grid_warper != nullptr)
+            {
+                start_optimization();
+
+                // TODO switch to difference image
+            }
+            ImGui::EndDisabled();
         }
 
         if (is_optimizing)
@@ -1368,6 +1391,14 @@ namespace img_aligner
         {
             ImGui::End();
             return;
+        }
+
+        // make sure selected_image_idx is valid
+        if (selected_image_idx < 0
+            || selected_image_idx >= ui_pass->images().size())
+        {
+            selected_image_idx = 0;
+            need_to_run_ui_pass = true;
         }
 
         // image selector
@@ -1698,12 +1729,12 @@ namespace img_aligner
 
     void App::imgui_div()
     {
-        ImGui::Dummy({ 1.f, 24.f * ui_scale });
+        ImGui::Dummy({ 1.f, 26.f * ui_scale });
     }
 
     void App::imgui_small_div()
     {
-        ImGui::Dummy({ 1.f, 6.f * ui_scale });
+        ImGui::Dummy({ 1.f, 5.f * ui_scale });
     }
 
     void App::imgui_horiz_div()
