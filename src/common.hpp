@@ -83,6 +83,7 @@ namespace img_aligner
 
     struct AppState
     {
+        bool ui_mode = true;
         GLFWwindow* window = nullptr;
         ImGuiIO* io = nullptr;
 
