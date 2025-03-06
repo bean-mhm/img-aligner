@@ -40,6 +40,9 @@ namespace img_aligner::grid_warp
         bv::ImageViewWPtr base_imgview;
         bv::ImageViewWPtr target_imgview;
 
+        float base_img_mul = 1.f;
+        float target_img_mul = 1.f;
+
         uint32_t grid_res_area = 512;
         float grid_padding = .1f;
 

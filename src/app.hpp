@@ -129,9 +129,9 @@ namespace img_aligner
             bv::ImageViewPtr& imgview
         );
 
-        bool try_recreate_grid_warper(
-            bool ui_mode,
-            std::string* out_error = nullptr
+        bool try_recreate_grid_warper(std::string* out_error = nullptr);
+        void destroy_grid_warper(
+            bool recreate_ui_pass_if_destroyed_grid_warper
         );
 
         void start_optimization();
@@ -174,7 +174,7 @@ namespace img_aligner
             bv::ImageViewPtr& imgview
         );
 
-        void ui_pass_select_image(std::string_view name);
+        void select_ui_pass_image(std::string_view name);
 
     };
 

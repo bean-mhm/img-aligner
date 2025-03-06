@@ -735,7 +735,7 @@ namespace img_aligner
         );
     }
 
-    bool App::try_recreate_grid_warper(bool ui_mode, std::string* out_error)
+    bool App::try_recreate_grid_warper(std::string* out_error)
     {
         grid_warper = nullptr;
         optimization_info = GridWarpOptimizationInfo{};
@@ -787,7 +787,7 @@ namespace img_aligner
             }
         }
 
-        if (ui_mode)
+        if (state.ui_mode)
         {
             recreate_ui_pass();
         }
@@ -798,6 +798,20 @@ namespace img_aligner
         }
 
         return !failed;
+    }
+
+    void App::destroy_grid_warper(
+        bool recreate_ui_pass_if_destroyed_grid_warper
+    )
+    {
+        if (grid_warper != nullptr)
+        {
+            grid_warper = nullptr;
+            if (state.ui_mode && recreate_ui_pass_if_destroyed_grid_warper)
+            {
+                recreate_ui_pass();
+            }
+        }
     }
 
     void App::start_optimization()
@@ -958,6 +972,7 @@ namespace img_aligner
                 "Base Image",
                 base_img->config().extent.width,
                 base_img->config().extent.height,
+                grid_warp_params.base_img_mul,
                 false
             );
         }
@@ -970,6 +985,7 @@ namespace img_aligner
                 "Target Image",
                 target_img->config().extent.width,
                 target_img->config().extent.height,
+                grid_warp_params.target_img_mul,
                 false
             );
         }
@@ -1030,39 +1046,95 @@ namespace img_aligner
         // load base image
         if (imgui_button_full_width("Load Base Image##Controls"))
         {
-            grid_warper = nullptr;
             if (browse_and_load_image(
                 base_img,
                 base_img_mem,
                 base_imgview
             ))
             {
+                destroy_grid_warper(false);
                 recreate_ui_pass();
-                ui_pass_select_image(BASE_IMAGE_NAME);
-            }
-            else
-            {
-                recreate_ui_pass();
+                select_ui_pass_image(BASE_IMAGE_NAME);
             }
         }
 
         // load target image
         if (imgui_button_full_width("Load Target Image##Controls"))
         {
-            grid_warper = nullptr;
             if (browse_and_load_image(
                 target_img,
                 target_img_mem,
                 target_imgview
             ))
             {
+                destroy_grid_warper(false);
                 recreate_ui_pass();
-                ui_pass_select_image(TARGET_IMAGE_NAME);
+                select_ui_pass_image(TARGET_IMAGE_NAME);
             }
-            else
+        }
+
+        // base image multiplier
+        imgui_small_div();
+        ImGui::TextWrapped("Base Image Multiplier");
+        imgui_tooltip("Scale the RGB values of the base image");
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        if (ImGui::DragFloat(
+            "##base_img_mul",
+            &grid_warp_params.base_img_mul,
+            .1f,
+            0.f, 10.f,
+            "%.3f",
+            ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat
+        ))
+        {
+            grid_warp_params.base_img_mul = std::max(
+                grid_warp_params.base_img_mul,
+                0.f
+            );
+
+            destroy_grid_warper(true);
+
+            for (auto& ui_image_info : ui_pass->images())
             {
-                recreate_ui_pass();
+                if (ui_image_info.name == BASE_IMAGE_NAME)
+                {
+                    ui_image_info.mul = grid_warp_params.base_img_mul;
+                    break;
+                }
             }
+            need_to_run_ui_pass = true;
+        }
+
+        // target image multiplier
+        imgui_small_div();
+        ImGui::TextWrapped("Target Image Multiplier");
+        imgui_tooltip("Scale the RGB values of the target image");
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        if (ImGui::DragFloat(
+            "##target_img_mul",
+            &grid_warp_params.target_img_mul,
+            .1f,
+            0.f, 10.f,
+            "%.3f",
+            ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat
+        ))
+        {
+            grid_warp_params.target_img_mul = std::max(
+                grid_warp_params.target_img_mul,
+                0.f
+            );
+
+            destroy_grid_warper(true);
+
+            for (auto& ui_image_info : ui_pass->images())
+            {
+                if (ui_image_info.name == TARGET_IMAGE_NAME)
+                {
+                    ui_image_info.mul = grid_warp_params.target_img_mul;
+                    break;
+                }
+            }
+            need_to_run_ui_pass = true;
         }
 
         imgui_div();
@@ -1085,9 +1157,7 @@ namespace img_aligner
                 (uint32_t)1,
                 (uint32_t)(8192u * 8192u)
             );
-
-            grid_warper = nullptr;
-            recreate_ui_pass();
+            destroy_grid_warper(true);
         }
 
         // grid padding
@@ -1115,9 +1185,7 @@ namespace img_aligner
                 0.f,
                 1.f
             );
-
-            grid_warper = nullptr;
-            recreate_ui_pass();
+            destroy_grid_warper(true);
         }
 
         // intermediate resolution
@@ -1141,9 +1209,7 @@ namespace img_aligner
                 (uint32_t)1,
                 (uint32_t)(16384u * 16384u)
             );
-
-            grid_warper = nullptr;
-            recreate_ui_pass();
+            destroy_grid_warper(true);
         }
 
         // create grid warper
@@ -1151,7 +1217,7 @@ namespace img_aligner
         if (!grid_warper && imgui_button_full_width("Recreate Grid Warper"))
         {
             std::string s_error;
-            if (!grid_warper && !try_recreate_grid_warper(true, &s_error))
+            if (!grid_warper && !try_recreate_grid_warper(&s_error))
             {
                 current_errors.push_back(s_error);
                 ImGui::OpenPopup(ERROR_DIALOG_TITLE);
@@ -1347,6 +1413,7 @@ namespace img_aligner
 
         imgui_dialogs();
 
+        imgui_div();
         ImGui::End();
     }
 
@@ -1380,6 +1447,7 @@ namespace img_aligner
             open_url(APP_GITHUB_URL);
         }
 
+        imgui_div();
         ImGui::End();
     }
 
@@ -2116,7 +2184,7 @@ namespace img_aligner
         return false;
     }
 
-    void App::ui_pass_select_image(std::string_view name)
+    void App::select_ui_pass_image(std::string_view name)
     {
         for (size_t i = 0; i < ui_pass->images().size(); i++)
         {

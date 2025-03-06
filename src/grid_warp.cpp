@@ -164,6 +164,10 @@ namespace img_aligner::grid_warp
         if ((padded_grid_res_y - grid_res_y) % 2 != 0)
             padded_grid_res_y++;
 
+        // set up push constants
+        gwp_frag_push_constants.base_img_mul = params.base_img_mul;
+        dfp_frag_push_constants.target_img_mul = params.target_img_mul;
+
         create_vertex_and_index_buffer_and_generate_vertices(queue);
         make_copy_of_vertices();
         create_sampler_and_images(queue);
@@ -251,6 +255,7 @@ namespace img_aligner::grid_warp
             "Warped Image (Intermediate Resolution)",
             warped_img->config().extent.width,
             warped_img->config().extent.height,
+            1.f,
             false
         );
 
@@ -260,6 +265,7 @@ namespace img_aligner::grid_warp
             "Warped Image (Original Resolution)",
             warped_hires_img->config().extent.width,
             warped_hires_img->config().extent.height,
+            1.f,
             false
         );
 
@@ -271,6 +277,7 @@ namespace img_aligner::grid_warp
             "Difference Image",
             warped_img->config().extent.width,
             warped_img->config().extent.height,
+            1.f,
             true
         );
     }
