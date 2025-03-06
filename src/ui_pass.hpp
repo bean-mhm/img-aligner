@@ -16,6 +16,11 @@ namespace img_aligner
         uint32_t width;
         uint32_t height;
 
+        // scale the RGB values of the image (this is separate from exposure but
+        // they can be applied together. note that exposure is exponential but
+        // this is a linear multiplier).
+        float mul;
+
     private:
         bool single_channel;
 
@@ -28,6 +33,7 @@ namespace img_aligner
             std::string name,
             uint32_t width,
             uint32_t height,
+            float mul,
             bool single_channel,
             UiPass* parent_ui_pass,
             bv::DescriptorSetPtr ui_pass_ds
@@ -68,6 +74,11 @@ namespace img_aligner
             return _max_height;
         }
 
+        constexpr std::vector<UiImageInfo>& images()
+        {
+            return _images;
+        }
+
         constexpr const std::vector<UiImageInfo>& images() const
         {
             return _images;
@@ -79,6 +90,7 @@ namespace img_aligner
             std::string name,
             uint32_t width,
             uint32_t height,
+            float mul,
             bool single_channel
         );
 

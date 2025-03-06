@@ -7,6 +7,7 @@ namespace img_aligner
         std::string name,
         uint32_t width,
         uint32_t height,
+        float mul,
         bool single_channel,
         UiPass* parent_ui_pass,
         bv::DescriptorSetPtr ui_pass_ds
@@ -14,6 +15,7 @@ namespace img_aligner
         : name(std::move(name)),
         width(width),
         height(height),
+        mul(mul),
         parent_ui_pass(parent_ui_pass),
         single_channel(single_channel),
         ui_pass_ds(ui_pass_ds)
@@ -389,6 +391,7 @@ namespace img_aligner
         std::string name,
         uint32_t width,
         uint32_t height,
+        float mul,
         bool single_channel
     )
     {
@@ -441,6 +444,7 @@ namespace img_aligner
             name,
             width,
             height,
+            mul,
             single_channel,
             this,
             ds
@@ -516,7 +520,7 @@ namespace img_aligner
         );
 
         UiPassFragPushConstants frag_push_constants{
-            .img_mul = std::exp2(exposure),
+            .img_mul = std::exp2(exposure) * std::max(image.mul, 0.f),
             .use_flim = use_flim ? 1 : 0,
             .single_channel = image.single_channel ? 1 : 0
         };
