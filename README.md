@@ -1,55 +1,111 @@
-# What
+# img-aligner
 
-This program allows you to warp an image to look like another, similar image.
+This program allows you to warp an image (the __base image__) to look
+like another, already similar image (the __target image__).
 
 # Why
 
-The original goal was to perspective-align two or more photos with different
-exposure times taken from the same scene with slighly different camera angles.
-This can be used in __HDR fusion__ where we mix photos from the same scene with the
-same camera angle but with different exposure levels by using brighter ones to
-get details in the highlights (sky, headlights, etc.) and the darker photos to
-get clean and noise-free shadows.
+My personal motivation for this project was to perspective-align two or more
+photos with different exposure durations taken from the same scene and almost
+the same camera angle. This can be used in __HDR fusion__ where we mix photos
+from the same scene with different exposure levels to get a clean, noiseless
+linear image that we can further work on (e.g. by applying a view transform,
+commonly called a tone mapper). We can do this by using the darker images to
+capture details in the highlights (sky, headlights, etc.) since the image is
+dark enough to prevent overexposure and clipping, and we can use the brighter
+photos to get clean and noise-free shadows. Again, darker images prevent
+overexposure or clipping in bright areas, and brighter images prevent noise in
+dark areas. By combining them, we can get the best of both worlds. I usually do
+this with a custom shader node setup I've made in
+[Blender](https://www.blender.org/).
 
-Remember that bright photos are typically
-overexposed / clipped in the highlights but have clean shadows, and darker
-ones maintain details in the highlights but are noisy in dark areas like shadows.
-By combining them, we can get the best of both worlds.
+Now, HDR fusion requires both the scene and the camera to be fully stationary
+because there's a delay between each image we capture (not to mention motion
+blur in images with higher exposure times). Using a tripod can help, but it's
+not always an option, and sometimes I just need to pull out my phone and, using
+[Open Camera](https://opencamera.org.uk/), press capture in the
+"Exposure Bracket" mode which will automatically take 5 RAW (DNG) images with
+varying exposure levels. Obviously, this introduces tiny movements in the camera
+(the phone) simply from my hand movements, even if I hold my breath.
 
-This program does __not__ perform HDR fusion, it just helps you align your photos to avoid artifacts later.
+Despite being tiny, these movements are still large enough to ruin the
+images for HDR fusion by introducing artifacts, so what I needed was a program
+that aligns these "Exposure Bracket" images to fix my hand movements. Adobe
+Photoshop has a similar feature, but it doesn't seem to work for images in
+linear color spaces with 32-bit floating-point data, and I don't wanna rely on
+paid Adobe software, or any Adobe software for that matter.
 
 # How
 
-The algorithm uses grid warping to distort the starting image to roughly match
-the target image. An evolution algorithm is used for optimization to minimize
-the difference from the target image. Here's what the algorithm does in pseudocode:
+The algorithm uses grid warping to distort the __base image__ to match the
+__target image__. An evolution algorithm is used for optimization to minimize
+the "cost". To calculate the cost, we render the per-pixel logarithmic
+difference between the warped base image and the target image into what we call
+the __difference image__, then we downscale that image to a really tiny resolution
+like 16x9 (called the __cost resolution__, calculated based on the grid
+resolution) and store it in the __cost image__. Finally, we find the maximum
+value in the pixels of the cost image, and that becomes our cost value, which is
+what we're trying to minimize. Here's what the algorithm does in pseudocode
+(more or less):
 
 ```
 in every iteration:
-    randomly choose a grid point
-    offset it by a gaussian distribution
-    recalculate error from target image
-    if new_error > old_error:
-        undo the offset
+    - warp the grid vertices using a gaussian distribution with a random center,
+      direction, and strength.  the ranges are calculated based on parameters.
+    - recalculate the cost
+    - if new cost < old cost, undo the warping
+    - break loop if stop conditions are met
 ```
 
-For increased performance, grid warping and error calculation are performed on
-the graphics processing unit (GPU) using the Vulkan API.
+For increased performance, grid warping and cost calculation are performed at
+a lower resolution (called the __intermediate resolution__) on the graphics
+processing unit (GPU) using the Vulkan API.
+
+# Color Spaces
+
+Unlike typical images we might see on the internet which can only store RGB
+(red, green, blue) values in the [0, 1] range, linear images allow any real
+number (even negative) for the RGB values in their pixels.
+
+img-aligner only supports OpenEXR images. It performs calculations in a linear
+color space using 32-bit floating point values. All images are assumed to be
+in Linear BT.709 (AKA Linear Rec. 709) or something similar, like
+Linear BT.2020.
+
+img-aligner always assumes your display device uses the sRGB standard. If you're
+using a P3 or BT.2020 device, linear images that were originally intended to
+work in BT.709 might look strongly vibrant on your display. This only affects
+how you view images, not how they're processed or warped.
 
 # Usage
 
-1. Use the _Load Starting Image_ button in the _IMAGES_ section to open a file dialog and choose the image
-you want to distort. Next, hit _Load Target Image_ to load the target image.
+1. In the _Controls_ tab, use the _Load Base Image_ button in the _IMAGES_
+section to open a file dialog and choose the image you want to distort. Next,
+hit _Load Target Image_ to load the target image.
 
-2. Adjust settings in the _SETTINGS_ section. This is optional.
+> If one of the images is darker or brighter than the other by a linear factor (as is the case for exposure bracketed images), you can adjust the _Base / Target Image Multiplier_ to compensate for that.
 
-3. Hit _Optimize_ to start the optimization process.
+2. Adjust grid warping settings in the _GRID WARPER_ section and hit
+_Recreate Grid Warper_.
+
+3. Adjust optimizations settings in the _OPTIMIZATION_ section and hit
+_Start Alignin'_ to start minimizing the cost.
+
+4. Observe optimization statistics and a plot of the cost over time in the
+_STATS_ section.
+
+You can see the currently selected image in the _Image Viewer_ tab, and you can
+choose to display another image. You can also adjust the exposure and the zoom
+level, tick the _flim_ checkbox to apply the
+[flim](https://github.com/bean-mhm/flim) transform on the image when displaying,
+or tick _Preview Grid_ to see a preview of the grid used for warping.
 
 # Command Line
 
-If you want to batch-process several images, you can call this program from a
-command line or another program using the `--cli` argument to enable the command line interface.
-If no other arguments are provided, a help text will be printed.
+To batch-process multiple images, you can call img-aligner from a terminal
+or another program using the `--cli` argument to enable the command line
+interface (CLI). If no other arguments are provided, a help text will be
+printed.
 
 # How It's Made
 
@@ -61,45 +117,4 @@ This program is written in C++20 and uses the following libraries.
 | [beva](https://github.com/bean-mhm/beva) | Vulkan wrapper |
 | [Dear ImGui](https://github.com/ocornut/imgui) | Graphical user interface |
 | [NFD Extended](https://github.com/btzy/nativefiledialog-extended) | Native file dialogs |
-| [OpenColorIO](https://opencolorio.org/) | Color management |
-| [OpenImageIO](https://github.com/OpenImageIO/oiio) | Reading and writing images |
-
-# Color Management
-
-The program uses the [OpenColorIO](https://opencolorio.org/) library for color
-management and [OpenImageIO](https://github.com/OpenImageIO/oiio) for loading
-and saving images. It performs calculations in a linear color space using 32-bit
-floating point values.
-
-## OCIO Configs
-
-An [OpenColorIO](https://opencolorio.org/) config typically contains an organized list of transforms and settings for color management. The following is what you typically find in an OCIO config (not in order), along with short descriptions. Note that this is my own understanding as a learner, so take it with a grain of salt.
-
-| Element | Description |
-|--|--|
-| Reference Color Space | Not to be confused with the working color space, the reference color space is used to convert from any color space to any other color space. If we know how to go from color space *A* to the reference and vice versa, and we know how to go from color space *B* to the reference and vice versa, then we can easily go from *A* to *B* by first converting to the reference space, then to the target color space, *B*. |
-| Color Space | A color space usually tells OCIO how to convert from and to the reference space by describing what transforms to use. It may also contain additional information on how data must be stored in said color space, a description, a list of aliases, and so on. |
-| View | A view simply references a color space to be used. It may have a different name than the color space it references. |
-| Display | A display contains a list of views that can be used with said display format. |
-| Role | Roles are simply aliases for color spaces. As an example, the line `reference: Linear CIE-XYZ I-E` defines the reference color space. The `scene_linear` role generally defines the color space in which rendering and processing should be done. The `data` role defines the color space used for raw or generic data, A.K.A non-color data. The `color_picking` role defines what color space should be used in color pickers, and so on. Note that a program does not have to use these roles. For example, a program might always use `sRGB` in its color pickers regardless of the `color_picking` role. The `reference` role is an exception of this, as it is always used to convert between color spaces. |
-| Look | A look is an optional transform that may be applied to an image before displaying it. |
-
-The OCIO library lets us convert between color spaces, apply display/view transforms and looks, and so on.
-
-Let's go through the different sections in the _Color Management_ panel.
-
-## VIEW
-
-Here we can alter how we *view* the image contained in the current slot by adjusting the exposure, the *Display* type, and the *View* transform, and optionally choosing an artistic *Look*. This does __not__ affect the pixel values of the image in any way, it just defines how the image is displayed.
-
-## IMAGE IO
-
-These settings define how images are imported and exported.
-
-| Parameter | Description |
-|--|--|
-| Input | The interpreted color space when importing images in linear formats such as OpenEXR. The imported image will be converted from this color space to the working space. |
-| Output | The output color space when exporting images in linear formats without a display/view transform. |
-| Non-Linear | The interpreted color space when importing images in non-linear formats like PNG and JPEG. |
-| Auto-Detect | If enabled, RealBloom will try to detect the color space when loading linear images, and discard the *Input* setting if a color space was detected. |
-| Apply View Transform | If enabled, the current display/view transform will be applied when exporting linear images. The display/view transform is always applied to non-linear images. |
+| [OpenEXR](https://openexr.com) | Reading and writing OpenEXR images |
