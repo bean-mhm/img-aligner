@@ -906,7 +906,7 @@ namespace img_aligner
                     }
 
                     // stop condition: max iters
-                    if (optimization_params.max_iters > 0
+                    if (optimization_params.max_iters >= 0
                         && optimization_info.n_iters > optimization_params
                         .max_iters)
                     {
@@ -920,7 +920,7 @@ namespace img_aligner
                         elapsed_sec(optimization_info.start_time)
                         + optimization_info.accum_elapsed;
                     if (optimization_params.max_runtime_sec > 0.f
-                        && total_elapsed > optimization_params.max_runtime_sec)
+                        && total_elapsed >= optimization_params.max_runtime_sec)
                     {
                         optimization_info.stop_reason =
                             GridWarpOptimizationStopReason::ReachedMaxRuntime;
@@ -1280,7 +1280,7 @@ namespace img_aligner
             "##cost_res",
             ImGuiDataType_U32,
             &grid_warp_params.cost_res_area,
-            200.f
+            20.f
         ))
         {
             grid_warp_params.cost_res_area = std::clamp(
@@ -1340,7 +1340,7 @@ namespace img_aligner
         // min change in cost in N iters
         imgui_small_div();
         ImGui::TextWrapped(std::format(
-            "In the last {} iterations, the cost decreased by less than",
+            "In {} iterations, the cost decreased by less than",
             grid_warp::N_ITERS_TO_CHECK_CHANGE_IN_COST
         ).c_str());
         ImGui::SetNextItemWidth(-FLT_MIN);
@@ -1412,7 +1412,7 @@ namespace img_aligner
         {
             ImGui::BeginDisabled(!grid_warper);
 
-            static constexpr auto button_label =
+            const char* button_label =
                 (optimization_info.n_iters > 0)
                 ? "Continue Alignin'##Controls"
                 : "Start Alignin'##Controls";
