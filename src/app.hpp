@@ -15,6 +15,19 @@ namespace img_aligner
         float max_runtime_sec = 600.f;
     };
 
+    enum class GridWarpOptimizationStopReason
+    {
+        None,
+        ManuallyStopped,
+        LowChangeInCost,
+        ReachedMaxIters,
+        ReachedMaxRuntime
+    };
+
+    const char* GridWarpOptimizationStopReason_to_string(
+        GridWarpOptimizationStopReason reason
+    );
+
     struct GridWarpOptimizationInfo
     {
         size_t n_iters = 0; // num. total iterations
@@ -29,6 +42,9 @@ namespace img_aligner
         // optimization is running, this should be added to the elapsed time
         // since start_time.
         float accum_elapsed = 0.f;
+
+        GridWarpOptimizationStopReason stop_reason =
+            GridWarpOptimizationStopReason::None;
     };
 
     class App

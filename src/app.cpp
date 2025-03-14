@@ -11,6 +11,25 @@ namespace img_aligner
     static void glfw_error_callback(int error, const char* description);
     static void imgui_check_vk_result(VkResult err);
 
+    const char* GridWarpOptimizationStopReason_to_string(
+        GridWarpOptimizationStopReason reason
+    )
+    {
+        switch (reason)
+        {
+        case GridWarpOptimizationStopReason::ManuallyStopped:
+            return "manually stopped";
+        case GridWarpOptimizationStopReason::LowChangeInCost:
+            return "low change in cost";
+        case GridWarpOptimizationStopReason::ReachedMaxIters:
+            return "reached maximum iterations";
+        case GridWarpOptimizationStopReason::ReachedMaxRuntime:
+            return "reached maximum run time";
+        default:
+            return "none";
+        }
+    }
+
     void App::run()
     {
         try
@@ -832,6 +851,7 @@ namespace img_aligner
         is_optimizing = true;
         optimization_info.start_time =
             std::chrono::high_resolution_clock::now();
+        optimization_info.stop_reason = GridWarpOptimizationStopReason::None;
 
         optimization_thread_stop = false;
         optimization_thread = std::make_unique<std::jthread>(
@@ -845,7 +865,6 @@ namespace img_aligner
                         optimization_params.max_warp_strength,
                         state.queue_grid_warp_optimize
                     );
-
 
                     // update optimization info
                     optimization_info_mutex.lock();
@@ -881,6 +900,8 @@ namespace img_aligner
                     if (optimization_info.change_in_cost_in_last_n_iters <
                         optimization_params.min_change_in_cost_in_last_n_iters)
                     {
+                        optimization_info.stop_reason =
+                            GridWarpOptimizationStopReason::LowChangeInCost;
                         optimization_thread_stop = true;
                     }
 
@@ -889,14 +910,20 @@ namespace img_aligner
                         && optimization_info.n_iters > optimization_params
                         .max_iters)
                     {
+                        optimization_info.stop_reason =
+                            GridWarpOptimizationStopReason::ReachedMaxIters;
                         optimization_thread_stop = true;
                     }
 
                     // stop condition: max run time
+                    float total_elapsed =
+                        elapsed_sec(optimization_info.start_time)
+                        + optimization_info.accum_elapsed;
                     if (optimization_params.max_runtime_sec > 0.f
-                        && elapsed_sec(optimization_info.start_time) >
-                        optimization_params.max_runtime_sec)
+                        && total_elapsed > optimization_params.max_runtime_sec)
                     {
+                        optimization_info.stop_reason =
+                            GridWarpOptimizationStopReason::ReachedMaxRuntime;
                         optimization_thread_stop = true;
                     }
 
@@ -909,6 +936,13 @@ namespace img_aligner
 
                 std::scoped_lock lock(optimization_mutex);
                 std::scoped_lock lock2(optimization_info_mutex);
+
+                if (optimization_info.stop_reason ==
+                    GridWarpOptimizationStopReason::None)
+                {
+                    optimization_info.stop_reason =
+                        GridWarpOptimizationStopReason::ManuallyStopped;
+                }
 
                 // updated accumulated elapsed time
                 optimization_info.accum_elapsed += elapsed_sec(
@@ -1378,7 +1412,11 @@ namespace img_aligner
         {
             ImGui::BeginDisabled(!grid_warper);
 
-            if (imgui_button_full_width("Start Alignin'##Controls")
+            static constexpr auto button_label =
+                (optimization_info.n_iters > 0)
+                ? "Continue Alignin'##Controls"
+                : "Start Alignin'##Controls";
+            if (imgui_button_full_width(button_label)
                 && grid_warper != nullptr)
             {
                 start_optimization();
@@ -1395,6 +1433,17 @@ namespace img_aligner
 
             imgui_div();
             imgui_bold("STATS");
+
+            if (optimization_info.stop_reason
+                != GridWarpOptimizationStopReason::None)
+            {
+                ImGui::TextWrapped(
+                    "Stop reason: %s",
+                    GridWarpOptimizationStopReason_to_string(
+                        optimization_info.stop_reason
+                    )
+                );
+            }
 
             float total_elapsed = optimization_info.accum_elapsed;
             if (is_optimizing)
