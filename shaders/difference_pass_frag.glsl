@@ -16,9 +16,9 @@ layout(location = 0) out vec4 out_col;
 // Linear BT.709 I-D65.
 float rgb_log_diff_unsigned(vec3 a, vec3 b)
 {
-    // clip negative values and add a tiny offset to avoid infinity
-    a = max(a, 0.) + .001;
-    b = max(b, 0.) + .001;
+    // clip negative values and add a small offset to avoid infinity
+    a = max(a, 0.) + .01;
+    b = max(b, 0.) + .01;
     
     // logarithmic difference per channel
     vec3 d = log(a / b);
@@ -31,9 +31,9 @@ float rgb_log_diff_unsigned(vec3 a, vec3 b)
 // BT.709 I-D65.
 float rgb_log_diff(vec3 a, vec3 b)
 {
-    // clip negative values and add a tiny offset to avoid infinity
-    a = max(a, 0.) + .001;
-    b = max(b, 0.) + .001;
+    // clip negative values and add a small offset to avoid infinity
+    a = max(a, 0.) + .01;
+    b = max(b, 0.) + .01;
     
     // logarithmic difference per channel
     vec3 d = log(a / b);
