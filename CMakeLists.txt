@@ -83,6 +83,7 @@ add_custom_command(TARGET img-aligner
     COMMAND "${GLSLC_PATH}" -fshader-stage=vertex "${CMAKE_SOURCE_DIR}/shaders/grid_warp_pass_vert.glsl" -o "${CMAKE_BINARY_DIR}/bin/shaders/grid_warp_pass_vert.spv"
     COMMAND "${GLSLC_PATH}" -fshader-stage=fragment "${CMAKE_SOURCE_DIR}/shaders/grid_warp_pass_frag.glsl" -o "${CMAKE_BINARY_DIR}/bin/shaders/grid_warp_pass_frag.spv"
     COMMAND "${GLSLC_PATH}" -fshader-stage=fragment "${CMAKE_SOURCE_DIR}/shaders/difference_pass_frag.glsl" -o "${CMAKE_BINARY_DIR}/bin/shaders/difference_pass_frag.spv"
+    COMMAND "${GLSLC_PATH}" -fshader-stage=fragment "${CMAKE_SOURCE_DIR}/shaders/cost_pass_frag.glsl" -o "${CMAKE_BINARY_DIR}/bin/shaders/cost_pass_frag.spv"
     COMMAND "${GLSLC_PATH}" -fshader-stage=fragment "${CMAKE_SOURCE_DIR}/shaders/ui_pass_frag.glsl" -o "${CMAKE_BINARY_DIR}/bin/shaders/ui_pass_frag.spv"
     COMMAND echo done compiling shaders
 )
