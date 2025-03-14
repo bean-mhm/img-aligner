@@ -35,6 +35,17 @@ namespace img_aligner::grid_warp
         float target_img_mul = 1.f;
     };
 
+    struct CostPassFragPushConstants
+    {
+        glm::ivec2 cost_res;
+    };
+
+    struct CostInfo
+    {
+        float avg_diff; // average per-pixel logarithmic difference
+        float max_local_diff; // maximum value in the cost image
+    };
+
     struct Params
     {
         bv::ImageViewWPtr base_imgview;
@@ -43,13 +54,33 @@ namespace img_aligner::grid_warp
         float base_img_mul = 1.f;
         float target_img_mul = 1.f;
 
-        uint32_t grid_res_area = 512;
-        float grid_padding = .1f;
+        uint32_t grid_res_area = 200;
+        float grid_padding = .05f;
 
         uint32_t intermediate_res_area = 1200000;
+        uint32_t cost_res_area = 60;
 
         uint32_t rng_seed = 8191;
     };
+
+    // there are 3 types of passes in GridWarper:
+    // 1. grid warp pass
+    //    - samples base_img
+    //    - renders to warped_img or warped_hires_img (we make 2
+    //      framebuffers and use the appropriate one).
+    //    - uses the grid vertex buffer
+    // 2. difference pass
+    //    - samples warped_img and target_img
+    //    - calculates the per-pixel logarithmic difference
+    //    - renders to difference_img
+    //    - does not use a vertex buffer. instead, generates vertices for a
+    //      "full-screen" quad in the vertex shader.
+    // 3. cost pass
+    //    - samples difference_img using as many texel fetches needed to
+    //      avoid aliasing.
+    //    - renders to the cost image at the cost resolution
+    //    - does not use a vertex buffer. instead, generates vertices for a
+    //      "full-screen" quad in the vertex shader.
 
     class GridWarper
     {
@@ -61,21 +92,10 @@ namespace img_aligner::grid_warp
         );
         ~GridWarper();
 
-        // run the grid warp pass. if hires is set to true, the warped image
-        // will be rendered to warped_hires_img, otherwise warped_img will be
-        // used.
         void run_grid_warp_pass(bool hires, const bv::QueuePtr& queue);
 
-        // run the difference pass and return the cost based on the difference
-        // between warped_img and target_img. we first generate mipmaps for the
-        // difference image which has a square resolution of a power of 2. then,
-        // we use one of the smallest mip levels (like 16x16) and find the
-        // maximum difference value in the pixels at that mip level. if we just
-        // used the average difference value (which is found in the last mip
-        // level of resolution 1x1) the algorithm could introduce local
-        // differences while still decreasing the average (global) difference
-        // which is bad.
-        float run_difference_pass(const bv::QueuePtr& queue);
+        // returns the cost values
+        CostInfo run_difference_and_cost_pass(const bv::QueuePtr& queue);
 
         void add_images_to_ui_pass(UiPass& ui_pass);
 
@@ -99,9 +119,14 @@ namespace img_aligner::grid_warp
             return n_vertices;
         }
 
-        constexpr const std::optional<float>& get_last_cost() const
+        constexpr const std::optional<float>& get_last_avg_diff() const
         {
-            return last_cost;
+            return last_avg_diff;
+        }
+
+        constexpr const std::optional<float>& get_initial_max_local_diff() const
+        {
+            return initial_max_local_diff;
         }
 
         // displace the grid vertices using an unnormalized gaussian
@@ -121,11 +146,11 @@ namespace img_aligner::grid_warp
         void make_copy_of_vertices();
         void restore_copy_of_vertices();
         void create_sampler_and_images(const bv::QueuePtr& queue);
-        void create_avg_difference_buffer();
         void create_passes();
 
         bv::CommandBufferPtr create_grid_warp_pass_cmd_buf(bool hires);
         bv::CommandBufferPtr create_difference_pass_cmd_buf();
+        bv::CommandBufferPtr create_cost_pass_cmd_buf();
 
     private:
         AppState& state;
@@ -148,7 +173,12 @@ namespace img_aligner::grid_warp
         uint32_t padded_grid_res_x = 1;
         uint32_t padded_grid_res_y = 1;
 
-        std::optional<float> last_cost;
+        uint32_t cost_res_x = 1;
+        uint32_t cost_res_y = 1;
+
+        // used for optimization
+        std::optional<float> last_avg_diff;
+        std::optional<float> initial_max_local_diff;
 
         // vertex buffer for the grid vertices, host-visible and host-coherent
         // because we'll keep moving the vertices in every iteration.
@@ -169,57 +199,34 @@ namespace img_aligner::grid_warp
         // the one sampler we use for all images
         bv::SamplerPtr sampler = nullptr;
 
-        // grid warped image at intermediate resolution, no mipmapping. the base
-        // image will be rendered to this image but it'll be downsampled and
-        // warped.
+        // grid warped image at intermediate resolution. the base image will be
+        // rendered to this image but it'll be downsampled and warped.
         bv::ImagePtr warped_img = nullptr;
         bv::MemoryChunkPtr warped_img_mem = nullptr;
         bv::ImageViewPtr warped_imgview = nullptr;
 
-        // grid warped image at original resolution, no mipmapping. this will
-        // only be updated after optimization is stopped.
+        // grid warped image at original resolution. this will only be updated
+        // after optimization is stopped.
         bv::ImagePtr warped_hires_img = nullptr;
         bv::MemoryChunkPtr warped_hires_img_mem = nullptr;
         bv::ImageViewPtr warped_hires_imgview = nullptr;
 
-        // logarithmic difference image (difference between the warped image and
-        // the target image), square resolution which is equal to the upper
-        // power of 2 of the intermediate resolution, mipmapped so we can get
-        // the averaged error.
-        uint32_t difference_res_square = 1;
+        // difference image (per-pixel logarithmic difference between the warped
+        // image and the target image).
         bv::ImagePtr difference_img = nullptr;
         bv::MemoryChunkPtr difference_img_mem = nullptr;
         bv::ImageViewPtr difference_imgview = nullptr;
-        bv::ImageViewPtr difference_imgview_first_mip = nullptr;
 
-        // the average difference buffer is a host-visible buffer into which we
-        // copy one of the last mip levels of the difference image.
-        bv::BufferPtr avg_difference_buf = nullptr;
-        bv::MemoryChunkPtr avg_difference_buf_mem = nullptr;
-        float* avg_difference_buf_mapped = nullptr;
+        // cost image. this is just a downscaled version of the difference
+        // image.
+        bv::ImagePtr cost_img = nullptr;
+        bv::MemoryChunkPtr cost_img_mem = nullptr;
+        bv::ImageViewPtr cost_imgview = nullptr;
 
-        // NOTE: there are 2 types of passes:
-        // 1. grid warp pass
-        //    - samples base_img
-        //    - renders to warped_img or warped_hires_img (we make 2
-        //      framebuffers and use the appropriate one).
-        //    - uses the grid vertex buffer
-        // 2. difference pass
-        //    - samples warped_img and target_img
-        //    - calculates the logarithmic difference pixel-wise
-        //    - renders to difference_img
-        //    - does not use a vertex buffer. instead, generates vertices for a
-        //      "full-screen" quad in the vertex shader.
-        //    - we mipmap the difference image down to 1x1 and read one of the
-        //      last mip levels to the average difference buffer.
-        //    - the difference image has a square resolution of the upper power
-        //      of 2 of the intermediate resolution's largest dimension. for
-        //      example, if the intermediate resolution is 200x500 the
-        //      resolution of the difference image will be 512x512. this is done
-        //      to avoid inaccuracies caused by bilinear interpolation. of
-        //      course, this introduces extra black pixels in the result that
-        //      affect the average difference, so we make sure to correct for
-        //      that.
+        // host visible buffer to copy the cost image's pixels to the CPU
+        bv::BufferPtr cost_buf = nullptr;
+        bv::MemoryChunkPtr cost_buf_mem = nullptr;
+        float* cost_buf_mapped = nullptr;
 
         // grid warp pass: descriptor stuff
         bv::DescriptorSetLayoutPtr gwp_descriptor_set_layout = nullptr;
@@ -247,6 +254,19 @@ namespace img_aligner::grid_warp
         bv::GraphicsPipelinePtr dfp_graphics_pipeline = nullptr;
         DifferencePassFragPushConstants dfp_frag_push_constants;
         bv::FencePtr dfp_fence = nullptr;
+
+        // cost pass: descriptor stuff
+        bv::DescriptorSetLayoutPtr csp_descriptor_set_layout = nullptr;
+        bv::DescriptorPoolPtr csp_descriptor_pool = nullptr;
+        bv::DescriptorSetPtr csp_descriptor_set;
+
+        // cost pass
+        bv::RenderPassPtr csp_render_pass = nullptr;
+        bv::FramebufferPtr csp_framebuf = nullptr;
+        bv::PipelineLayoutPtr csp_pipeline_layout = nullptr;
+        bv::GraphicsPipelinePtr csp_graphics_pipeline = nullptr;
+        CostPassFragPushConstants csp_frag_push_constants;
+        bv::FencePtr csp_fence = nullptr;
 
     };
 

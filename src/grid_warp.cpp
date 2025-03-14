@@ -116,6 +116,27 @@ namespace img_aligner::grid_warp
             img_height
         );
 
+        // figure out the cost resolution
+
+        area_fac =
+            (double)params.cost_res_area
+            / (double)(img_width * img_height);
+        size_fac = std::clamp(std::sqrt(area_fac), 0., 1.);
+
+        cost_res_x = (uint32_t)std::floor(size_fac * (double)img_width);
+        cost_res_y = (uint32_t)std::floor(size_fac * (double)img_height);
+
+        cost_res_x = std::clamp(
+            cost_res_x,
+            (uint32_t)1,
+            intermediate_res_x
+        );
+        cost_res_y = std::clamp(
+            cost_res_y,
+            (uint32_t)1,
+            intermediate_res_y
+        );
+
         // figure out the grid resolution
 
         area_fac =
@@ -171,7 +192,6 @@ namespace img_aligner::grid_warp
         create_vertex_and_index_buffer_and_generate_vertices(queue);
         make_copy_of_vertices();
         create_sampler_and_images(queue);
-        create_avg_difference_buffer();
         create_passes();
     }
 
@@ -215,12 +235,15 @@ namespace img_aligner::grid_warp
         difference_img = nullptr;
         difference_img_mem = nullptr;
         difference_imgview = nullptr;
-        difference_imgview_first_mip = nullptr;
+
+        cost_img = nullptr;
+        cost_img_mem = nullptr;
+        cost_imgview = nullptr;
+
+        cost_buf = nullptr;
+        cost_buf_mem = nullptr;
 
         sampler = nullptr;
-
-        avg_difference_buf = nullptr;
-        avg_difference_buf_mem = nullptr;
     }
 
     void GridWarper::run_grid_warp_pass(bool hires, const bv::QueuePtr& queue)
@@ -231,20 +254,41 @@ namespace img_aligner::grid_warp
         gwp_fence->reset();
     }
 
-    float GridWarper::run_difference_pass(const bv::QueuePtr& queue)
+    CostInfo GridWarper::run_difference_and_cost_pass(const bv::QueuePtr& queue)
     {
         auto cmd_buf = create_difference_pass_cmd_buf();
         queue->submit({}, {}, { cmd_buf }, {}, dfp_fence);
         dfp_fence->wait();
         dfp_fence->reset();
 
-        // TODO use other mip levels
+        cmd_buf = create_cost_pass_cmd_buf();
+        queue->submit({}, {}, { cmd_buf }, {}, csp_fence);
+        csp_fence->wait();
+        csp_fence->reset();
 
-        float avg = *avg_difference_buf_mapped;
-        float sum =
-            avg * (float)(difference_res_square * difference_res_square);
-        avg = sum / (float)(intermediate_res_x * intermediate_res_y);
-        return  avg;
+        // find average and maximum value in the cost image
+        float avg_diff = 0.f;
+        float max_local_diff = 0.f;
+        for (size_t y = 0; y < cost_res_y; y++)
+        {
+            for (size_t x = 0; x < cost_res_x; x++)
+            {
+                float v = cost_buf_mapped[x + (y * cost_res_x)];
+
+                avg_diff += v;
+
+                max_local_diff = std::max(
+                    max_local_diff,
+                    v
+                );
+            }
+        }
+        avg_diff /= (float)(cost_res_x * cost_res_y);
+
+        return CostInfo{
+            .avg_diff = avg_diff,
+            .max_local_diff = max_local_diff
+        };
     }
 
     void GridWarper::add_images_to_ui_pass(UiPass& ui_pass)
@@ -269,14 +313,22 @@ namespace img_aligner::grid_warp
             false
         );
 
-        // we only need the bottom left corner of the difference image which
-        // is a rectangle of the intermediate resolution.
         ui_pass.add_image(
             difference_imgview,
             VK_IMAGE_LAYOUT_GENERAL,
             "Difference Image",
-            warped_img->config().extent.width,
-            warped_img->config().extent.height,
+            difference_img->config().extent.width,
+            difference_img->config().extent.height,
+            1.f,
+            true
+        );
+
+        ui_pass.add_image(
+            cost_imgview,
+            VK_IMAGE_LAYOUT_GENERAL,
+            "Cost Image",
+            cost_img->config().extent.width,
+            cost_img->config().extent.height,
             1.f,
             true
         );
@@ -288,11 +340,13 @@ namespace img_aligner::grid_warp
     )
     {
         // keep track of the cost
-        if (!last_cost)
+        if (!last_avg_diff || !initial_max_local_diff)
         {
-            last_cost = run_difference_pass(queue);
+            auto cost_info = run_difference_and_cost_pass(queue);
+            last_avg_diff = cost_info.avg_diff;
+            initial_max_local_diff = cost_info.max_local_diff;
         }
-        float old_cost = *last_cost;
+        float old_avg_diff = *last_avg_diff;
 
         // make a copy of the vertices in case we decide to undo the
         // displacement
@@ -367,17 +421,18 @@ namespace img_aligner::grid_warp
 
         // see if the displacement did any good (decreased the cost)
         run_grid_warp_pass(false, queue);
-        float new_cost = run_difference_pass(queue);
+        auto new_cost_info = run_difference_and_cost_pass(queue);
 
-        // if it increased the cost, undo the displacement
-        if (new_cost > old_cost)
+        // undo the displacement (warping) if it wasn't good
+        if (new_cost_info.avg_diff > old_avg_diff
+            || new_cost_info.max_local_diff > *initial_max_local_diff)
         {
             restore_copy_of_vertices();
             return false;
         }
         else
         {
-            last_cost = new_cost;
+            last_avg_diff = new_cost_info.avg_diff;
         }
         return true;
     }
@@ -562,14 +617,12 @@ namespace img_aligner::grid_warp
             }
         );
 
-        // command buffer for image layout transitions and generating mipmaps
+        // command buffer for image layout transitions
         auto cmd_buf = begin_single_time_commands(state, true);
 
         // create images and image views, and transition layouts
 
-        // warped image uses intermediate resolution with no mipmapping. it's
-        // a color attachment but also sampled in the difference pass.
-
+        // warped image uses the intermediate resolution.
         create_image(
             state,
             intermediate_res_x,
@@ -598,8 +651,7 @@ namespace img_aligner::grid_warp
             1
         );
 
-        // high-resolution warped image uses the original resolution with no
-        // mipmapping
+        // high-resolution warped image uses the original resolution
         create_image(
             state,
             img_width,
@@ -631,38 +683,23 @@ namespace img_aligner::grid_warp
             1
         );
 
-        // difference image uses a square resolution of the closest upper power
-        // of 2 of the intermediate resolution. it uses mipmapping to get the
-        // average difference (error) while optimizing.
-        difference_res_square = upper_power_of_2(std::max(
-            intermediate_res_x,
-            intermediate_res_y
-        ));
-        uint32_t difference_mip_levels = round_log2(difference_res_square);
+        // difference image uses the intermediate resolution
         create_image(
             state,
-            difference_res_square,
-            difference_res_square,
-            difference_mip_levels,
+            intermediate_res_x,
+            intermediate_res_y,
+            1,
             VK_SAMPLE_COUNT_1_BIT,
             R_FORMAT,
             VK_IMAGE_TILING_OPTIMAL,
 
-            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
-            | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
             difference_img,
             difference_img_mem
         );
         difference_imgview = create_image_view(
-            state,
-            difference_img,
-            R_FORMAT,
-            VK_IMAGE_ASPECT_COLOR_BIT,
-            difference_mip_levels
-        );
-        difference_imgview_first_mip = create_image_view(
             state,
             difference_img,
             R_FORMAT,
@@ -674,27 +711,57 @@ namespace img_aligner::grid_warp
             difference_img,
             VK_IMAGE_LAYOUT_UNDEFINED,
             VK_IMAGE_LAYOUT_GENERAL,
-            difference_mip_levels
+            1
+        );
+
+        // cost image uses the cost resolution and a host-visible memory chunk
+        create_image(
+            state,
+            cost_res_x,
+            cost_res_y,
+            1,
+            VK_SAMPLE_COUNT_1_BIT,
+            R_FORMAT,
+            VK_IMAGE_TILING_OPTIMAL,
+
+            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
+            | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            cost_img,
+            cost_img_mem
+        );
+        cost_imgview = create_image_view(
+            state,
+            cost_img,
+            R_FORMAT,
+            VK_IMAGE_ASPECT_COLOR_BIT,
+            1
+        );
+        transition_image_layout(
+            cmd_buf,
+            cost_img,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_GENERAL,
+            1
         );
 
         // end, submit, and wait for the command buffer
         end_single_time_commands(cmd_buf, queue);
-    }
 
-    void GridWarper::create_avg_difference_buffer()
-    {
+        // cost buffer
         create_buffer(
             state,
-            sizeof(float),
+            cost_res_x * cost_res_y * sizeof(float),
             VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
             | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 
-            avg_difference_buf,
-            avg_difference_buf_mem
+            cost_buf,
+            cost_buf_mem
         );
-        avg_difference_buf_mapped = (float*)avg_difference_buf_mem->mapped();
+        cost_buf_mapped = (float*)cost_buf_mem->mapped();
     }
 
     void GridWarper::create_passes()
@@ -712,6 +779,9 @@ namespace img_aligner::grid_warp
 
         bv::ShaderModulePtr dfp_frag_shader_module = nullptr;
         bv::ShaderStage dfp_frag_shader_stage{};
+
+        bv::ShaderModulePtr csp_frag_shader_module = nullptr;
+        bv::ShaderStage csp_frag_shader_stage{};
 
         {
             std::vector<uint8_t> shader_code = read_file(
@@ -770,6 +840,21 @@ namespace img_aligner::grid_warp
                 .flags = {},
                 .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
                 .module = dfp_frag_shader_module,
+                .entry_point = "main",
+                .specialization_info = std::nullopt
+            };
+
+            shader_code = read_file(
+                "./shaders/cost_pass_frag.spv"
+            );
+            csp_frag_shader_module = bv::ShaderModule::create(
+                state.device,
+                std::move(shader_code)
+            );
+            csp_frag_shader_stage = bv::ShaderStage{
+                .flags = {},
+                .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+                .module = csp_frag_shader_module,
                 .entry_point = "main",
                 .specialization_info = std::nullopt
             };
@@ -1146,7 +1231,7 @@ namespace img_aligner::grid_warp
                 .flags = 0,
                 .format = R_FORMAT,
                 .samples = VK_SAMPLE_COUNT_1_BIT,
-                .load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
+                .load_op = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
                 .store_op = VK_ATTACHMENT_STORE_OP_STORE,
                 .stencil_load_op = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
                 .stencil_store_op = VK_ATTACHMENT_STORE_OP_DONT_CARE,
@@ -1196,7 +1281,7 @@ namespace img_aligner::grid_warp
             bv::FramebufferConfig{
                 .flags = 0,
                 .render_pass = dfp_render_pass,
-                .attachments = { difference_imgview_first_mip },
+                .attachments = { difference_imgview },
                 .width = difference_img->config().extent.width,
                 .height = difference_img->config().extent.height,
                 .layers = 1
@@ -1334,12 +1419,271 @@ namespace img_aligner::grid_warp
 
         // difference pass: fence
         dfp_fence = bv::Fence::create(state.device, 0);
+
+        // cost pass: descriptor set layout
+        {
+            bv::DescriptorSetLayoutBinding binding_difference_img{
+                .binding = 0,
+                .descriptor_type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                .descriptor_count = 1,
+                .stage_flags = VK_SHADER_STAGE_FRAGMENT_BIT,
+                .immutable_samplers = { sampler }
+            };
+
+            csp_descriptor_set_layout = bv::DescriptorSetLayout::create(
+                state.device,
+                {
+                    .flags = 0,
+                    .bindings = { binding_difference_img }
+                }
+            );
+        }
+
+        // cost pass: descriptor pool
+        {
+            // 1 image in every descriptor set * 1 set in total
+            bv::DescriptorPoolSize image_pool_size{
+                .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                .descriptor_count = 1
+            };
+
+            csp_descriptor_pool = bv::DescriptorPool::create(
+                state.device,
+                {
+                    .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
+                    .max_sets = 1,
+                    .pool_sizes = { image_pool_size }
+                }
+            );
+        }
+
+        // cost pass: descriptor set
+        {
+            csp_descriptor_set = bv::DescriptorPool::allocate_set(
+                csp_descriptor_pool,
+                csp_descriptor_set_layout
+            );
+
+            bv::DescriptorImageInfo difference_img_info{
+                .sampler = sampler,
+                .image_view = difference_imgview,
+                .image_layout = VK_IMAGE_LAYOUT_GENERAL
+            };
+
+            std::vector<bv::WriteDescriptorSet> descriptor_writes;
+            descriptor_writes.push_back({
+                .dst_set = csp_descriptor_set,
+                .dst_binding = 0,
+                .dst_array_element = 0,
+                .descriptor_count = 1,
+                .descriptor_type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                .image_infos = { difference_img_info },
+                .buffer_infos = {},
+                .texel_buffer_views = {}
+                });
+            bv::DescriptorSet::update_sets(state.device, descriptor_writes, {});
+        }
+
+        // cost pass: render pass
+        {
+            bv::Attachment color_attachment{
+                .flags = 0,
+                .format = R_FORMAT,
+                .samples = VK_SAMPLE_COUNT_1_BIT,
+                .load_op = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                .store_op = VK_ATTACHMENT_STORE_OP_STORE,
+                .stencil_load_op = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                .stencil_store_op = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+                .initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
+                .final_layout = VK_IMAGE_LAYOUT_GENERAL
+            };
+
+            bv::AttachmentReference color_attachment_ref{
+                .attachment = 0,
+                .layout = VK_IMAGE_LAYOUT_GENERAL
+            };
+
+            bv::Subpass subpass{
+                .flags = 0,
+                .pipeline_bind_point = VK_PIPELINE_BIND_POINT_GRAPHICS,
+                .input_attachments = {},
+                .color_attachments = { color_attachment_ref },
+                .resolve_attachments = {},
+                .depth_stencil_attachment = std::nullopt,
+                .preserve_attachment_indices = {}
+            };
+
+            bv::SubpassDependency dependency{
+                .src_subpass = VK_SUBPASS_EXTERNAL,
+                .dst_subpass = 0,
+                .src_stage_mask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                .dst_stage_mask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                .src_access_mask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                .dst_access_mask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                .dependency_flags = 0
+            };
+
+            csp_render_pass = bv::RenderPass::create(
+                state.device,
+                bv::RenderPassConfig{
+                    .flags = 0,
+                    .attachments = { color_attachment },
+                    .subpasses = { subpass },
+                    .dependencies = { dependency }
+                }
+            );
+        }
+
+        // cost pass: framebuffer
+        csp_framebuf = bv::Framebuffer::create(
+            state.device,
+            bv::FramebufferConfig{
+                .flags = 0,
+                .render_pass = csp_render_pass,
+                .attachments = { cost_imgview },
+                .width = cost_img->config().extent.width,
+                .height = cost_img->config().extent.height,
+                .layers = 1
+            }
+        );
+
+        // cost pass: pipeline layout
+        {
+            bv::PushConstantRange frag_push_constant_range{
+                .stage_flags = VK_SHADER_STAGE_FRAGMENT_BIT,
+                .offset = 0,
+                .size = sizeof(CostPassFragPushConstants)
+            };
+
+            csp_pipeline_layout = bv::PipelineLayout::create(
+                state.device,
+                bv::PipelineLayoutConfig{
+                    .flags = 0,
+                    .set_layouts = { csp_descriptor_set_layout },
+                    .push_constant_ranges = { frag_push_constant_range }
+                }
+            );
+        }
+
+        // cost pass: graphics pipeline
+        {
+            bv::Viewport viewport{
+                .x = 0.f,
+                .y = 0.f,
+                .width = (float)csp_framebuf->config().width,
+                .height = (float)csp_framebuf->config().height,
+                .min_depth = 0.f,
+                .max_depth = 1.f
+            };
+
+            bv::Rect2d scissor{
+                .offset = { 0, 0 },
+                .extent = {
+                    csp_framebuf->config().width,
+                    csp_framebuf->config().height
+                }
+            };
+
+            bv::ViewportState viewport_state{
+                .viewports = { viewport },
+                .scissors = { scissor }
+            };
+
+            bv::RasterizationState rasterization_state{
+                .depth_clamp_enable = false,
+                .rasterizer_discard_enable = false,
+                .polygon_mode = VK_POLYGON_MODE_FILL,
+                .cull_mode = VK_CULL_MODE_BACK_BIT,
+                .front_face = VK_FRONT_FACE_CLOCKWISE,
+                .depth_bias_enable = false,
+                .depth_bias_constant_factor = 0.f,
+                .depth_bias_clamp = 0.f,
+                .depth_bias_slope_factor = 0.f,
+                .line_width = 1.f
+            };
+
+            bv::MultisampleState multisample_state{
+                .rasterization_samples = VK_SAMPLE_COUNT_1_BIT,
+                .sample_shading_enable = false,
+                .min_sample_shading = 1.f,
+                .sample_mask = {},
+                .alpha_to_coverage_enable = false,
+                .alpha_to_one_enable = false
+            };
+
+            bv::DepthStencilState depth_stencil_state{
+                .flags = 0,
+                .depth_test_enable = false,
+                .depth_write_enable = false,
+                .depth_compare_op = VK_COMPARE_OP_LESS,
+                .depth_bounds_test_enable = false,
+                .stencil_test_enable = false,
+                .front = {},
+                .back = {},
+                .min_depth_bounds = 0.f,
+                .max_depth_bounds = 1.f
+            };
+
+            bv::ColorBlendAttachment color_blend_attachment{
+                .blend_enable = false,
+                .src_color_blend_factor = VK_BLEND_FACTOR_ONE,
+                .dst_color_blend_factor = VK_BLEND_FACTOR_ZERO,
+                .color_blend_op = VK_BLEND_OP_ADD,
+                .src_alpha_blend_factor = VK_BLEND_FACTOR_ONE,
+                .dst_alpha_blend_factor = VK_BLEND_FACTOR_ZERO,
+                .alpha_blend_op = VK_BLEND_OP_ADD,
+                .color_write_mask =
+                VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
+                | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT
+            };
+
+            bv::ColorBlendState color_blend_state{
+                .flags = 0,
+                .logic_op_enable = false,
+                .logic_op = VK_LOGIC_OP_COPY,
+                .attachments = { color_blend_attachment },
+                .blend_constants = { 0.f, 0.f, 0.f, 0.f }
+            };
+
+            csp_graphics_pipeline = bv::GraphicsPipeline::create(
+                state.device,
+                bv::GraphicsPipelineConfig{
+                    .flags = 0,
+                    .stages = {
+                        fullscreen_quad_vert_shader_stage,
+                        csp_frag_shader_stage
+                    },
+                    .vertex_input_state = bv::VertexInputState{
+                        .binding_descriptions = {},
+                        .attribute_descriptions = {}
+                    },
+                    .input_assembly_state = bv::InputAssemblyState{
+                        .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+                        .primitive_restart_enable = false
+                    },
+                    .tessellation_state = std::nullopt,
+                    .viewport_state = viewport_state,
+                    .rasterization_state = rasterization_state,
+                    .multisample_state = multisample_state,
+                    .depth_stencil_state = depth_stencil_state,
+                    .color_blend_state = color_blend_state,
+                    .dynamic_states = {},
+                    .layout = csp_pipeline_layout,
+                    .render_pass = csp_render_pass,
+                    .subpass_index = 0,
+                    .base_pipeline = std::nullopt
+                }
+            );
+        }
+
+        // cost pass: fence
+        csp_fence = bv::Fence::create(state.device, 0);
     }
 
     bv::CommandBufferPtr GridWarper::create_grid_warp_pass_cmd_buf(bool hires)
     {
         bv::CommandBufferPtr cmd_buf = bv::CommandPool::allocate_buffer(
-            state.cmd_pool(false),
+            state.cmd_pool(true),
             VK_COMMAND_BUFFER_LEVEL_PRIMARY
         );
         cmd_buf->begin(0);
@@ -1426,7 +1770,7 @@ namespace img_aligner::grid_warp
             gwp_pipeline_layout->handle(),
             VK_SHADER_STAGE_FRAGMENT_BIT,
             0,
-            sizeof(GridWarpPassFragPushConstants),
+            sizeof(gwp_frag_push_constants),
             &gwp_frag_push_constants
         );
 
@@ -1449,13 +1793,10 @@ namespace img_aligner::grid_warp
     bv::CommandBufferPtr GridWarper::create_difference_pass_cmd_buf()
     {
         bv::CommandBufferPtr cmd_buf = bv::CommandPool::allocate_buffer(
-            state.cmd_pool(false),
+            state.cmd_pool(true),
             VK_COMMAND_BUFFER_LEVEL_PRIMARY
         );
         cmd_buf->begin(0);
-
-        VkClearValue clear_val{};
-        clear_val.color = { { 0.f, 0.f, 0.f, 0.f } };
 
         VkRenderPassBeginInfo render_pass_info{
             .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
@@ -1469,8 +1810,8 @@ namespace img_aligner::grid_warp
                     dfp_framebuf->config().height
                 }
             },
-            .clearValueCount = 1,
-            .pClearValues = &clear_val
+            .clearValueCount = 0,
+            .pClearValues = nullptr
         };
         vkCmdBeginRenderPass(
             cmd_buf->handle(),
@@ -1501,7 +1842,7 @@ namespace img_aligner::grid_warp
             dfp_pipeline_layout->handle(),
             VK_SHADER_STAGE_FRAGMENT_BIT,
             0,
-            sizeof(DifferencePassFragPushConstants),
+            sizeof(dfp_frag_push_constants),
             &dfp_frag_push_constants
         );
 
@@ -1515,18 +1856,92 @@ namespace img_aligner::grid_warp
 
         vkCmdEndRenderPass(cmd_buf->handle());
 
-        // memory barrier to wait for the render pass to finish rendering to the
-        // difference image before we do mipmapping.
-        VkImageMemoryBarrier difference_img_memory_barrier{
+        cmd_buf->end();
+
+        return cmd_buf;
+    }
+
+    bv::CommandBufferPtr GridWarper::create_cost_pass_cmd_buf()
+    {
+        bv::CommandBufferPtr cmd_buf = bv::CommandPool::allocate_buffer(
+            state.cmd_pool(true),
+            VK_COMMAND_BUFFER_LEVEL_PRIMARY
+        );
+        cmd_buf->begin(0);
+
+        VkRenderPassBeginInfo render_pass_info{
+            .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+            .pNext = nullptr,
+            .renderPass = csp_render_pass->handle(),
+            .framebuffer = csp_framebuf->handle(),
+            .renderArea = VkRect2D{
+                .offset = { 0, 0 },
+                .extent = {
+                    csp_framebuf->config().width,
+                    csp_framebuf->config().height
+                }
+            },
+            .clearValueCount = 0,
+            .pClearValues = nullptr
+        };
+        vkCmdBeginRenderPass(
+            cmd_buf->handle(),
+            &render_pass_info,
+            VK_SUBPASS_CONTENTS_INLINE
+        );
+
+        vkCmdBindPipeline(
+            cmd_buf->handle(),
+            VK_PIPELINE_BIND_POINT_GRAPHICS,
+            csp_graphics_pipeline->handle()
+        );
+
+        auto vk_descriptor_set = csp_descriptor_set->handle();
+        vkCmdBindDescriptorSets(
+            cmd_buf->handle(),
+            VK_PIPELINE_BIND_POINT_GRAPHICS,
+            csp_pipeline_layout->handle(),
+            0,
+            1,
+            &vk_descriptor_set,
+            0,
+            nullptr
+        );
+
+        csp_frag_push_constants.cost_res = {
+            (int32_t)csp_framebuf->config().width,
+            (int32_t)csp_framebuf->config().height
+        };
+        vkCmdPushConstants(
+            cmd_buf->handle(),
+            csp_pipeline_layout->handle(),
+            VK_SHADER_STAGE_FRAGMENT_BIT,
+            0,
+            sizeof(csp_frag_push_constants),
+            &csp_frag_push_constants
+        );
+
+        vkCmdDraw(
+            cmd_buf->handle(),
+            6,
+            1,
+            0,
+            0
+        );
+
+        vkCmdEndRenderPass(cmd_buf->handle());
+
+        // memory barrier to wait for the rendering
+        VkImageMemoryBarrier barrier{
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
             .pNext = nullptr,
-            .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+            .srcAccessMask = 0,
             .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
             .oldLayout = VK_IMAGE_LAYOUT_GENERAL,
             .newLayout = VK_IMAGE_LAYOUT_GENERAL,
             .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .image = difference_img->handle(),
+            .image = cost_img->handle(),
             .subresourceRange = VkImageSubresourceRange{
                 .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
                 .baseMipLevel = 0,
@@ -1537,48 +1952,34 @@ namespace img_aligner::grid_warp
         };
         vkCmdPipelineBarrier(
             cmd_buf->handle(),
-            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
             VK_PIPELINE_STAGE_TRANSFER_BIT,
             0,
             0, nullptr,
             0, nullptr,
-            1, &difference_img_memory_barrier
+            1, &barrier
         );
 
-        // generate mipmaps. this will also add a barrier so that the
-        // copy-to-buffer operation below waits for the mipmaps to be generated.
-        generate_mipmaps(
-            state,
-            cmd_buf,
-            difference_img,
-            true,
-            VK_PIPELINE_STAGE_TRANSFER_BIT,
-            VK_ACCESS_TRANSFER_READ_BIT
-        );
-
-        // copy the last mip level (which is 1x1) to the average difference
-        // buffer.
-        // TODO_decide_level
+        // copy to cost buffer
         VkBufferImageCopy copy_region{
             .bufferOffset = 0,
             .bufferRowLength = 0,
             .bufferImageHeight = 0,
             .imageSubresource = VkImageSubresourceLayers{
                 .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                .mipLevel = difference_img->config().mip_levels - 1,
+                .mipLevel = 0,
                 .baseArrayLayer = 0,
                 .layerCount = 1
             },
             .imageOffset = { 0, 0, 0 },
-            .imageExtent = { 1, 1, 1 }
+            .imageExtent = bv::Extent3d_to_vk(cost_img->config().extent)
         };
         vkCmdCopyImageToBuffer(
             cmd_buf->handle(),
-            difference_img->handle(),
+            cost_img->handle(),
             VK_IMAGE_LAYOUT_GENERAL,
-            avg_difference_buf->handle(),
-            1,
-            &copy_region
+            cost_buf->handle(),
+            1, &copy_region
         );
 
         cmd_buf->end();
