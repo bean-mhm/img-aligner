@@ -40,22 +40,29 @@ paid Adobe software, or any Adobe software for that matter.
 The algorithm uses grid warping to distort the __base image__ to match the
 __target image__. An evolution algorithm is used for optimization to minimize
 the "cost". To calculate the cost, we render the per-pixel logarithmic
-difference between the warped base image and the target image into what we call
-the __difference image__, then we downscale that image to a really tiny resolution
-like 16x9 (called the __cost resolution__, calculated based on the grid
-resolution) and store it in the __cost image__. Finally, we find the maximum
-value in the pixels of the cost image, and that becomes our cost value, which is
-what we're trying to minimize. Here's what the algorithm does in pseudocode
-(more or less):
+difference (between the warped base image and the target image) into what we call
+the __difference image__ which we then downscale to a really tiny resolution
+like 16x9 (called the __cost resolution__) and store it in the __cost image__.
+The downscaling is done in a smooth way and samples all necessary pixels to
+avoid aliasing.
+Finally, we find the __maximum and average__ value in the pixels of the cost image.
+The average (called the __average difference__) becomes our cost value, which is what we're trying to minimize.
 
-```
-in every iteration:
-    - warp the grid vertices using a gaussian distribution with a random center,
-      direction, and strength.  the ranges are calculated based on parameters.
-    - recalculate the cost
-    - if new cost < old cost, undo the warping
-    - break loop if stop conditions are met
-```
+The maximum (called the __maximum local difference__), however, is just there to make sure we don't introduce local
+differences while decreasing the average difference. If the cost
+resolution is 1x1, this will have no effect, but if the cost resolution is too high, it can slow down the
+optimization. Note that, in each iteration, we compare the cost after
+warping to the cost before warping (stored in the previous iteration). However,
+for the maximum value, we only compare it to the initial maximum value that we got
+in the beginning, and not the one from the previous iteration.
+
+Here's what the algorithm looks like in every iteration:
+1. Warp the grid vertices using a gaussian distribution with a random center,
+  direction, and strength.  The ranges of the random values are calculated based
+  on parameters.
+2. Recalculate the cost (average difference) and the maximum value in the cost image.
+3. If (cost > previous iteration's cost) or (maximum > initial maximum) the undo the warping.
+4. Break the loop if stop conditions are met.
 
 For increased performance, grid warping and cost calculation are performed at
 a lower resolution (called the __intermediate resolution__) on the graphics
@@ -76,6 +83,14 @@ img-aligner always assumes your display device uses the sRGB standard. If you're
 using a P3 or BT.2020 device, linear images that were originally intended to
 work in BT.709 might look strongly vibrant on your display. This only affects
 how you view images, not how they're processed or warped.
+
+If you're curious, I really tried adding the
+[OpenColorIO](https://opencolorio.org/) and
+[OpenImageIO](https://github.com/OpenImageIO/oiio)
+libraries for proper color management and image IO (like in
+[RealBloom](https://github.com/bean-mhm/realbloom)), but they were painfully
+hard to include and build with CMake, and I got errors after errors, so I gave
+up.
 
 # Usage
 
