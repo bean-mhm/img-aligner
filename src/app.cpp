@@ -737,8 +737,7 @@ namespace img_aligner
 
     bool App::try_recreate_grid_warper(std::string* out_error)
     {
-        grid_warper = nullptr;
-        optimization_info = GridWarpOptimizationInfo{};
+        destroy_grid_warper(false);
 
         bool failed = false;
         try
@@ -804,6 +803,7 @@ namespace img_aligner
         bool recreate_ui_pass_if_destroyed_grid_warper
     )
     {
+        optimization_info = GridWarpOptimizationInfo{};
         if (grid_warper != nullptr)
         {
             grid_warper = nullptr;
@@ -906,6 +906,28 @@ namespace img_aligner
                     optimization_mutex.unlock();
                     need_the_optimization_mutex.wait(true);
                 }
+
+                std::scoped_lock lock(optimization_mutex);
+                std::scoped_lock lock2(optimization_info_mutex);
+
+                // updated accumulated elapsed time
+                optimization_info.accum_elapsed += elapsed_sec(
+                    optimization_info.start_time
+                );
+
+                // run the different passes one last time
+                grid_warper->run_grid_warp_pass(
+                    false,
+                    state.queue_grid_warp_optimize
+                );
+                grid_warper->run_grid_warp_pass(
+                    true,
+                    state.queue_grid_warp_optimize
+                );
+                grid_warper->run_difference_and_cost_pass(
+                    state.queue_grid_warp_optimize
+                );
+
                 is_optimizing = false;
             }
         );
@@ -935,12 +957,6 @@ namespace img_aligner
         optimization_thread_stop = true;
         optimization_thread->join();
         optimization_thread = nullptr;
-
-        is_optimizing = false;
-
-        grid_warper->run_grid_warp_pass(false, state.queue_main);
-        grid_warper->run_grid_warp_pass(true, state.queue_main);
-        grid_warper->run_difference_and_cost_pass(state.queue_main);
     }
 
     void App::recreate_ui_pass()
@@ -1361,6 +1377,7 @@ namespace img_aligner
         else
         {
             ImGui::BeginDisabled(!grid_warper);
+
             if (imgui_button_full_width("Start Alignin'##Controls")
                 && grid_warper != nullptr)
             {
@@ -1368,19 +1385,26 @@ namespace img_aligner
 
                 // TODO switch to difference image
             }
+
             ImGui::EndDisabled();
         }
 
-        if (is_optimizing)
+        if (grid_warper != nullptr && optimization_info.n_iters > 0)
         {
             std::scoped_lock lock(optimization_info_mutex);
 
             imgui_div();
             imgui_bold("STATS");
 
+            float total_elapsed = optimization_info.accum_elapsed;
+            if (is_optimizing)
+            {
+                total_elapsed += elapsed_sec(optimization_info.start_time);
+            }
+
             ImGui::TextWrapped(std::format(
                 "Elapsed: {:.1f} s",
-                elapsed_sec(optimization_info.start_time)
+                total_elapsed
             ).c_str());
 
             ImGui::TextWrapped(std::format(

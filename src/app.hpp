@@ -23,7 +23,12 @@ namespace img_aligner
         std::vector<float> cost_history;
         float change_in_cost_in_last_n_iters = FLT_MAX;
 
-        TimePoint start_time;
+        std::optional<TimePoint> start_time;
+
+        // elapsed time accumulated from previous optimization runs. while
+        // optimization is running, this should be added to the elapsed time
+        // since start_time.
+        float accum_elapsed = 0.f;
     };
 
     class App
