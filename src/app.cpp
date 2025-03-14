@@ -775,7 +775,7 @@ namespace img_aligner
             );
 
             grid_warper->run_grid_warp_pass(false, state.queue_main);
-            grid_warper->run_difference_pass(state.queue_main);
+            grid_warper->run_difference_and_cost_pass(state.queue_main);
         }
         catch (std::string s)
         {
@@ -858,10 +858,10 @@ namespace img_aligner
                     }
 
                     // update cost history
-                    if (grid_warper->get_last_cost().has_value())
+                    if (grid_warper->get_last_avg_diff().has_value())
                     {
                         optimization_info.cost_history.push_back(
-                            *grid_warper->get_last_cost()
+                            *grid_warper->get_last_avg_diff()
                         );
                     }
 
@@ -937,6 +937,10 @@ namespace img_aligner
         optimization_thread = nullptr;
 
         is_optimizing = false;
+
+        grid_warper->run_grid_warp_pass(false, state.queue_main);
+        grid_warper->run_grid_warp_pass(true, state.queue_main);
+        grid_warper->run_difference_and_cost_pass(state.queue_main);
     }
 
     void App::recreate_ui_pass()
@@ -1212,6 +1216,31 @@ namespace img_aligner
             destroy_grid_warper(true);
         }
 
+        // cost resolution
+        imgui_small_div();
+        ImGui::TextWrapped("Cost Resolution");
+        imgui_tooltip(
+            "The difference image is smoothly downscaled to the (normally "
+            "tiny) cost resolution after which we find the maximum and average "
+            "of its pixels for optimization. This value defines the area of "
+            "the cost resolution."
+        );
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        if (ImGui::DragScalar(
+            "##cost_res",
+            ImGuiDataType_U32,
+            &grid_warp_params.cost_res_area,
+            200.f
+        ))
+        {
+            grid_warp_params.cost_res_area = std::clamp(
+                grid_warp_params.cost_res_area,
+                (uint32_t)1,
+                (uint32_t)(256u * 256u)
+            );
+            destroy_grid_warper(true);
+        }
+
         // create grid warper
         imgui_small_div();
         if (!grid_warper && imgui_button_full_width("Recreate Grid Warper"))
@@ -1325,8 +1354,6 @@ namespace img_aligner
             {
                 stop_optimization();
 
-                grid_warper->run_grid_warp_pass(true, state.queue_main);
-
                 // TODO unhide warped hires image and switch to it in ui pass
                 need_to_run_ui_pass = true;
             }
@@ -1371,6 +1398,15 @@ namespace img_aligner
                 "The number of iterations where the cost decreased (instead of "
                 "staying still)"
             );
+
+            if (grid_warper->get_initial_max_local_diff().has_value())
+            {
+                ImGui::TextWrapped(std::format(
+                    "Max Local Diff.: {:.7f}",
+                    *grid_warper->get_initial_max_local_diff()
+                ).c_str());
+            }
+            imgui_tooltip("Maximum value in the pixels of the cost image.");
 
             if (optimization_info.change_in_cost_in_last_n_iters >= FLT_MAX)
             {
