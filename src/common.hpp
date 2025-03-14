@@ -77,7 +77,7 @@ namespace img_aligner
     // the interval at which to run the UI pass and make a new copy of the grid
     // vertices for previewing in the UI, when grid warp optimization is
     // running.
-    static constexpr float GRID_WARP_OPTIMIZATION_UI_UPDATE_INTERVAL = .7f;
+    static constexpr float GRID_WARP_OPTIMIZATION_UI_UPDATE_INTERVAL = .6f;
 
     using TimePoint = std::chrono::steady_clock::time_point;
 
