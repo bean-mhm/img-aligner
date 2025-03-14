@@ -934,35 +934,44 @@ namespace img_aligner
                     need_the_optimization_mutex.wait(true);
                 }
 
-                std::scoped_lock lock(optimization_mutex);
-                std::scoped_lock lock2(optimization_info_mutex);
-
-                if (optimization_info.stop_reason ==
-                    GridWarpOptimizationStopReason::None)
                 {
-                    optimization_info.stop_reason =
-                        GridWarpOptimizationStopReason::ManuallyStopped;
+                    std::scoped_lock lock(optimization_mutex);
+                    std::scoped_lock lock2(optimization_info_mutex);
+
+                    if (optimization_info.stop_reason ==
+                        GridWarpOptimizationStopReason::None)
+                    {
+                        optimization_info.stop_reason =
+                            GridWarpOptimizationStopReason::ManuallyStopped;
+                    }
+
+                    // updated accumulated elapsed time
+                    optimization_info.accum_elapsed += elapsed_sec(
+                        optimization_info.start_time
+                    );
+
+                    // run the different passes one last time
+                    grid_warper->run_grid_warp_pass(
+                        false,
+                        state.queue_grid_warp_optimize
+                    );
+                    grid_warper->run_grid_warp_pass(
+                        true,
+                        state.queue_grid_warp_optimize
+                    );
+                    grid_warper->run_difference_and_cost_pass(
+                        state.queue_grid_warp_optimize
+                    );
+
+                    is_optimizing = false;
                 }
 
-                // updated accumulated elapsed time
-                optimization_info.accum_elapsed += elapsed_sec(
-                    optimization_info.start_time
-                );
-
-                // run the different passes one last time
-                grid_warper->run_grid_warp_pass(
-                    false,
-                    state.queue_grid_warp_optimize
-                );
-                grid_warper->run_grid_warp_pass(
-                    true,
-                    state.queue_grid_warp_optimize
-                );
-                grid_warper->run_difference_and_cost_pass(
-                    state.queue_grid_warp_optimize
-                );
-
-                is_optimizing = false;
+                // switch to warped hires image in ui pass
+                if (state.ui_mode && ui_pass != nullptr)
+                {
+                    select_ui_pass_image(grid_warp::WARPED_HIRES_IMAGE_NAME);
+                    need_to_run_ui_pass = true;
+                }
             }
         );
     }
@@ -1403,11 +1412,6 @@ namespace img_aligner
             if (imgui_button_full_width("Stop##Controls"))
             {
                 stop_optimization();
-
-                // switch to warped hires image in ui pass
-                select_ui_pass_image(grid_warp::WARPED_HIRES_IMAGE_NAME);
-
-                need_to_run_ui_pass = true;
             }
         }
         else
