@@ -300,7 +300,6 @@ namespace img_aligner::grid_warp
             warped_img->config().extent.width,
             warped_img->config().extent.height,
             1.f,
-            false,
             false
         );
 
@@ -311,7 +310,6 @@ namespace img_aligner::grid_warp
             warped_hires_img->config().extent.width,
             warped_hires_img->config().extent.height,
             1.f,
-            true,
             false
         );
 
@@ -322,7 +320,6 @@ namespace img_aligner::grid_warp
             difference_img->config().extent.width,
             difference_img->config().extent.height,
             1.f,
-            false,
             true
         );
 
@@ -333,7 +330,6 @@ namespace img_aligner::grid_warp
             cost_img->config().extent.width,
             cost_img->config().extent.height,
             1.f,
-            false,
             true
         );
     }
