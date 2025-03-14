@@ -1688,8 +1688,6 @@ namespace img_aligner
         ImGui::EndDisabled();
 
         // sub-child for the image and the grid preview
-        auto old_padding = ImGui::GetStyle().WindowPadding;
-        ImGui::GetStyle().WindowPadding = { 0.f, 0.f };
         ImGui::BeginChild(
             "##image",
             ImGui::GetContentRegionAvail(),
@@ -1803,7 +1801,6 @@ namespace img_aligner
             }
         }
         ImGui::EndChild();
-        ImGui::GetStyle().WindowPadding = old_padding;
 
         ImGui::End();
     }
