@@ -296,40 +296,44 @@ namespace img_aligner::grid_warp
         ui_pass.add_image(
             warped_imgview,
             VK_IMAGE_LAYOUT_GENERAL,
-            "Warped Image (Intermediate Resolution)",
+            WARPED_IMAGE_NAME,
             warped_img->config().extent.width,
             warped_img->config().extent.height,
             1.f,
+            false,
             false
         );
 
         ui_pass.add_image(
             warped_hires_imgview,
             VK_IMAGE_LAYOUT_GENERAL,
-            "Warped Image (Original Resolution)",
+            WARPED_HIRES_IMAGE_NAME,
             warped_hires_img->config().extent.width,
             warped_hires_img->config().extent.height,
             1.f,
+            true,
             false
         );
 
         ui_pass.add_image(
             difference_imgview,
             VK_IMAGE_LAYOUT_GENERAL,
-            "Difference Image",
+            DIFFERENCE_IMAGE_NAME,
             difference_img->config().extent.width,
             difference_img->config().extent.height,
             1.f,
+            false,
             true
         );
 
         ui_pass.add_image(
             cost_imgview,
             VK_IMAGE_LAYOUT_GENERAL,
-            "Cost Image",
+            COST_IMAGE_NAME,
             cost_img->config().extent.width,
             cost_img->config().extent.height,
             1.f,
+            false,
             true
         );
     }

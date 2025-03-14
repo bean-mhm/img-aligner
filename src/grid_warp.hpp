@@ -8,6 +8,13 @@ namespace img_aligner::grid_warp
 
     static constexpr size_t N_ITERS_TO_CHECK_CHANGE_IN_COST = 100;
 
+    static constexpr auto WARPED_IMAGE_NAME =
+        "Warped Image (Intermediate Resolution)";
+    static constexpr auto WARPED_HIRES_IMAGE_NAME =
+        "Warped Image (Original Resolution)";
+    static constexpr auto DIFFERENCE_IMAGE_NAME = "Difference Image";
+    static constexpr auto COST_IMAGE_NAME = "Cost Image";
+
     struct GridVertex
     {
         // the positions below are all normalized in the 0 to 1 range but they

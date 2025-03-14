@@ -1404,7 +1404,9 @@ namespace img_aligner
             {
                 stop_optimization();
 
-                // TODO unhide warped hires image and switch to it in ui pass
+                // switch to warped hires image in ui pass
+                select_ui_pass_image(grid_warp::WARPED_HIRES_IMAGE_NAME);
+
                 need_to_run_ui_pass = true;
             }
         }
@@ -1420,8 +1422,7 @@ namespace img_aligner
                 && grid_warper != nullptr)
             {
                 start_optimization();
-
-                // TODO switch to difference image
+                select_ui_pass_image(grid_warp::DIFFERENCE_IMAGE_NAME);
             }
 
             ImGui::EndDisabled();
