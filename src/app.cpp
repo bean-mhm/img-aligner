@@ -761,7 +761,9 @@ namespace img_aligner
     {
         if (img->config().format != VK_FORMAT_R32G32B32A32_SFLOAT)
         {
-            throw std::invalid_argument("unsupported format for saving image");
+            throw std::invalid_argument(
+                "unsupported Vulkan format for saving image"
+            );
         }
         auto pixels_rgbaf32 = read_back_image(state, img, state.queue_main);
 
