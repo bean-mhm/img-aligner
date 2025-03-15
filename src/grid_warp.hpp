@@ -6,7 +6,7 @@
 namespace img_aligner::grid_warp
 {
 
-    static constexpr size_t N_ITERS_TO_CHECK_CHANGE_IN_COST = 100;
+    static constexpr size_t N_ITERS_TO_CHECK_CHANGE_IN_COST = 500;
 
     static constexpr auto WARPED_IMAGE_NAME =
         "Warped Image (Intermediate Resolution)";
