@@ -1682,11 +1682,7 @@ namespace img_aligner::grid_warp
 
     bv::CommandBufferPtr GridWarper::create_grid_warp_pass_cmd_buf(bool hires)
     {
-        bv::CommandBufferPtr cmd_buf = bv::CommandPool::allocate_buffer(
-            state.cmd_pool(true),
-            VK_COMMAND_BUFFER_LEVEL_PRIMARY
-        );
-        cmd_buf->begin(0);
+        bv::CommandBufferPtr cmd_buf = begin_single_time_commands(state, true);
 
         VkClearValue clear_val{};
         clear_val.color = { { 0.f, 0.f, 0.f, 0.f } };
@@ -1792,11 +1788,7 @@ namespace img_aligner::grid_warp
 
     bv::CommandBufferPtr GridWarper::create_difference_pass_cmd_buf()
     {
-        bv::CommandBufferPtr cmd_buf = bv::CommandPool::allocate_buffer(
-            state.cmd_pool(true),
-            VK_COMMAND_BUFFER_LEVEL_PRIMARY
-        );
-        cmd_buf->begin(0);
+        bv::CommandBufferPtr cmd_buf = begin_single_time_commands(state, true);
 
         VkRenderPassBeginInfo render_pass_info{
             .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
@@ -1863,11 +1855,7 @@ namespace img_aligner::grid_warp
 
     bv::CommandBufferPtr GridWarper::create_cost_pass_cmd_buf()
     {
-        bv::CommandBufferPtr cmd_buf = bv::CommandPool::allocate_buffer(
-            state.cmd_pool(true),
-            VK_COMMAND_BUFFER_LEVEL_PRIMARY
-        );
-        cmd_buf->begin(0);
+        bv::CommandBufferPtr cmd_buf = begin_single_time_commands(state, true);
 
         VkRenderPassBeginInfo render_pass_info{
             .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
@@ -1961,26 +1949,7 @@ namespace img_aligner::grid_warp
         );
 
         // copy to cost buffer
-        VkBufferImageCopy copy_region{
-            .bufferOffset = 0,
-            .bufferRowLength = 0,
-            .bufferImageHeight = 0,
-            .imageSubresource = VkImageSubresourceLayers{
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                .mipLevel = 0,
-                .baseArrayLayer = 0,
-                .layerCount = 1
-            },
-            .imageOffset = { 0, 0, 0 },
-            .imageExtent = bv::Extent3d_to_vk(cost_img->config().extent)
-        };
-        vkCmdCopyImageToBuffer(
-            cmd_buf->handle(),
-            cost_img->handle(),
-            VK_IMAGE_LAYOUT_GENERAL,
-            cost_buf->handle(),
-            1, &copy_region
-        );
+        copy_image_to_buffer(cmd_buf, cost_img, cost_buf);
 
         cmd_buf->end();
 
