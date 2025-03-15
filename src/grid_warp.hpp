@@ -136,6 +136,26 @@ namespace img_aligner::grid_warp
             return initial_max_local_diff;
         }
 
+        constexpr const bv::ImagePtr& get_warped_img() const
+        {
+            return warped_img;
+        }
+
+        constexpr const bv::ImagePtr& get_warped_hires_img() const
+        {
+            return warped_hires_img;
+        }
+
+        constexpr const bv::ImagePtr& get_difference_img() const
+        {
+            return difference_img;
+        }
+
+        constexpr const bv::ImagePtr& get_cost_img() const
+        {
+            return cost_img;
+        }
+
         // displace the grid vertices using an unnormalized gaussian
         // distribution with randomly generated center point, radius (standard
         // deviation), displacement direction and strength. the grid warp and
