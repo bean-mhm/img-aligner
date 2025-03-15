@@ -754,6 +754,45 @@ namespace img_aligner
         );
     }
 
+    void App::save_image(
+        const bv::ImagePtr& img,
+        std::string_view filename
+    )
+    {
+        if (img->config().format != VK_FORMAT_R32G32B32A32_SFLOAT)
+        {
+            throw std::invalid_argument("unsupported format for saving image");
+        }
+        auto pixels_rgbaf32 = read_back_image(state, img, state.queue_main);
+
+        uint32_t width = img->config().extent.width;
+        uint32_t height = img->config().extent.height;
+
+        Imf::Array2D<Imf::Rgba> pixels(width, height);
+        for (size_t y = 0; y < height; y++)
+        {
+            for (size_t x = 0; x < width; x++)
+            {
+                size_t red_idx = (x + (y * width)) * 4;
+                pixels[y][x] = Imf::Rgba(
+                    pixels_rgbaf32[red_idx + 0],
+                    pixels_rgbaf32[red_idx + 1],
+                    pixels_rgbaf32[red_idx + 2],
+                    pixels_rgbaf32[red_idx + 3]
+                );
+            }
+        }
+
+        Imf::RgbaOutputFile f(
+            filename.data(),
+            (int)width,
+            (int)height,
+            Imf::WRITE_RGBA
+        );
+        f.setFrameBuffer(&pixels[0][0], 1, width);
+        f.writePixels(height);
+    }
+
     bool App::try_recreate_grid_warper(std::string* out_error)
     {
         destroy_grid_warper(false);
@@ -1525,6 +1564,18 @@ namespace img_aligner
             }
         }
 
+        imgui_div();
+        imgui_bold("EXPORT");
+
+        // export warped image
+        ImGui::BeginDisabled(!grid_warper || optimization_info.n_iters < 1);
+        if (imgui_button_full_width("Export Warped Image"))
+        {
+            browse_and_save_image(grid_warper->get_warped_hires_img());
+        }
+        imgui_tooltip("Export the warped image at full resolution");
+        ImGui::EndDisabled();
+
         imgui_dialogs();
 
         imgui_div();
@@ -2289,7 +2340,7 @@ namespace img_aligner
             catch (const std::exception& e)
             {
                 current_errors.push_back(std::format(
-                    "Failed to load OpenEXR image from file \"{}\": {}",
+                    "Failed to load image from file \"{}\": {}",
                     filename,
                     e.what()
                 ));
@@ -2310,6 +2361,47 @@ namespace img_aligner
         }
 
         return false;
+    }
+
+    void App::browse_and_save_image(const bv::ImagePtr& img)
+    {
+        nfdu8char_t* nfd_filename;
+        nfdsavedialogu8args_t args{ 0 };
+        nfdu8filteritem_t filters[1] = { { "OpenEXR", "exr" } };
+        args.filterList = filters;
+        args.filterCount = sizeof(filters) / sizeof(nfdu8filteritem_t);
+        nfdresult_t result = NFD_SaveDialogU8_With(&nfd_filename, &args);
+        if (result == NFD_OKAY)
+        {
+            std::string filename(nfd_filename);
+            NFD_FreePathU8(nfd_filename);
+
+            try
+            {
+                save_image(img, filename);
+            }
+            catch (const std::exception& e)
+            {
+                current_errors.push_back(std::format(
+                    "Failed to save image to file \"{}\": {}",
+                    filename,
+                    e.what()
+                ));
+                ImGui::OpenPopup(ERROR_DIALOG_TITLE);
+            }
+        }
+        else if (result == NFD_CANCEL)
+        {
+            // user pressed cancel
+        }
+        else if (result == NFD_ERROR)
+        {
+            current_errors.push_back(std::format(
+                "Native File Dialog: {}",
+                NFD_GetError()
+            ));
+            ImGui::OpenPopup(ERROR_DIALOG_TITLE);
+        }
     }
 
     void App::select_ui_pass_image(std::string_view name)

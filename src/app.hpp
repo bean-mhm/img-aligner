@@ -150,6 +150,11 @@ namespace img_aligner
             bv::ImageViewPtr& imgview
         );
 
+        void save_image(
+            const bv::ImagePtr& img,
+            std::string_view filename
+        );
+
         bool try_recreate_grid_warper(std::string* out_error = nullptr);
         void destroy_grid_warper(
             bool recreate_ui_pass_if_destroyed_grid_warper
@@ -194,6 +199,7 @@ namespace img_aligner
             bv::MemoryChunkPtr& img_mem,
             bv::ImageViewPtr& imgview
         );
+        void browse_and_save_image(const bv::ImagePtr& img);
 
         void select_ui_pass_image(std::string_view name);
 
