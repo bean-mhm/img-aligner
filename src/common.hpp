@@ -214,6 +214,19 @@ namespace img_aligner
         VkDeviceSize buffer_offset = 0
     );
 
+    void copy_image_to_buffer(
+        const bv::CommandBufferPtr& cmd_buf,
+        const bv::ImagePtr& image,
+        const bv::BufferPtr& buffer,
+        VkDeviceSize buffer_offset = 0
+    );
+
+    float* read_back_image(
+        AppState& state,
+        const bv::ImagePtr& image,
+        const bv::QueuePtr& queue
+    );
+
     // if use_general_layout is true, the image is expected to be in
     // VK_IMAGE_LAYOUT_GENERAL and no layout transitions will happen. otherwise,
     // the image must be in VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL and it will be

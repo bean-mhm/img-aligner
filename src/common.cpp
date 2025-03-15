@@ -361,6 +361,95 @@ namespace img_aligner
         );
     }
 
+    void copy_image_to_buffer(
+        const bv::CommandBufferPtr& cmd_buf,
+        const bv::ImagePtr& image,
+        const bv::BufferPtr& buffer,
+        VkDeviceSize buffer_offset
+    )
+    {
+        VkBufferImageCopy copy_region{
+            .bufferOffset = buffer_offset,
+            .bufferRowLength = 0,
+            .bufferImageHeight = 0,
+            .imageSubresource = VkImageSubresourceLayers{
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .mipLevel = 0,
+                .baseArrayLayer = 0,
+                .layerCount = 1
+            },
+            .imageOffset = { 0, 0, 0 },
+            .imageExtent = bv::Extent3d_to_vk(image->config().extent)
+        };
+
+        vkCmdCopyImageToBuffer(
+            cmd_buf->handle(),
+            image->handle(),
+            VK_IMAGE_LAYOUT_GENERAL,
+            buffer->handle(),
+            1, &copy_region
+        );
+    }
+
+    float* read_back_image(
+        AppState& state,
+        const bv::ImagePtr& image,
+        const bv::QueuePtr& queue
+    )
+    {
+        uint32_t width = image->config().extent.width;
+        uint32_t height = image->config().extent.height;
+
+        // verify format and figure out channel count and bit depth
+        size_t n_channels = 0;
+        size_t n_bytes_per_channel = 0;
+        switch (image->config().format)
+        {
+        case VK_FORMAT_R32G32B32A32_SFLOAT:
+            n_channels = 4;
+            n_bytes_per_channel = sizeof(float);
+            break;
+
+        case VK_FORMAT_R32_SFLOAT:
+            n_channels = 1;
+            n_bytes_per_channel = sizeof(float);
+            break;
+
+        default:
+            throw std::invalid_argument(
+                "image format not supported for read back"
+            );
+        }
+
+        // size of the image in bytes
+        VkDeviceSize size_bytes =
+            width * height * n_channels * n_bytes_per_channel;
+
+        // buffer to copy to
+        bv::BufferPtr buf = nullptr;
+        bv::MemoryChunkPtr buf_mem = nullptr;
+        create_buffer(
+            state,
+            size_bytes,
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+            | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+
+            buf,
+            buf_mem
+        );
+
+        // copy to buffer
+        auto fence = bv::Fence::create(state.device, 0);
+        auto cmd_buf = begin_single_time_commands(state, true);
+        copy_image_to_buffer(cmd_buf, image, buf);
+        end_single_time_commands(cmd_buf, queue, fence);
+        fence->wait();
+
+        return (float*)buf_mem->mapped();
+    }
+
     void generate_mipmaps(
         AppState& state,
         bv::CommandBufferPtr& cmd_buf,
