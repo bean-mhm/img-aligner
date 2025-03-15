@@ -1568,7 +1568,9 @@ namespace img_aligner
         imgui_bold("EXPORT");
 
         // export warped image
-        ImGui::BeginDisabled(!grid_warper || optimization_info.n_iters < 1);
+        ImGui::BeginDisabled(
+            !grid_warper || optimization_info.n_iters < 1 || is_optimizing
+        );
         if (imgui_button_full_width("Export Warped Image"))
         {
             browse_and_save_image(grid_warper->get_warped_hires_img());

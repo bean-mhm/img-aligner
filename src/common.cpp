@@ -147,9 +147,8 @@ namespace img_aligner
         if (fence == nullptr)
         {
             queue->wait_idle();
+            cmd_buf = nullptr;
         }
-
-        cmd_buf = nullptr;
     }
 
     uint32_t find_memory_type_idx(
@@ -391,7 +390,7 @@ namespace img_aligner
         );
     }
 
-    float* read_back_image(
+    std::vector<float> read_back_image(
         AppState& state,
         const bv::ImagePtr& image,
         const bv::QueuePtr& queue
@@ -439,6 +438,7 @@ namespace img_aligner
             buf,
             buf_mem
         );
+        float* buf_mapped = (float*)buf_mem->mapped();
 
         // copy to buffer
         auto fence = bv::Fence::create(state.device, 0);
@@ -447,7 +447,14 @@ namespace img_aligner
         end_single_time_commands(cmd_buf, queue, fence);
         fence->wait();
 
-        return (float*)buf_mem->mapped();
+        // copy from buffer to vector
+        std::vector<float> data(size_bytes / sizeof(float));
+        std::copy(
+            buf_mapped,
+            buf_mapped + data.size(),
+            data.data()
+        );
+        return data;
     }
 
     void generate_mipmaps(

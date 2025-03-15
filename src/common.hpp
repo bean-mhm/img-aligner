@@ -221,7 +221,7 @@ namespace img_aligner
         VkDeviceSize buffer_offset = 0
     );
 
-    float* read_back_image(
+    std::vector<float> read_back_image(
         AppState& state,
         const bv::ImagePtr& image,
         const bv::QueuePtr& queue
