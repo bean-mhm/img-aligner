@@ -1,7 +1,9 @@
 #include "app.hpp"
 
 #include "OpenEXR/ImfRgbaFile.h"
+#include "OpenEXR/ImfOutputFile.h"
 #include "OpenEXR/ImfArray.h"
+#include "OpenEXR/ImfChannelList.h"
 
 #include "nfd.hpp"
 
@@ -770,28 +772,52 @@ namespace img_aligner
         uint32_t width = img->config().extent.width;
         uint32_t height = img->config().extent.height;
 
-        Imf::Array2D<Imf::Rgba> pixels(width, height);
-        for (size_t y = 0; y < height; y++)
-        {
-            for (size_t x = 0; x < width; x++)
-            {
-                size_t red_idx = (x + (y * width)) * 4;
-                pixels[y][x] = Imf::Rgba(
-                    pixels_rgbaf32[red_idx + 0],
-                    pixels_rgbaf32[red_idx + 1],
-                    pixels_rgbaf32[red_idx + 2],
-                    pixels_rgbaf32[red_idx + 3]
-                );
-            }
-        }
+        Imf::Header header((int)width, (int)height);
+        header.channels().insert("R", Imf::Channel(Imf::PixelType::FLOAT));
+        header.channels().insert("G", Imf::Channel(Imf::PixelType::FLOAT));
+        header.channels().insert("B", Imf::Channel(Imf::PixelType::FLOAT));
+        header.channels().insert("A", Imf::Channel(Imf::PixelType::FLOAT));
 
-        Imf::RgbaOutputFile f(
-            filename.data(),
-            (int)width,
-            (int)height,
-            Imf::WRITE_RGBA
+        Imf::FrameBuffer fb;
+        fb.insert(
+            "R",
+            Imf::Slice(
+                Imf::FLOAT,
+                (char*)pixels_rgbaf32.data(),
+                4 * sizeof(float),
+                width * 4 * sizeof(float)
+            )
         );
-        f.setFrameBuffer(&pixels[0][0], 1, width);
+        fb.insert(
+            "G",
+            Imf::Slice(
+                Imf::FLOAT,
+                (char*)(pixels_rgbaf32.data() + 1),
+                4 * sizeof(float),
+                width * 4 * sizeof(float)
+            )
+        );
+        fb.insert(
+            "B",
+            Imf::Slice(
+                Imf::FLOAT,
+                (char*)(pixels_rgbaf32.data() + 2),
+                4 * sizeof(float),
+                width * 4 * sizeof(float)
+            )
+        );
+        fb.insert(
+            "A",
+            Imf::Slice(
+                Imf::FLOAT,
+                (char*)(pixels_rgbaf32.data() + 3),
+                4 * sizeof(float),
+                width * 4 * sizeof(float)
+            )
+        );
+
+        Imf::OutputFile f(filename.data(), header);
+        f.setFrameBuffer(fb);
         f.writePixels(height);
     }
 
