@@ -47,6 +47,14 @@ namespace img_aligner
             GridWarpOptimizationStopReason::None;
     };
 
+    struct MetadataExportOptions
+    {
+        bool params_and_res = true;
+        bool grid_vertices = false;
+        bool optimization_info = true;
+        bool cost_history = false;
+    };
+
     class App
     {
     public:
@@ -91,6 +99,9 @@ namespace img_aligner
 
         // last time we updated the UI stuff when optimization is running.
         TimePoint last_ui_update_when_optimizing_time;
+
+        // export options
+        MetadataExportOptions metadata_export_options;
 
         void init();
         void main_loop();
@@ -155,6 +166,10 @@ namespace img_aligner
             std::string_view filename
         );
 
+        void export_metadata(
+            std::string_view filename
+        );
+
         bool try_recreate_grid_warper(std::string* out_error = nullptr);
         void destroy_grid_warper(
             bool recreate_ui_pass_if_destroyed_grid_warper
@@ -200,6 +215,7 @@ namespace img_aligner
             bv::ImageViewPtr& imgview
         );
         void browse_and_save_image(const bv::ImagePtr& img);
+        void browse_and_export_metadata();
 
         void select_ui_pass_image(std::string_view name);
 

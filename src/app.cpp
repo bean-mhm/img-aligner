@@ -821,6 +821,13 @@ namespace img_aligner
         f.writePixels(height);
     }
 
+    void App::export_metadata(
+        std::string_view filename
+    )
+    {
+        std::cout << "export metadata to \"" << filename << "\"\n";
+    }
+
     bool App::try_recreate_grid_warper(std::string* out_error)
     {
         destroy_grid_warper(false);
@@ -1593,17 +1600,54 @@ namespace img_aligner
         }
 
         imgui_div();
-        imgui_bold("EXPORT");
+        imgui_bold("EXPORT IMAGE");
 
         // export warped image
         ImGui::BeginDisabled(
             !grid_warper || optimization_info.n_iters < 1 || is_optimizing
         );
-        if (imgui_button_full_width("Export Warped Image"))
+        if (imgui_button_full_width("Export Warped Image")
+            && grid_warper != nullptr
+            && optimization_info.n_iters > 0
+            && !is_optimizing)
         {
             browse_and_save_image(grid_warper->get_warped_hires_img());
         }
         imgui_tooltip("Export the warped image at full resolution");
+        ImGui::EndDisabled();
+
+        imgui_div();
+        imgui_bold("EXPORT METADATA");
+
+        ImGui::BeginDisabled(
+            !grid_warper || is_optimizing
+        );
+
+        // metadata export options
+        ImGui::Checkbox(
+            "Parameters and Resolutions",
+            &metadata_export_options.params_and_res
+        );
+        ImGui::Checkbox(
+            "Grid Vertices",
+            &metadata_export_options.grid_vertices
+        );
+        ImGui::Checkbox(
+            "Optimization Info",
+            &metadata_export_options.optimization_info
+        );
+        ImGui::Checkbox(
+            "Cost History",
+            &metadata_export_options.cost_history
+        );
+
+        // export metadata
+        if (imgui_button_full_width("Export Metadata")
+            && grid_warper != nullptr)
+        {
+            browse_and_export_metadata();
+        }
+
         ImGui::EndDisabled();
 
         imgui_dialogs();
@@ -2414,6 +2458,47 @@ namespace img_aligner
             {
                 current_errors.push_back(std::format(
                     "Failed to save image to file \"{}\": {}",
+                    filename,
+                    e.what()
+                ));
+                ImGui::OpenPopup(ERROR_DIALOG_TITLE);
+            }
+        }
+        else if (result == NFD_CANCEL)
+        {
+            // user pressed cancel
+        }
+        else if (result == NFD_ERROR)
+        {
+            current_errors.push_back(std::format(
+                "Native File Dialog: {}",
+                NFD_GetError()
+            ));
+            ImGui::OpenPopup(ERROR_DIALOG_TITLE);
+        }
+    }
+
+    void App::browse_and_export_metadata()
+    {
+        nfdu8char_t* nfd_filename;
+        nfdsavedialogu8args_t args{ 0 };
+        nfdu8filteritem_t filters[1] = { { "JSON", "json" } };
+        args.filterList = filters;
+        args.filterCount = sizeof(filters) / sizeof(nfdu8filteritem_t);
+        nfdresult_t result = NFD_SaveDialogU8_With(&nfd_filename, &args);
+        if (result == NFD_OKAY)
+        {
+            std::string filename(nfd_filename);
+            NFD_FreePathU8(nfd_filename);
+
+            try
+            {
+                export_metadata(filename);
+            }
+            catch (const std::exception& e)
+            {
+                current_errors.push_back(std::format(
+                    "Failed to export metadata to file \"{}\": {}",
                     filename,
                     e.what()
                 ));
