@@ -28,22 +28,22 @@ target_link_libraries(img-aligner PUBLIC ${Vulkan_LIBRARIES})
 
 # GLFW
 set(GLFW_LIBRARY_TYPE "STATIC")
-add_subdirectory(glfw)
+add_subdirectory(thirdparty/glfw)
 target_include_directories(img-aligner PUBLIC ${GLFW_SOURCE_DIR}/include)
 target_link_libraries(img-aligner PUBLIC glfw)
 
 # OpenEXR
-add_subdirectory(openexr)
+add_subdirectory(thirdparty/openexr)
 set(OPENEXR_INSTALL off)
 set(OPENEXR_INSTALL_TOOLS off)
 set(OPENEXR_BUILD_TOOLS off)
 set(OPENEXR_BUILD_EXAMPLES off)
-target_include_directories(img-aligner PUBLIC openexr/src/lib)
+target_include_directories(img-aligner PUBLIC thirdparty/openexr/src/lib)
 target_link_libraries(img-aligner PUBLIC OpenEXR)
 
 # Native File Dialog Extended
-add_subdirectory(nativefiledialog-extended)
-target_include_directories(img-aligner PUBLIC nativefiledialog-extended/src/include)
+add_subdirectory(thirdparty/nativefiledialog-extended)
+target_include_directories(img-aligner PUBLIC thirdparty/nativefiledialog-extended/src/include)
 target_link_libraries(img-aligner PRIVATE nfd)
 
 # macro to make a directory if it doesn't exist (at build time)

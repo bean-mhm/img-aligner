@@ -1,6 +1,6 @@
 [submodule "openexr"]
-	path = openexr
+	path = thirdparty/openexr
 	url = https://github.com/AcademySoftwareFoundation/openexr.git
 [submodule "nativefiledialog-extended"]
-	path = nativefiledialog-extended
+	path = thirdparty/nativefiledialog-extended
 	url = https://github.com/btzy/nativefiledialog-extended.git
