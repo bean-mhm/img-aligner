@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # doesn't work with Visual Studio generators
 
 project(img-aligner VERSION 1.0)
 
@@ -45,6 +45,9 @@ target_link_libraries(img-aligner PUBLIC OpenEXR)
 add_subdirectory(thirdparty/nativefiledialog-extended)
 target_include_directories(img-aligner PUBLIC thirdparty/nativefiledialog-extended/src/include)
 target_link_libraries(img-aligner PRIVATE nfd)
+
+# RapidJSON
+target_include_directories(img-aligner PUBLIC thirdparty/rapidjson/include)
 
 # macro to make a directory if it doesn't exist (at build time)
 if(MSVC OR MSYS OR MINGW OR WIN32)
