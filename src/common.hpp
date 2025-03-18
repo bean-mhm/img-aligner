@@ -79,7 +79,7 @@ namespace img_aligner
     // running.
     static constexpr float GRID_WARP_OPTIMIZATION_UI_UPDATE_INTERVAL = .5f;
 
-    using TimePoint = std::chrono::steady_clock::time_point;
+    using TimePoint = std::chrono::high_resolution_clock::time_point;
 
     struct AppState
     {
@@ -113,10 +113,8 @@ namespace img_aligner
         bool imgui_swapchain_rebuild = false;
     };
 
-    double elapsed_sec(const std::chrono::steady_clock::time_point& t);
-    double elapsed_sec(
-        const std::optional<std::chrono::steady_clock::time_point>& t
-    );
+    double elapsed_sec(const TimePoint& t);
+    double elapsed_sec(const std::optional<TimePoint>& t);
 
     std::vector<uint8_t> read_file(const std::string& filename);
 

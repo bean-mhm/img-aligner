@@ -7,6 +7,10 @@
 
 #include "nfd.hpp"
 
+#include "rapidjson/document.h"
+#include "rapidjson/writer.h"
+#include "rapidjson/stringbuffer.h"
+
 namespace img_aligner
 {
 
@@ -705,11 +709,11 @@ namespace img_aligner
     {
         if (!std::filesystem::exists(filename))
         {
-            throw std::exception("file doesn't exist");
+            throw std::runtime_error("file doesn't exist");
         }
         if (std::filesystem::is_directory(filename))
         {
-            throw std::exception(
+            throw std::runtime_error(
                 "provided path is a directory, not a file"
             );
         }
@@ -825,7 +829,7 @@ namespace img_aligner
         std::string_view filename
     )
     {
-        std::cout << "export metadata to \"" << filename << "\"\n";
+        rapidjson::Document doc;
     }
 
     bool App::try_recreate_grid_warper(std::string* out_error)

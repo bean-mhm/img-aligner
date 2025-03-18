@@ -40,14 +40,14 @@ namespace img_aligner
         return pools[thread_id];
     }
 
-    double elapsed_sec(const std::chrono::steady_clock::time_point& t)
+    double elapsed_sec(const TimePoint& t)
     {
         const auto now = std::chrono::high_resolution_clock::now();
         return std::chrono::duration<double>(now - t).count();
     }
 
     double elapsed_sec(
-        const std::optional<std::chrono::steady_clock::time_point>& t
+        const std::optional<TimePoint>& t
     )
     {
         if (!t.has_value())
