@@ -771,12 +771,39 @@ namespace img_aligner
                 "unsupported Vulkan format for saving image"
             );
         }
-        auto pixels_rgbaf32 = read_back_image(state, img, state.queue_main);
+        std::vector<float> pixels_rgbaf32_flipped =
+            read_back_image(state, img, state.queue_main);
 
         uint32_t width = img->config().extent.width;
         uint32_t height = img->config().extent.height;
 
-        Imf::Header header((int)width, (int)height);
+        // flip pixels vertically
+        std::vector<float> pixels_rgbaf32(pixels_rgbaf32_flipped.size());
+        size_t row_size = width * 4;
+        for (size_t y = 0; y < height; y++)
+        {
+            size_t red_idx = (y * width) * 4;
+            size_t red_idx_flipped = ((height - y - 1) * width) * 4;
+
+            std::copy(
+                pixels_rgbaf32_flipped.data() + red_idx_flipped,
+                pixels_rgbaf32_flipped.data() + red_idx_flipped + row_size,
+                pixels_rgbaf32.data() + red_idx
+            );
+        }
+
+        // clear the old version (flipped)
+        clear_vec(pixels_rgbaf32_flipped);
+
+        Imf::Header header(
+            (int)width,
+            (int)height,
+            1.f,
+            { 0.f, 0.f },
+            1.f,
+            Imf::LineOrder::INCREASING_Y,
+            Imf::Compression::ZIP_COMPRESSION
+        );
         header.channels().insert("R", Imf::Channel(Imf::PixelType::FLOAT));
         header.channels().insert("G", Imf::Channel(Imf::PixelType::FLOAT));
         header.channels().insert("B", Imf::Channel(Imf::PixelType::FLOAT));
