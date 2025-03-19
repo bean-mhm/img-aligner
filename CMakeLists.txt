@@ -22,8 +22,8 @@ target_compile_definitions(img-aligner PRIVATE
 
 # compiler and linker flags
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    target_compile_options(img-aligner PRIVATE -static-libgcc -static-libstdc++ -mconsole)
-    target_link_options(img-aligner PRIVATE -static-libgcc -static-libstdc++ -mconsole)
+    target_compile_options(img-aligner PRIVATE -static -static-libgcc -static-libstdc++ -mconsole)
+    target_link_options(img-aligner PRIVATE -static -static-libgcc -static-libstdc++ -mconsole)
 endif()
 
 # include dirs
@@ -132,4 +132,26 @@ add_custom_command(TARGET img-aligner
     COMMAND ${COPY_COMMAND_PREFIX} "\"${CMAKE_SOURCE_DIR}/licenses/.\" \"${CMAKE_BINARY_DIR}/bin/licenses\"" ${COPY_COMMAND_SUFFIX}
     COMMAND ${COPY_COMMAND_PREFIX} "\"${CMAKE_SOURCE_DIR}/fonts/.\" \"${CMAKE_BINARY_DIR}/bin/fonts\"" ${COPY_COMMAND_SUFFIX}
     COMMAND echo done copying resource files
+)
+
+# find required runtime DLLs
+find_file(LIBGCC_DLL libgcc_s_seh-1.dll PATHS ${CMAKE_C_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
+find_file(LIBSTDCXX_DLL libstdc++-6.dll PATHS ${CMAKE_CXX_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
+find_file(LIBWINPTHREAD_DLL libwinpthread-1.dll PATHS ${CMAKE_C_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
+find_file(LIBBZ2_DLL libbz2-1.dll PATHS ${CMAKE_C_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
+find_file(ZLIB_DLL zlib1.dll PATHS ${CMAKE_C_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
+
+# copy required DLLs to the output directory
+add_custom_command(TARGET img-aligner POST_BUILD
+    COMMAND echo copying runtime DLLs
+
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    # ${LIBGCC_DLL} (these are statically linked)
+    # ${LIBSTDCXX_DLL} (these are statically linked)
+    ${LIBWINPTHREAD_DLL}
+    ${LIBBZ2_DLL}
+    ${ZLIB_DLL}
+    ${CMAKE_BINARY_DIR}/bin
+
+    COMMAND echo done copying runtime DLLs
 )
