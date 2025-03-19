@@ -157,6 +157,14 @@ namespace img_aligner
         return v.x < 0.f || v.y < 0.f || v.x > 1.f || v.y > 1.f;
     }
 
+    // zero out a vector's capacity to actually free the memory
+    template<typename T>
+    void clear_vec(std::vector<T>& vec)
+    {
+        vec.clear();
+        std::vector<T>().swap(vec);
+    }
+
     // if use_transfer_pool is true, the command buffer will be allocated
     // from transfer_cmd_pool instead of cmd_pool. transfer_cmd_pool has the
     // VK_COMMAND_POOL_CREATE_TRANSIENT_BIT flag enabled which might be of
