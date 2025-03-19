@@ -157,11 +157,12 @@ cd build
 
 4. Generate CMake configuration with Ninja.
 ```bash
-cmake -G "Ninja" ..
+cmake -G "Ninja" -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ ..
 ```
 Make sure you have a stable internet connection so that unavailable packages
 can be fetched online. You only need to regenerate this in certain cases, like
-when you add or remove source files or modify `CMakeLists.txt`.
+when you add or remove source files, modify `CMakeLists.txt`, or want to switch
+between debug and release mode.
 
 5. Build & Run.
 ```bash
