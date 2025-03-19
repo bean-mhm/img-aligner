@@ -148,7 +148,7 @@ add_custom_command(TARGET img-aligner POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
     # ${LIBGCC_DLL} (these are statically linked)
     # ${LIBSTDCXX_DLL} (these are statically linked)
-    ${LIBWINPTHREAD_DLL}
+    # ${LIBWINPTHREAD_DLL} (these are statically linked)
     ${LIBBZ2_DLL}
     ${ZLIB_DLL}
     ${CMAKE_BINARY_DIR}/bin
