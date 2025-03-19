@@ -1,7 +1,8 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.24)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # doesn't work with Visual Studio generators
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_COLOR_DIAGNOSTICS ON)
 
 project(img-aligner VERSION 1.0)
 
@@ -10,6 +11,7 @@ file(GLOB_RECURSE SRC_CPP_FILES src/*.cpp)
 file(GLOB_RECURSE SRC_C_FILES src/*.c)
 add_executable(img-aligner ${SRC_CPP_FILES} ${SRC_C_FILES})
 set_target_properties(img-aligner PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/$<0:>")
+set_target_properties(img-aligner PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/$<0:>")
 
 # add compile definition for debug builds
 target_compile_definitions(img-aligner PRIVATE
@@ -17,6 +19,12 @@ target_compile_definitions(img-aligner PRIVATE
     DEBUG_BUILD=1
     >
 )
+
+# compiler and linker flags
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(img-aligner PRIVATE -static-libgcc -static-libstdc++ -mconsole)
+    target_link_options(img-aligner PRIVATE -static-libgcc -static-libstdc++ -mconsole)
+endif()
 
 # include dirs
 target_include_directories(img-aligner PUBLIC src/lib)
@@ -46,8 +54,32 @@ add_subdirectory(thirdparty/nativefiledialog-extended)
 target_include_directories(img-aligner PUBLIC thirdparty/nativefiledialog-extended/src/include)
 target_link_libraries(img-aligner PRIVATE nfd)
 
-# RapidJSON
+# RapidJSON (no need to build or link)
 target_include_directories(img-aligner PUBLIC thirdparty/rapidjson/include)
+
+# FreeType (needed for Dear ImGUI)
+add_subdirectory(thirdparty/freetype)
+target_include_directories(img-aligner PUBLIC thirdparty/freetype/include)
+target_link_libraries(img-aligner PUBLIC freetype)
+
+# Windows API
+if(MSVC OR MSYS OR MINGW OR WIN32)
+    target_link_libraries(img-aligner PUBLIC
+        kernel32
+        user32
+        gdi32
+        dwmapi
+        winspool
+        comdlg32
+        advapi32
+        shell32
+        ole32
+        oleaut32
+        uuid
+        odbc32
+        odbccp32
+    )
+endif()
 
 # macro to make a directory if it doesn't exist (at build time)
 if(MSVC OR MSYS OR MINGW OR WIN32)
