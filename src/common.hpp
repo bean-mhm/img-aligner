@@ -128,6 +128,13 @@ namespace img_aligner
     // right) until it reaches 0.
     uint32_t round_log2(uint32_t n);
 
+    std::string float_to_str(
+        float v,
+        size_t max_significant_digits = 5, // can only reduce decimal digits
+        size_t min_precision = 1,
+        size_t max_precision = 11
+    );
+
     // linear interpolation
     template<typename V, std::floating_point T>
     T lerp(const V& a, const V& b, T t)
