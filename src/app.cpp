@@ -1585,8 +1585,8 @@ namespace img_aligner
             if (grid_warper->get_initial_max_local_diff().has_value())
             {
                 ImGui::TextWrapped(std::format(
-                    "Max Local Diff.: {:.7f}",
-                    *grid_warper->get_initial_max_local_diff()
+                    "Max Local Diff.: {}",
+                    float_to_str(*grid_warper->get_initial_max_local_diff())
                 ).c_str());
             }
             imgui_tooltip("Maximum value in the pixels of the cost image.");
@@ -1598,8 +1598,10 @@ namespace img_aligner
             else
             {
                 ImGui::TextWrapped(std::format(
-                    "Change in Cost: {:.7f}",
-                    optimization_info.change_in_cost_in_last_n_iters
+                    "Change in Cost: {}",
+                    float_to_str(
+                        optimization_info.change_in_cost_in_last_n_iters
+                    )
                 ).c_str());
             }
             imgui_tooltip(std::format(
@@ -1610,8 +1612,8 @@ namespace img_aligner
             if (!optimization_info.cost_history.empty())
             {
                 ImGui::TextWrapped(std::format(
-                    "Cost: {:.7f}",
-                    optimization_info.cost_history.back()
+                    "Cost: {}",
+                    float_to_str(optimization_info.cost_history.back())
                 ).c_str());
 
                 ImGui::PlotLines(
