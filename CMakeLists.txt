@@ -54,9 +54,6 @@ add_subdirectory(thirdparty/nativefiledialog-extended)
 target_include_directories(img-aligner PUBLIC thirdparty/nativefiledialog-extended/src/include)
 target_link_libraries(img-aligner PRIVATE nfd)
 
-# RapidJSON (no need to build or link)
-target_include_directories(img-aligner PUBLIC thirdparty/rapidjson/include)
-
 # FreeType (needed for Dear ImGUI)
 add_subdirectory(thirdparty/freetype)
 target_include_directories(img-aligner PUBLIC thirdparty/freetype/include)
