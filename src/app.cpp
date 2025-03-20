@@ -7,9 +7,8 @@
 
 #include "nfd.hpp"
 
-#include "rapidjson/document.h"
-#include "rapidjson/writer.h"
-#include "rapidjson/stringbuffer.h"
+#include <nlohmann/json.hpp>
+using json = nlohmann::ordered_json;
 
 namespace img_aligner
 {
@@ -18,6 +17,25 @@ namespace img_aligner
     static void imgui_check_vk_result(VkResult err);
 
     const char* GridWarpOptimizationStopReason_to_string(
+        GridWarpOptimizationStopReason reason
+    )
+    {
+        switch (reason)
+        {
+        case GridWarpOptimizationStopReason::ManuallyStopped:
+            return "ManuallyStopped";
+        case GridWarpOptimizationStopReason::LowChangeInCost:
+            return "LowChangeInCost";
+        case GridWarpOptimizationStopReason::ReachedMaxIters:
+            return "ReachedMaxIters";
+        case GridWarpOptimizationStopReason::ReachedMaxRuntime:
+            return "ReachedMaxRuntime";
+        default:
+            return "None";
+        }
+    }
+
+    const char* GridWarpOptimizationStopReason_to_string_friendly(
         GridWarpOptimizationStopReason reason
     )
     {
@@ -856,7 +874,190 @@ namespace img_aligner
         std::string_view filename
     )
     {
-        rapidjson::Document doc;
+        if (!grid_warper)
+        {
+            throw std::logic_error(
+                "can't export metadata if there's no grid warper"
+            );
+        }
+        if (is_optimizing)
+        {
+            throw std::logic_error(
+                "can't export metadata during grid warp optimization"
+            );
+        }
+
+        json j;
+
+        j["exported_from"] = std::format(
+            "{} v{} ({})",
+            APP_TITLE, APP_VERSION, APP_GITHUB_URL
+        );
+
+        if (metadata_export_options.params_and_res)
+        {
+            json j2;
+
+            j2["base_img_mul"] = to_str_hp(grid_warp_params.base_img_mul);
+            j2["target_img_mul"] = to_str_hp(grid_warp_params.target_img_mul);
+
+            j2["grid_res_area"] = to_str_hp(grid_warp_params.grid_res_area);
+            j2["grid_padding"] = to_str_hp(grid_warp_params.grid_padding);
+
+            j2["intermediate_res_area"] = to_str_hp(
+                grid_warp_params.intermediate_res_area
+            );
+            j2["cost_res_area"] = to_str_hp(grid_warp_params.cost_res_area);
+
+            j2["rng_seed"] = to_str_hp(grid_warp_params.rng_seed);
+
+            j["grid_warp_params"] = j2;
+        }
+
+        if (metadata_export_options.params_and_res)
+        {
+            json j2;
+
+            j2["img_width"] = to_str_hp(grid_warper->get_img_width());
+            j2["img_height"] = to_str_hp(grid_warper->get_img_height());
+
+            j2["intermediate_res_x"] = to_str_hp(
+                grid_warper->get_intermediate_res_x()
+            );
+            j2["intermediate_res_y"] = to_str_hp(
+                grid_warper->get_intermediate_res_y()
+            );
+
+            j2["grid_res_x"] = to_str_hp(grid_warper->get_grid_res_x());
+            j2["grid_res_y"] = to_str_hp(grid_warper->get_grid_res_y());
+
+            j2["padded_grid_res_x"] = to_str_hp(
+                grid_warper->get_padded_grid_res_x()
+            );
+            j2["padded_grid_res_y"] = to_str_hp(
+                grid_warper->get_padded_grid_res_y()
+            );
+
+            j2["cost_res_x"] = to_str_hp(grid_warper->get_cost_res_x());
+            j2["cost_res_y"] = to_str_hp(grid_warper->get_cost_res_y());
+
+            j["grid_warp_resolutions"] = j2;
+        }
+
+        if (metadata_export_options.optimization_info)
+        {
+            json j2;
+
+            j2["max_warp_strength"] = to_str_hp(
+                optimization_params.max_warp_strength
+            );
+
+            j2["min_change_in_cost_in_last_n_iters"] = to_str_hp(
+                optimization_params.min_change_in_cost_in_last_n_iters
+            );
+            j2["N_ITERS_TO_CHECK_CHANGE_IN_COST"] = to_str_hp(
+                grid_warp::N_ITERS_TO_CHECK_CHANGE_IN_COST
+            );
+
+            j2["max_iters"] = to_str_hp(optimization_params.max_iters);
+            j2["max_runtime_sec"] = to_str_hp(
+                optimization_params.max_runtime_sec
+            );
+
+            j["grid_warp_optimization_params"] = j2;
+        }
+
+        if (metadata_export_options.optimization_info)
+        {
+            json j2;
+
+            if (!grid_warper->get_last_avg_diff())
+            {
+                j2["last_avg_diff"] = nullptr;
+            }
+            else
+            {
+                j2["last_avg_diff"] = to_str_hp(
+                    *grid_warper->get_last_avg_diff()
+                );
+            }
+
+            if (!grid_warper->get_initial_max_local_diff())
+            {
+                j2["initial_max_local_diff"] = nullptr;
+            }
+            else
+            {
+                j2["initial_max_local_diff"] = to_str_hp(
+                    *grid_warper->get_initial_max_local_diff()
+                );
+            }
+
+            j2["n_iters"] = to_str_hp(optimization_info.n_iters);
+            j2["n_good_iters"] = to_str_hp(optimization_info.n_good_iters);
+
+            j2["cost_history"] = json::array();
+            for (const auto& v : optimization_info.cost_history)
+            {
+                j2["cost_history"].push_back(to_str_hp(v));
+            }
+
+            j2["change_in_cost_in_last_n_iters"] = to_str_hp(
+                optimization_info.change_in_cost_in_last_n_iters
+            );
+            j2["N_ITERS_TO_CHECK_CHANGE_IN_COST"] = to_str_hp(
+                grid_warp::N_ITERS_TO_CHECK_CHANGE_IN_COST
+            );
+
+            j2["accum_elapsed"] = to_str_hp(optimization_info.accum_elapsed);
+            j2["stop_reason"] = GridWarpOptimizationStopReason_to_string(
+                optimization_info.stop_reason
+            );
+
+            j["grid_warp_optimization_info"] = j2;
+        }
+
+        if (metadata_export_options.grid_vertices)
+        {
+            json j2;
+
+            j2["count_x"] = to_str_hp(
+                grid_warper->get_padded_grid_res_x() + 1
+            );
+            j2["count_y"] = to_str_hp(
+                grid_warper->get_padded_grid_res_y() + 1
+            );
+            j2["count"] = to_str_hp(grid_warper->get_n_vertices());
+
+            const auto vertices = grid_warper->get_vertices();
+            for (size_t i = 0; i < grid_warper->get_n_vertices(); i++)
+            {
+                const auto& vert = vertices[i];
+
+                json jvert;
+                jvert["orig_pos"].push_back(to_str_hp(vert.orig_pos.x));
+                jvert["orig_pos"].push_back(to_str_hp(vert.orig_pos.y));
+                jvert["warped_pos"].push_back(to_str_hp(vert.warped_pos.x));
+                jvert["warped_pos"].push_back(to_str_hp(vert.warped_pos.y));
+
+                j2["items"].push_back(jvert);
+            }
+
+            j["grid_vertices"] = j2;
+        }
+
+        std::ofstream f(
+            filename.data(),
+            std::ofstream::out | std::ofstream::trunc
+        );
+        if (!f.is_open())
+        {
+            throw std::runtime_error("failed to open output file");
+        }
+
+        f << j.dump(metadata_export_options.pretty_print ? 2 : -1);
+        f.flush();
+        f.close();
     }
 
     bool App::try_recreate_grid_warper(std::string* out_error)
@@ -1050,7 +1251,7 @@ namespace img_aligner
                             GridWarpOptimizationStopReason::ManuallyStopped;
                     }
 
-                    // updated accumulated elapsed time
+                    // update accumulated elapsed time
                     optimization_info.accum_elapsed += elapsed_sec(
                         optimization_info.start_time
                     );
@@ -1549,7 +1750,7 @@ namespace img_aligner
             {
                 ImGui::TextWrapped(
                     "Stop reason: %s",
-                    GridWarpOptimizationStopReason_to_string(
+                    GridWarpOptimizationStopReason_to_string_friendly(
                         optimization_info.stop_reason
                     )
                 );
@@ -1586,7 +1787,7 @@ namespace img_aligner
             {
                 ImGui::TextWrapped(std::format(
                     "Max Local Diff.: {}",
-                    float_to_str(*grid_warper->get_initial_max_local_diff())
+                    to_str(*grid_warper->get_initial_max_local_diff())
                 ).c_str());
             }
             imgui_tooltip("Maximum value in the pixels of the cost image.");
@@ -1599,9 +1800,7 @@ namespace img_aligner
             {
                 ImGui::TextWrapped(std::format(
                     "Change in Cost: {}",
-                    float_to_str(
-                        optimization_info.change_in_cost_in_last_n_iters
-                    )
+                    to_str(optimization_info.change_in_cost_in_last_n_iters)
                 ).c_str());
             }
             imgui_tooltip(std::format(
@@ -1613,7 +1812,7 @@ namespace img_aligner
             {
                 ImGui::TextWrapped(std::format(
                     "Cost: {}",
-                    float_to_str(optimization_info.cost_history.back())
+                    to_str(optimization_info.cost_history.back())
                 ).c_str());
 
                 ImGui::PlotLines(
@@ -1657,21 +1856,37 @@ namespace img_aligner
         );
 
         // metadata export options
+
         ImGui::Checkbox(
-            "Parameters and Resolutions",
+            "Parameters & Resolutions",
             &metadata_export_options.params_and_res
         );
-        ImGui::Checkbox(
-            "Grid Vertices",
-            &metadata_export_options.grid_vertices
+        imgui_tooltip(
+            "Include grid warp parameters and internal resolutions"
         );
+
         ImGui::Checkbox(
             "Optimization Info",
             &metadata_export_options.optimization_info
         );
+        imgui_tooltip(
+            "Include grid warp optimization parameters and statistics"
+        );
+
         ImGui::Checkbox(
-            "Cost History",
-            &metadata_export_options.cost_history
+            "Grid Vertices",
+            &metadata_export_options.grid_vertices
+        );
+        imgui_tooltip(
+            "Include grid vertex data"
+        );
+
+        ImGui::Checkbox(
+            "Pretty Print",
+            &metadata_export_options.pretty_print
+        );
+        imgui_tooltip(
+            "Produce pretty printed JSON"
         );
 
         // export metadata

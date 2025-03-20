@@ -27,6 +27,9 @@ namespace img_aligner
     const char* GridWarpOptimizationStopReason_to_string(
         GridWarpOptimizationStopReason reason
     );
+    const char* GridWarpOptimizationStopReason_to_string_friendly(
+        GridWarpOptimizationStopReason reason
+    );
 
     struct GridWarpOptimizationInfo
     {
@@ -50,9 +53,9 @@ namespace img_aligner
     struct MetadataExportOptions
     {
         bool params_and_res = true;
-        bool grid_vertices = false;
         bool optimization_info = true;
-        bool cost_history = false;
+        bool grid_vertices = false;
+        bool pretty_print = true;
     };
 
     class App
