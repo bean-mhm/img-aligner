@@ -139,14 +139,20 @@ This program is written in C++20 and uses the following libraries.
 This project uses CMake as its build system (they don't like it, but if it
 works it works).
 
-1. Make sure you've installed [CMake](https://cmake.org/) and proper C++ compilers. On Windows, you
+1. Make sure you've installed [Git](https://git-scm.com/),
+[CMake](https://cmake.org/), and proper C++ compilers. On Windows, you
 can use [MSYS2](https://www.msys2.org/) which comes with CMake, GCC, mingw-w64,
 and other useful tools and libraries.
 
 2. Make sure the [Ninja](https://ninja-build.org/) build system is installed.
 
-3. Create a `build` directory in the root directory of the repository and change
-the working directory to it.
+3. Clone the repository and switch the working directory to it.
+```bash
+git clone https://github.com/bean-mhm/img-aligner.git
+cd img-aligner
+```
+
+4. Create a `build` directory and change the working directory to it.
 ```bash
 # delete if it already exists
 rm -rf ./build
@@ -155,16 +161,15 @@ mkdir build
 cd build
 ```
 
-4. Generate CMake configuration with Ninja.
+5. Generate CMake configuration with Ninja.
 ```bash
 cmake -G "Ninja" -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ ..
 ```
 Make sure you have a stable internet connection so that unavailable packages
 can be fetched online. You only need to regenerate this in certain cases, like
-when you add or remove source files, modify `CMakeLists.txt`, or want to switch
-between debug and release mode.
+when you add or remove source files or modify `CMakeLists.txt`.
 
-5. Build & Run.
+6. Build & Run.
 ```bash
 # build in debug mode
 cmake --build . --config Debug
