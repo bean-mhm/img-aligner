@@ -106,24 +106,54 @@ namespace img_aligner::grid_warp
 
         void add_images_to_ui_pass(UiPass& ui_pass);
 
-        constexpr const uint32_t get_padded_grid_res_x() const
+        constexpr uint32_t get_img_width() const
+        {
+            return img_width;
+        }
+
+        constexpr uint32_t get_img_height() const
+        {
+            return img_height;
+        }
+
+        constexpr uint32_t get_intermediate_res_x() const
+        {
+            return intermediate_res_x;
+        }
+
+        constexpr uint32_t get_intermediate_res_y() const
+        {
+            return intermediate_res_y;
+        }
+
+        constexpr uint32_t get_grid_res_x() const
+        {
+            return grid_res_x;
+        }
+
+        constexpr uint32_t get_grid_res_y() const
+        {
+            return grid_res_y;
+        }
+
+        constexpr uint32_t get_padded_grid_res_x() const
         {
             return padded_grid_res_x;
         }
 
-        constexpr const uint32_t get_padded_grid_res_y() const
+        constexpr uint32_t get_padded_grid_res_y() const
         {
             return padded_grid_res_y;
         }
 
-        const GridVertex* get_vertices() const
+        constexpr uint32_t get_cost_res_x() const
         {
-            return vertex_buf_mapped;
+            return cost_res_x;
         }
 
-        constexpr uint32_t get_n_vertices() const
+        constexpr uint32_t get_cost_res_y() const
         {
-            return n_vertices;
+            return cost_res_y;
         }
 
         constexpr const std::optional<float>& get_last_avg_diff() const
@@ -134,6 +164,16 @@ namespace img_aligner::grid_warp
         constexpr const std::optional<float>& get_initial_max_local_diff() const
         {
             return initial_max_local_diff;
+        }
+
+        constexpr uint32_t get_n_vertices() const
+        {
+            return n_vertices;
+        }
+
+        const GridVertex* get_vertices() const
+        {
+            return vertex_buf_mapped;
         }
 
         constexpr const bv::ImagePtr& get_warped_img() const
