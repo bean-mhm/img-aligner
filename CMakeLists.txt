@@ -95,14 +95,14 @@ else()
     endmacro()
 endif()
 
-# figure out the copy command in the current platform
+# figure out recursive directory copy command in the current platform
 if(MSVC OR MSYS OR MINGW OR WIN32)
-    set(COPY_COMMAND_PREFIX "xcopy")
-    set(COPY_COMMAND_SUFFIX /s)
+    set(CMD_RCOPY_PREFIX "xcopy")
+    set(CMD_RCOPY_SUFFIX /s)
     list(APPEND COPY_COMMAND_SUFFIX /y)
 else()
-    set(COPY_COMMAND_PREFIX "cp -ra")
-    set(COPY_COMMAND_SUFFIX "")
+    set(CMD_RCOPY_PREFIX "cp -ra")
+    set(CMD_RCOPY_SUFFIX "")
 endif()
 
 # compile shaders
@@ -126,8 +126,9 @@ mkdir_if_needed("${CMAKE_BINARY_DIR}/bin/fonts")
 add_custom_command(TARGET img-aligner
     POST_BUILD
     COMMAND echo copying resource files
-    COMMAND ${COPY_COMMAND_PREFIX} "\"${CMAKE_SOURCE_DIR}/licenses/.\" \"${CMAKE_BINARY_DIR}/bin/licenses\"" ${COPY_COMMAND_SUFFIX}
-    COMMAND ${COPY_COMMAND_PREFIX} "\"${CMAKE_SOURCE_DIR}/fonts/.\" \"${CMAKE_BINARY_DIR}/bin/fonts\"" ${COPY_COMMAND_SUFFIX}
+    COMMAND ${CMD_RCOPY_PREFIX} "\"${CMAKE_SOURCE_DIR}/licenses/.\" \"${CMAKE_BINARY_DIR}/bin/licenses\"" ${CMD_RCOPY_SUFFIX}
+    COMMAND ${CMD_RCOPY_PREFIX} "\"${CMAKE_SOURCE_DIR}/fonts/.\" \"${CMAKE_BINARY_DIR}/bin/fonts\"" ${CMD_RCOPY_SUFFIX}
+    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/imgui.ini" "${CMAKE_BINARY_DIR}/bin/imgui.ini"
     COMMAND echo done copying resource files
 )
 
