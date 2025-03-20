@@ -167,18 +167,24 @@ namespace img_aligner
             }
         }
 
+        if (s == "-0")
+        {
+            s = "0";
+        }
+
         return s;
     }
 
-    template<std::integral T>
-    std::string to_str_hp(T v)
-    {
-        return std::to_string(v);
-    }
-
-    // use maximum precision for floats
+    // use higher precision for floats
     template<std::floating_point T>
     std::string to_str_hp(T v)
+    {
+        return to_str(v, 15, 0, 20);
+    }
+
+    // use highest precision for floats
+    template<std::floating_point T>
+    std::string to_str_hhp(T v)
     {
         std::string s = std::format(
             std::is_same_v<T, float> ? "{0:.50f}" : "{0:.326f}",
@@ -195,7 +201,26 @@ namespace img_aligner
             s = s.substr(0, s.length() - 1);
         }
 
+        if (s == "-0")
+        {
+            s = "0";
+        }
+
         return s;
+    }
+
+    // no difference for non float types
+    template<std::integral T>
+    std::string to_str_hp(T v)
+    {
+        return std::to_string(v);
+    }
+
+    // no difference for non float types
+    template<std::integral T>
+    std::string to_str_hhp(T v)
+    {
+        return std::to_string(v);
     }
 
     // linear interpolation
