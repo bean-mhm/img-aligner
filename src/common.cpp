@@ -122,40 +122,6 @@ namespace img_aligner
         return i;
     }
 
-    std::string float_to_str(
-        float v,
-        size_t max_significant_digits,
-        size_t min_precision,
-        size_t max_precision
-    )
-    {
-        // this may be negative and it's intentional
-        int32_t n_integral_digits = (int32_t)std::floor(std::log10(v)) + 1;
-
-        int32_t precision = std::clamp(
-            (int32_t)max_significant_digits - n_integral_digits,
-            (int32_t)min_precision,
-            (int32_t)max_precision
-        );
-
-        std::string s = std::format("{0:.{1}f}", v, precision);
-
-        // remove redundant zeros after decimal point
-        if (precision > 0)
-        {
-            while (s.ends_with('0'))
-            {
-                s = s.substr(0, s.length() - 1);
-            }
-            if (s.ends_with('.'))
-            {
-                s = s.substr(0, s.length() - 1);
-            }
-        }
-
-        return s;
-    }
-
     bv::CommandBufferPtr begin_single_time_commands(
         AppState& state,
         bool use_transient_pool

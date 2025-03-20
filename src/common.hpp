@@ -20,6 +20,7 @@
 #include <optional>
 #include <chrono>
 #include <random>
+#include <type_traits>
 #include <stdexcept>
 #include <cmath>
 #include <cstdlib>
@@ -128,12 +129,74 @@ namespace img_aligner
     // right) until it reaches 0.
     uint32_t round_log2(uint32_t n);
 
-    std::string float_to_str(
-        float v,
+    template<std::integral T>
+    std::string to_str(T v)
+    {
+        return std::to_string(v);
+    }
+
+    template<std::floating_point T>
+    std::string to_str(
+        T v,
         size_t max_significant_digits = 5, // can only reduce decimal digits
         size_t min_precision = 1,
         size_t max_precision = 11
-    );
+    )
+    {
+        // this may be negative and it's intentional
+        int64_t n_integral_digits = (int64_t)std::floor(std::log10(v)) + 1;
+
+        int64_t precision = std::clamp(
+            (int64_t)max_significant_digits - n_integral_digits,
+            (int64_t)min_precision,
+            (int64_t)max_precision
+        );
+
+        std::string s = std::format("{0:.{1}f}", v, precision);
+
+        // remove redundant zeros after decimal point
+        if (precision > 0)
+        {
+            while (s.ends_with('0'))
+            {
+                s = s.substr(0, s.length() - 1);
+            }
+            if (s.ends_with('.'))
+            {
+                s = s.substr(0, s.length() - 1);
+            }
+        }
+
+        return s;
+    }
+
+    template<std::integral T>
+    std::string to_str_hp(T v)
+    {
+        return std::to_string(v);
+    }
+
+    // use maximum precision for floats
+    template<std::floating_point T>
+    std::string to_str_hp(T v)
+    {
+        std::string s = std::format(
+            std::is_same_v<T, float> ? "{0:.50f}" : "{0:.326f}",
+            v
+        );
+
+        // remove redundant zeros after decimal point
+        while (s.ends_with('0'))
+        {
+            s = s.substr(0, s.length() - 1);
+        }
+        if (s.ends_with('.'))
+        {
+            s = s.substr(0, s.length() - 1);
+        }
+
+        return s;
+    }
 
     // linear interpolation
     template<typename V, std::floating_point T>
