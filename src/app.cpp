@@ -1338,7 +1338,7 @@ namespace img_aligner
             ui_pass->add_image(
                 base_imgview,
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                "Base Image",
+                BASE_IMAGE_NAME,
                 base_img->config().extent.width,
                 base_img->config().extent.height,
                 grid_warp_params.base_img_mul,
@@ -1351,7 +1351,7 @@ namespace img_aligner
             ui_pass->add_image(
                 target_imgview,
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                "Target Image",
+                TARGET_IMAGE_NAME,
                 target_img->config().extent.width,
                 target_img->config().extent.height,
                 grid_warp_params.target_img_mul,
@@ -1463,15 +1463,22 @@ namespace img_aligner
 
             destroy_grid_warper(true);
 
-            for (auto& ui_image_info : ui_pass->images())
+            // update multiplier and switch to the image
+            if (ui_pass != nullptr)
             {
-                if (ui_image_info.name == BASE_IMAGE_NAME)
+                for (size_t i = 0; i < ui_pass->images().size(); i++)
                 {
-                    ui_image_info.mul = grid_warp_params.base_img_mul;
+                    if (ui_pass->images()[i].name != BASE_IMAGE_NAME)
+                    {
+                        continue;
+                    }
+
+                    ui_pass->images()[i].mul = grid_warp_params.base_img_mul;
+                    selected_image_idx = i;
                     break;
                 }
+                need_to_run_ui_pass = true;
             }
-            need_to_run_ui_pass = true;
         }
 
         // target image multiplier
@@ -1495,15 +1502,22 @@ namespace img_aligner
 
             destroy_grid_warper(true);
 
-            for (auto& ui_image_info : ui_pass->images())
+            // update multiplier and switch to the image
+            if (ui_pass != nullptr)
             {
-                if (ui_image_info.name == TARGET_IMAGE_NAME)
+                for (size_t i = 0; i < ui_pass->images().size(); i++)
                 {
-                    ui_image_info.mul = grid_warp_params.target_img_mul;
+                    if (ui_pass->images()[i].name != TARGET_IMAGE_NAME)
+                    {
+                        continue;
+                    }
+
+                    ui_pass->images()[i].mul = grid_warp_params.target_img_mul;
+                    selected_image_idx = i;
                     break;
                 }
+                need_to_run_ui_pass = true;
             }
-            need_to_run_ui_pass = true;
         }
 
         imgui_div();
@@ -2769,13 +2783,21 @@ namespace img_aligner
 
     void App::select_ui_pass_image(std::string_view name)
     {
+        if (!ui_pass)
+        {
+            throw std::logic_error(
+                "can't select UI pass image if there's no UI pass"
+            );
+        }
+
         for (size_t i = 0; i < ui_pass->images().size(); i++)
         {
-            if (ui_pass->images()[i].name == name)
+            if (ui_pass->images()[i].name != name)
             {
-                selected_image_idx = i;
-                break;
+                continue;
             }
+            selected_image_idx = i;
+            break;
         }
     }
 
