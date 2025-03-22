@@ -103,7 +103,7 @@ hit _Load Target Image_ to load the target image.
 2. Adjust grid warping settings in the _GRID WARPER_ section and hit
 _Recreate Grid Warper_.
 
-3. Adjust optimizations settings in the _OPTIMIZATION_ section and hit
+3. Adjust optimization settings in the _OPTIMIZATION_ section and hit
 _Start Alignin'_ to start minimizing the cost.
 
 4. Observe optimization statistics and a plot of the cost over time in the
