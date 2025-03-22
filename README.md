@@ -89,8 +89,7 @@ If you're curious, I really tried adding the
 [OpenImageIO](https://github.com/OpenImageIO/oiio)
 libraries for proper color management and image IO (like in
 [RealBloom](https://github.com/bean-mhm/realbloom)), but they were painfully
-hard to include and build with CMake, and I got errors after errors, so I gave
-up.
+hard to configure and build with CMake, and I got errors after errors.
 
 # Usage
 
@@ -129,35 +128,42 @@ img-aligner --cli
 
 # How It's Made
 
-This program is written in C++20 and uses the following libraries.
+This project is written in C++20 with
+[Visual Studio Code](https://code.visualstudio.com/) and uses mainly the
+following libraries.
 
 | Library | Used for |
 |--|--|
+| [CLI11](https://github.com/CLIUtils/CLI11) | Command line interface |
 | [GLFW](https://www.glfw.org/) | Window management |
-| [beva](https://github.com/bean-mhm/beva) | Vulkan wrapper |
 | [Dear ImGui](https://github.com/ocornut/imgui) | Graphical user interface |
+| [FreeType](https://github.com/freetype/freetype) | Font rendering |
 | [NFD Extended](https://github.com/btzy/nativefiledialog-extended) | Native file dialogs |
+| [beva](https://github.com/bean-mhm/beva) | Vulkan wrapper |
 | [OpenEXR](https://openexr.com) | Reading and writing OpenEXR images |
+| [GLM](https://github.com/g-truc/glm) | Math |
+| [nlohmann/json](https://github.com/nlohmann/json) | JSON serialization |
 
 # How to Build
 
-This project uses CMake as its build system (they don't like it, but if it
-works it works).
+This project uses CMake as its build system (if it works it works).
 
-1. Make sure you've installed [Git](https://git-scm.com/),
-[CMake](https://cmake.org/), and proper C++ compilers. On Windows, you
-can use [MSYS2](https://www.msys2.org/) which comes with CMake, GCC, mingw-w64,
+## Tools
+
+Make sure you've installed [Git](https://git-scm.com/),
+[CMake](https://cmake.org/), the [Ninja](https://ninja-build.org/) build system, and proper C++ compilers. On Windows, you
+can use [MSYS2](https://www.msys2.org/) which comes with GCC, mingw-w64,
 and other useful tools and libraries.
 
-2. Make sure the [Ninja](https://ninja-build.org/) build system is installed.
+## Building
 
-3. Clone the repository and switch the working directory to it.
+1. Clone the repository and switch the working directory to it.
 ```bash
 git clone https://github.com/bean-mhm/img-aligner.git
 cd img-aligner
 ```
 
-4. Create a `build` directory and change the working directory to it.
+2. Create a `build` directory and change the working directory to it.
 ```bash
 # delete if it already exists
 rm -rf ./build
@@ -166,7 +172,7 @@ mkdir build
 cd build
 ```
 
-5. Generate CMake configuration with Ninja.
+3. Generate CMake configuration with Ninja.
 ```bash
 cmake -G "Ninja" ..
 ```
@@ -174,7 +180,7 @@ Make sure you have a stable internet connection so that unavailable packages
 can be fetched online. You only need to regenerate this in certain cases, like
 when you add or remove source files or modify `CMakeLists.txt`.
 
-6. Build & Run.
+4. Build & Run.
 ```bash
 # build in debug mode
 cmake --build . --config Debug
