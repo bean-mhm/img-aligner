@@ -1840,6 +1840,22 @@ namespace img_aligner
             destroy_grid_warper(true);
         }
 
+        // RNG seed
+        imgui_small_div();
+        ImGui::TextWrapped("Seed");
+        imgui_tooltip(
+            "Seed number to use for pseudo-random number generators"
+        );
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        if (ImGui::InputScalar(
+            "##rng_seed",
+            ImGuiDataType_U32,
+            &grid_warp_params.rng_seed
+        ))
+        {
+            destroy_grid_warper(true);
+        }
+
         // create grid warper
         imgui_small_div();
         if (!grid_warper && imgui_button_full_width("Recreate Grid Warper"))
@@ -1854,19 +1870,6 @@ namespace img_aligner
 
         imgui_div();
         imgui_bold("OPTIMIZATION");
-
-        // RNG seed
-        imgui_small_div();
-        ImGui::TextWrapped("Seed");
-        imgui_tooltip(
-            "Seed number to use for pseudo-random number generators"
-        );
-        ImGui::SetNextItemWidth(-FLT_MIN);
-        ImGui::InputScalar(
-            "##rng_seed",
-            ImGuiDataType_U32,
-            &grid_warp_params.rng_seed
-        );
 
         // warp strength
         imgui_small_div();
@@ -2066,12 +2069,14 @@ namespace img_aligner
         }
 
         imgui_div();
-        imgui_bold("EXPORT IMAGE");
 
-        // export warped image
         ImGui::BeginDisabled(
             !grid_warper || optimization_info.n_iters < 1 || is_optimizing
         );
+
+        imgui_bold("EXPORT IMAGE");
+
+        // export warped image
         if (imgui_button_full_width("Export Warped Image")
             && grid_warper != nullptr
             && optimization_info.n_iters > 0
@@ -2080,14 +2085,16 @@ namespace img_aligner
             browse_and_save_image(grid_warper->get_warped_hires_img());
         }
         imgui_tooltip("Export the warped image at full resolution");
+
         ImGui::EndDisabled();
 
         imgui_div();
-        imgui_bold("EXPORT METADATA");
 
         ImGui::BeginDisabled(
             !grid_warper || is_optimizing
         );
+
+        imgui_bold("EXPORT METADATA");
 
         // metadata export options
 
