@@ -115,12 +115,17 @@ level, tick the _flim_ checkbox to apply the
 [flim](https://github.com/bean-mhm/flim) transform on the image when displaying,
 or tick _Preview Grid_ to see a preview of the grid used for warping.
 
-# Command Line
+# Command Line Interface
 
 To batch-process multiple images, you can call img-aligner from a terminal
-or another program using the `--cli` argument to enable the command line
-interface (CLI). If no other arguments are provided, a help text will be
-printed.
+or another program using `--cli` as the first argument to enable command line
+mode. If no other arguments are provided, a help text will be
+printed. The options are basically identical to that of the graphical user
+interface (GUI).
+
+```bash
+img-aligner --cli
+```
 
 # How It's Made
 
@@ -163,7 +168,7 @@ cd build
 
 5. Generate CMake configuration with Ninja.
 ```bash
-cmake -G "Ninja" -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ ..
+cmake -G "Ninja" ..
 ```
 Make sure you have a stable internet connection so that unavailable packages
 can be fetched online. You only need to regenerate this in certain cases, like
