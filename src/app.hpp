@@ -61,13 +61,17 @@ namespace img_aligner
     class App
     {
     public:
-        App() = default;
+        App(int argc, char** argv);
+
         void run();
 
     private:
         static constexpr auto ERROR_DIALOG_TITLE = "Error";
         static constexpr auto BASE_IMAGE_NAME = "Base Image";
         static constexpr auto TARGET_IMAGE_NAME = "Target Image";
+
+        int argc;
+        char** argv;
 
         AppState state;
 
@@ -148,6 +152,8 @@ namespace img_aligner
         void init_imgui();
 
     private:
+        void handle_command_line();
+
         void recreate_image(
             bv::ImagePtr& img,
             bv::MemoryChunkPtr& img_mem,

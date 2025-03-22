@@ -54,6 +54,10 @@ namespace img_aligner
         }
     }
 
+    App::App(int argc, char** argv)
+        : argc(argc), argv(argv)
+    {}
+
     void App::run()
     {
         try
@@ -70,21 +74,43 @@ namespace img_aligner
 
     void App::init()
     {
-        NFD_Init();
-        init_window();
-        init_context();
-        setup_debug_messenger();
-        create_surface();
-        pick_physical_device();
-        create_logical_device();
-        create_memory_bank();
-        create_imgui_descriptor_pool();
-        init_imgui_vk_window_data();
-        init_imgui();
+        // determine if we're in GUI mode or command line mode
+        state.ui_mode = (argc < 2 || std::string(argv[1]) != "--cli");
+
+        if (state.ui_mode)
+        {
+            NFD_Init();
+            init_window();
+            init_context();
+            setup_debug_messenger();
+            create_surface();
+            pick_physical_device();
+            create_logical_device();
+            create_memory_bank();
+            create_imgui_descriptor_pool();
+            init_imgui_vk_window_data();
+            init_imgui();
+        }
+        else
+        {
+            init_context();
+            setup_debug_messenger();
+            pick_physical_device();
+            create_logical_device();
+            create_memory_bank();
+
+            handle_command_line();
+        }
     }
 
     void App::main_loop()
     {
+        // do nothing in command line mode
+        if (!state.ui_mode)
+        {
+            return;
+        }
+
         while (!glfwWindowShouldClose(state.window))
         {
             // poll and handle events (inputs, window resize, etc.)
@@ -235,7 +261,10 @@ namespace img_aligner
 
     void App::cleanup()
     {
-        NFD_Quit();
+        if (state.ui_mode)
+        {
+            NFD_Quit();
+        }
 
         if (is_optimizing)
         {
@@ -255,19 +284,22 @@ namespace img_aligner
 
         state.device->wait_idle();
 
-        ImGui_ImplVulkan_Shutdown();
-        ImGui_ImplGlfw_Shutdown();
-        ImGui::DestroyContext();
+        if (state.ui_mode)
+        {
+            ImGui_ImplVulkan_Shutdown();
+            ImGui_ImplGlfw_Shutdown();
+            ImGui::DestroyContext();
 
-        // this destorys the surface as well
-        ImGui_ImplVulkanH_DestroyWindow(
-            state.context->vk_instance(),
-            state.device->handle(),
-            &state.imgui_vk_window_data,
-            state.context->vk_allocator_ptr()
-        );
+            // this destorys the surface as well
+            ImGui_ImplVulkanH_DestroyWindow(
+                state.context->vk_instance(),
+                state.device->handle(),
+                &state.imgui_vk_window_data,
+                state.context->vk_allocator_ptr()
+            );
 
-        state.imgui_descriptor_pool = nullptr;
+            state.imgui_descriptor_pool = nullptr;
+        }
 
         state.cmd_pools.clear();
         state.transient_cmd_pools.clear();
@@ -281,8 +313,11 @@ namespace img_aligner
         state.debug_messenger = nullptr;
         state.context = nullptr;
 
-        glfwDestroyWindow(state.window);
-        glfwTerminate();
+        if (state.ui_mode)
+        {
+            glfwDestroyWindow(state.window);
+            glfwTerminate();
+        }
     }
 
     void App::init_window()
@@ -332,8 +367,10 @@ namespace img_aligner
         }
 
         std::vector<std::string> extensions;
+
+        // extensions required by GLFW
+        if (state.ui_mode)
         {
-            // extensions required by GLFW
             uint32_t glfw_ext_count = 0;
             const char** glfw_exts;
             glfw_exts = glfwGetRequiredInstanceExtensions(&glfw_ext_count);
@@ -341,12 +378,12 @@ namespace img_aligner
             {
                 extensions.emplace_back(glfw_exts[i]);
             }
+        }
 
-            // debug utils extension
-            if (DEBUG_MODE)
-            {
-                extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-            }
+        // debug utils extension
+        if (DEBUG_MODE)
+        {
+            extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
         }
 
         state.context = bv::Context::create({
@@ -388,7 +425,7 @@ namespace img_aligner
                 const bv::DebugMessageData& message_data
                 )
             {
-                std::cout << message_data.message << '\n';
+                std::cout << "Vulkan: " << message_data.message << '\n';
             }
         );
     }
@@ -420,27 +457,31 @@ namespace img_aligner
         std::vector<bv::PhysicalDevice> supported_physical_devices;
         for (const auto& pdev : all_physical_devices)
         {
-            // make sure there's a queue family that supports graphics
-            // operations and our window surface.
+            // make sure there's a queue family that supports at least 2 queues
+            // with graphics operations and our window surface.
             if (pdev.find_queue_family_indices(
                 VK_QUEUE_GRAPHICS_BIT,
                 0,
-                state.surface
+                state.ui_mode ? state.surface : nullptr,
+                2
             ).empty())
             {
                 continue;
             }
 
             // make sure the device supports our window surface
-            auto sc_support = pdev.fetch_swapchain_support(state.surface);
-            if (!sc_support.has_value())
+            if (state.ui_mode)
             {
-                continue;
-            }
-            if (sc_support->present_modes.empty()
-                || sc_support->surface_formats.empty())
-            {
-                continue;
+                auto sc_support = pdev.fetch_swapchain_support(state.surface);
+                if (!sc_support.has_value())
+                {
+                    continue;
+                }
+                if (sc_support->present_modes.empty()
+                    || sc_support->surface_formats.empty())
+                {
+                    continue;
+                }
             }
 
             // make sure the RGBA 32-bit float format is supported
@@ -533,7 +574,8 @@ namespace img_aligner
             state.physical_device->find_first_queue_family_index(
                 VK_QUEUE_GRAPHICS_BIT,
                 0,
-                state.surface
+                state.ui_mode ? state.surface : nullptr,
+                2
             );
 
         std::vector<bv::QueueRequest> queue_requests;
@@ -546,12 +588,18 @@ namespace img_aligner
 
         bv::PhysicalDeviceFeatures enabled_features{};
 
+        std::vector<std::string> device_extensions;
+        if (state.ui_mode)
+        {
+            device_extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+        }
+
         state.device = bv::Device::create(
             state.context,
             state.physical_device.value(),
             {
                 .queue_requests = queue_requests,
-                .extensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME },
+                .extensions = device_extensions,
                 .enabled_features = enabled_features
             }
         );
@@ -686,6 +734,178 @@ namespace img_aligner
 
         // load UI style and fonts
         update_ui_scale_reload_fonts_and_style();
+    }
+
+    void App::handle_command_line()
+    {
+        CLI::App cli(
+            std::format("{} v{} ({})", APP_TITLE, APP_VERSION, APP_GITHUB_URL),
+            APP_TITLE
+        );
+        argv = cli.ensure_utf8(argv);
+
+        cli.add_flag("--cli", "enable command line mode");
+
+        // CLI11's exception-reliant way of handling version and help is weird
+        // so I'm handling it manually.
+        bool flag_help;
+        cli.remove_option(cli.get_help_ptr());
+        cli.add_flag(
+            "-h,--help",
+            flag_help,
+            "print this help message and exit"
+        );
+
+        // CLI11's exception-reliant way of handling version and help is weird
+        // so I'm handling it manually.
+        bool flag_version;
+        cli.remove_option(cli.get_version_ptr());
+        cli.add_flag(
+            "-v,--version",
+            flag_version,
+            "print app version and exit"
+        );
+
+        std::string base_img_path;
+        cli.add_option(
+            "-b,--base",
+            base_img_path,
+            "path to the base image file (.exr)"
+        );
+
+        std::string target_img_path;
+        cli.add_option(
+            "-t,--target",
+            target_img_path,
+            "path to the target image file (.exr)"
+        );
+
+        cli.add_option(
+            "-x,--base-mul",
+            grid_warp_params.base_img_mul,
+            "base image multiplier"
+        );
+
+        cli.add_option(
+            "-y,--target-mul",
+            grid_warp_params.target_img_mul,
+            "target image multiplier"
+        );
+
+        cli.add_option(
+            "-g,--grid-res",
+            grid_warp_params.grid_res_area,
+            "area of the grid resolution"
+        );
+
+        cli.add_option(
+            "-p,--grid-padding",
+            grid_warp_params.grid_padding,
+            "grid padding"
+        );
+
+        cli.add_option(
+            "-r,--interm-res",
+            grid_warp_params.intermediate_res_area,
+            "area of the intermediate resolution"
+        );
+
+        cli.add_option(
+            "-c,--cost-res",
+            grid_warp_params.cost_res_area,
+            "area of the cost resolution"
+        );
+
+        cli.add_option(
+            "-s,--seed",
+            grid_warp_params.rng_seed,
+            "seed number to use for pseudo-random number generators"
+        );
+
+        cli.add_option(
+            "-w,--warp-strength",
+            optimization_params.max_warp_strength,
+            "maximum amount of warping in every iteration"
+        );
+
+        cli.add_option(
+            "-m,--min-change-in-cost",
+            optimization_params.min_change_in_cost_in_last_n_iters,
+            std::format(
+                "stop optimization if the cost decreased by less than this "
+                "value in {} iterations",
+                grid_warp::N_ITERS_TO_CHECK_CHANGE_IN_COST
+            )
+        );
+
+        cli.add_option(
+            "-i,--max-iters",
+            optimization_params.max_iters,
+            "maximum number of iterations"
+        );
+
+        cli.add_option(
+            "-z,--max-runtime",
+            optimization_params.max_runtime_sec,
+            "maximum run time in seconds"
+        );
+
+        std::string output_img_path;
+        cli.add_option(
+            "-o,--output",
+            output_img_path,
+            "optional path to the output (warped) image file (.exr)"
+        );
+
+        cli.add_flag(
+            "-q,--meta-params",
+            metadata_export_options.params_and_res,
+            "include parameters and resolutions when exporting metadata"
+        );
+
+        cli.add_flag(
+            "-u,--meta-opt",
+            metadata_export_options.optimization_info,
+            "include optimization parameters and statistics when exporting "
+            "metadata"
+        );
+
+        cli.add_flag(
+            "-d,--meta-vert",
+            metadata_export_options.grid_vertices,
+            "include grid vertex data when exporting metadata"
+        );
+
+        cli.add_flag(
+            "-k,--meta-pretty",
+            metadata_export_options.pretty_print,
+            "produce pretty printed JSON when exporting metadata"
+        );
+
+        std::string metadata_path;
+        cli.add_option(
+            "-e,--meta",
+            metadata_path,
+            "optional path to the metadata file (.json)"
+        );
+
+        // parse
+        cli.parse(argc, argv);
+
+        if (flag_help)
+        {
+            std::cout << cli.help() << '\n';
+            return;
+        }
+
+        if (flag_version)
+        {
+            std::cout << APP_VERSION << '\n';
+            return;
+        }
+
+        // TODO
+        std::cout << "handle CLI stuff\n";
     }
 
     void App::recreate_image(
