@@ -748,7 +748,7 @@ namespace img_aligner
 
         // CLI11's exception-reliant way of handling version and help is weird
         // so I'm handling it manually.
-        bool flag_help;
+        bool flag_help = false;
         cli.remove_option(cli.get_help_ptr());
         cli.add_flag(
             "-h,--help",
@@ -758,7 +758,7 @@ namespace img_aligner
 
         // CLI11's exception-reliant way of handling version and help is weird
         // so I'm handling it manually.
-        bool flag_version;
+        bool flag_version = false;
         cli.remove_option(cli.get_version_ptr());
         cli.add_flag(
             "-v,--version",
@@ -778,6 +778,13 @@ namespace img_aligner
             "-t,--target",
             target_img_path,
             "path to the target image file (.exr)"
+        );
+
+        std::string output_img_path;
+        cli.add_option(
+            "-o,--output",
+            output_img_path,
+            "optional path to the warped image file (.exr)"
         );
 
         cli.add_option(
@@ -845,46 +852,46 @@ namespace img_aligner
         );
 
         cli.add_option(
-            "-z,--max-runtime",
+            "-R,--max-runtime",
             optimization_params.max_runtime_sec,
             "maximum run time in seconds"
         );
 
-        std::string output_img_path;
-        cli.add_option(
-            "-o,--output",
-            output_img_path,
-            "optional path to the output (warped) image file (.exr)"
+        bool flag_silent = false;
+        cli.add_flag(
+            "-n,--silent",
+            flag_silent,
+            "don't print statistics during optimization"
         );
 
         cli.add_flag(
-            "-q,--meta-params",
+            "-P,--meta-params",
             metadata_export_options.params_and_res,
             "include parameters and resolutions when exporting metadata"
         );
 
         cli.add_flag(
-            "-u,--meta-opt",
+            "-O,--meta-opt",
             metadata_export_options.optimization_info,
             "include optimization parameters and statistics when exporting "
             "metadata"
         );
 
         cli.add_flag(
-            "-d,--meta-vert",
+            "-V,--meta-vert",
             metadata_export_options.grid_vertices,
             "include grid vertex data when exporting metadata"
         );
 
         cli.add_flag(
-            "-k,--meta-pretty",
+            "-K,--meta-pretty",
             metadata_export_options.pretty_print,
             "produce pretty printed JSON when exporting metadata"
         );
 
         std::string metadata_path;
         cli.add_option(
-            "-e,--meta",
+            "-M,--meta",
             metadata_path,
             "optional path to the metadata file (.json)"
         );
@@ -892,7 +899,7 @@ namespace img_aligner
         // parse
         cli.parse(argc, argv);
 
-        if (flag_help)
+        if (flag_help || argc <= 2)
         {
             std::cout << cli.help() << '\n';
             return;
@@ -904,8 +911,102 @@ namespace img_aligner
             return;
         }
 
-        // TODO
-        std::cout << "handle CLI stuff\n";
+        if (base_img_path.empty())
+        {
+            throw std::invalid_argument("base image path is required");
+        }
+        if (target_img_path.empty())
+        {
+            throw std::invalid_argument("target image path is required");
+        }
+
+        try
+        {
+            load_image(base_img_path, base_img, base_img_mem, base_imgview);
+        }
+        catch (const std::exception& e)
+        {
+            throw std::runtime_error(std::format(
+                "failed to load base image: {}",
+                e.what()
+            ).c_str());
+        }
+
+        try
+        {
+            load_image(
+                target_img_path,
+                target_img,
+                target_img_mem,
+                target_imgview
+            );
+        }
+        catch (const std::exception& e)
+        {
+            throw std::runtime_error(std::format(
+                "failed to load target image: {}",
+                e.what()
+            ).c_str());
+        }
+
+        try
+        {
+            recreate_grid_warper();
+        }
+        catch (const std::exception& e)
+        {
+            throw std::runtime_error(std::format(
+                "failed to create grid warper: {}",
+                e.what()
+            ).c_str());
+        }
+
+        start_optimization();
+
+        while (is_optimizing)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+            if (flag_silent)
+            {
+                continue;
+            }
+
+            std::cout << optimization_info.n_iters << '\n';
+        }
+
+        try
+        {
+            if (!output_img_path.empty())
+            {
+                save_image(
+                    grid_warper->get_warped_hires_img(),
+                    output_img_path
+                );
+            }
+        }
+        catch (const std::exception& e)
+        {
+            throw std::runtime_error(std::format(
+                "failed to save warped image: {}",
+                e.what()
+            ).c_str());
+        }
+
+        try
+        {
+            if (!metadata_path.empty())
+            {
+                export_metadata(metadata_path);
+            }
+        }
+        catch (const std::exception& e)
+        {
+            throw std::runtime_error(std::format(
+                "failed to export metadata: {}",
+                e.what()
+            ).c_str());
+        }
     }
 
     void App::recreate_image(
@@ -1280,20 +1381,20 @@ namespace img_aligner
         f.close();
     }
 
-    bool App::try_recreate_grid_warper(std::string* out_error)
+    void App::recreate_grid_warper()
     {
         destroy_grid_warper(false);
 
-        bool failed = false;
+        std::optional<std::string> error;
         try
         {
             if (!base_img)
             {
-                throw std::string("You haven't loaded a base image yet.");
+                throw std::string("there's no base image");
             }
             if (!target_img)
             {
-                throw std::string("You haven't loaded a target image yet.");
+                throw std::string("there's no target image");
             }
 
             uint32_t base_img_width = base_img->config().extent.width;
@@ -1305,7 +1406,7 @@ namespace img_aligner
                 || base_img_height != target_img_height)
             {
                 throw std::string(
-                    "Base and target images must have the same resolution."
+                    "base and target images must have the same resolution"
                 );
             }
 
@@ -1323,25 +1424,24 @@ namespace img_aligner
         }
         catch (std::string s)
         {
-            failed = true;
+            error = s;
             grid_warper = nullptr;
-            if (out_error)
-            {
-                *out_error = s;
-            }
         }
 
         if (state.ui_mode)
         {
             recreate_ui_pass();
+
+            if (grid_warper != nullptr)
+            {
+                copy_grid_vertices_for_ui_preview();
+            }
         }
 
-        if (grid_warper != nullptr)
+        if (error)
         {
-            copy_grid_vertices_for_ui_preview();
+            throw std::runtime_error(error->c_str());
         }
-
-        return !failed;
     }
 
     void App::destroy_grid_warper(
@@ -1860,10 +1960,16 @@ namespace img_aligner
         imgui_small_div();
         if (!grid_warper && imgui_button_full_width("Recreate Grid Warper"))
         {
-            std::string s_error;
-            if (!grid_warper && !try_recreate_grid_warper(&s_error))
+            try
             {
-                current_errors.push_back(s_error);
+                recreate_grid_warper();
+            }
+            catch (const std::exception& e)
+            {
+                current_errors.push_back(std::format(
+                    "Failed to recreate grid warper: {}",
+                    e.what()
+                ));
                 ImGui::OpenPopup(ERROR_DIALOG_TITLE);
             }
         }

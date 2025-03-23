@@ -179,7 +179,7 @@ namespace img_aligner
             std::string_view filename
         );
 
-        bool try_recreate_grid_warper(std::string* out_error = nullptr);
+        void recreate_grid_warper();
         void destroy_grid_warper(
             bool recreate_ui_pass_if_destroyed_grid_warper
         );
