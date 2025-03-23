@@ -75,7 +75,7 @@ namespace img_aligner
     static constexpr VkFormat UI_DISPLAY_IMG_FORMAT =
         VK_FORMAT_R16G16B16A16_SFLOAT;
 
-    static constexpr bool DEBUG_MODE = true;
+    static constexpr bool DEBUG_MODE = false;
 
     // the interval at which to run the UI pass and make a new copy of the grid
     // vertices for previewing in the UI, when grid warp optimization is
