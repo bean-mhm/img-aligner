@@ -68,7 +68,7 @@ For increased performance, grid warping and cost calculation are performed at
 a lower resolution (called the __intermediate resolution__) on the graphics
 processing unit (GPU) using the Vulkan API.
 
-# Color Spaces
+# Color Spaces & Image Formats
 
 Unlike typical images we might see on the internet which can only store RGB
 (red, green, blue) values in the [0, 1] range, linear images allow any real
