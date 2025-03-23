@@ -120,8 +120,8 @@ namespace img_aligner
     double elapsed_sec(const std::optional<TimePoint>& t);
 
     std::vector<uint8_t> read_file(const std::string& filename);
-
     void open_url(std::string_view url);
+    void clear_console();
 
     // closest upper power of 2 to an integer.
     // examples: 11 -> 16, 3000 -> 4096, 256 -> 256

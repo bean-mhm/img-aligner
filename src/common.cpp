@@ -95,6 +95,15 @@ namespace img_aligner
 #endif
     }
 
+    void clear_console()
+    {
+#if defined(_WIN32) || defined(_WIN64) || defined(WINDOWS)
+        std::system("cls");
+#else
+        std::system("clear");
+#endif
+    }
+
     uint32_t upper_power_of_2(uint32_t n)
     {
         if (n != 0)
