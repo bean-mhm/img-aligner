@@ -965,7 +965,7 @@ namespace img_aligner
 
         while (is_optimizing)
         {
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
             if (flag_silent)
             {
