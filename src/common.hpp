@@ -75,12 +75,15 @@ namespace img_aligner
     static constexpr VkFormat UI_DISPLAY_IMG_FORMAT =
         VK_FORMAT_R16G16B16A16_SFLOAT;
 
-    static constexpr bool DEBUG_MODE = false;
+    // enable Vulkan validation layer and debug messages. this is usually only
+    // available if the Vulkan SDK is installed on the user's machine, which is
+    // rarely the case for a regular user, so disable this for final releases.
+    static constexpr bool ENABLE_VALIDATION_LAYER = false;
 
     // the interval at which to run the UI pass and make a new copy of the grid
     // vertices for previewing in the UI, when grid warp optimization is
     // running.
-    static constexpr float GRID_WARP_OPTIMIZATION_UI_UPDATE_INTERVAL = .5f;
+    static constexpr float GRID_WARP_OPTIMIZATION_UI_UPDATE_INTERVAL = .7f;
 
     using TimePoint = std::chrono::high_resolution_clock::time_point;
 

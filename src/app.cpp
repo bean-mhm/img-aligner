@@ -361,7 +361,7 @@ namespace img_aligner
     void App::init_context()
     {
         std::vector<std::string> layers;
-        if (DEBUG_MODE)
+        if (ENABLE_VALIDATION_LAYER)
         {
             layers.push_back("VK_LAYER_KHRONOS_validation");
         }
@@ -381,7 +381,7 @@ namespace img_aligner
         }
 
         // debug utils extension
-        if (DEBUG_MODE)
+        if (ENABLE_VALIDATION_LAYER)
         {
             extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
         }
@@ -400,7 +400,7 @@ namespace img_aligner
 
     void App::setup_debug_messenger()
     {
-        if (!DEBUG_MODE)
+        if (!ENABLE_VALIDATION_LAYER)
         {
             return;
         }
