@@ -1169,35 +1169,11 @@ namespace img_aligner
         std::string_view filename
     )
     {
-        if (img->config().format != VK_FORMAT_R32G32B32A32_SFLOAT)
-        {
-            throw std::invalid_argument(
-                "unsupported Vulkan format for saving image"
-            );
-        }
-        std::vector<float> pixels_rgbaf32_flipped =
-            read_back_image(state, img, state.queue_main);
+        std::vector<float> pixels_rgbaf32 =
+            read_back_image_rgbaf32(state, img, state.queue_main, true);
 
         uint32_t width = img->config().extent.width;
         uint32_t height = img->config().extent.height;
-
-        // flip pixels vertically
-        std::vector<float> pixels_rgbaf32(pixels_rgbaf32_flipped.size());
-        size_t row_size = width * 4;
-        for (size_t y = 0; y < height; y++)
-        {
-            size_t red_idx = (y * width) * 4;
-            size_t red_idx_flipped = ((height - y - 1) * width) * 4;
-
-            std::copy(
-                pixels_rgbaf32_flipped.data() + red_idx_flipped,
-                pixels_rgbaf32_flipped.data() + red_idx_flipped + row_size,
-                pixels_rgbaf32.data() + red_idx
-            );
-        }
-
-        // clear the old version (flipped)
-        clear_vec(pixels_rgbaf32_flipped);
 
         Imf::Header header(
             (int)width,

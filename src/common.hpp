@@ -33,6 +33,7 @@
 #include "imgui/imgui_impl_vulkan.h"
 
 #include "vulkan/vulkan.h"
+#include "vulkan/vk_enum_string_helper.h"
 #include "GLFW/glfw3.h"
 
 #include "beva/beva.hpp"
@@ -329,10 +330,12 @@ namespace img_aligner
         VkDeviceSize buffer_offset = 0
     );
 
-    std::vector<float> read_back_image(
+    // returns pixels in the RGBA F32 format (performs conversions if needed)
+    std::vector<float> read_back_image_rgbaf32(
         AppState& state,
         const bv::ImagePtr& image,
-        const bv::QueuePtr& queue
+        const bv::QueuePtr& queue,
+        bool vflip // flip vertically
     );
 
     // if use_general_layout is true, the image is expected to be in

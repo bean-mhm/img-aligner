@@ -399,14 +399,15 @@ namespace img_aligner
         );
     }
 
-    std::vector<float> read_back_image(
+    std::vector<float> read_back_image_rgbaf32(
         AppState& state,
         const bv::ImagePtr& image,
-        const bv::QueuePtr& queue
+        const bv::QueuePtr& queue,
+        bool vflip
     )
     {
-        uint32_t width = image->config().extent.width;
-        uint32_t height = image->config().extent.height;
+        size_t width = image->config().extent.width;
+        size_t height = image->config().extent.height;
 
         // verify format and figure out channel count and bit depth
         size_t n_channels = 0;
@@ -424,9 +425,10 @@ namespace img_aligner
             break;
 
         default:
-            throw std::invalid_argument(
-                "image format not supported for read back"
-            );
+            throw std::invalid_argument(std::format(
+                "image format ({}) not supported for read back",
+                string_VkFormat(image->config().format)
+            ).c_str());
         }
 
         // size of the image in bytes
@@ -456,14 +458,81 @@ namespace img_aligner
         end_single_time_commands(cmd_buf, queue, fence);
         fence->wait();
 
-        // copy from buffer to vector
-        std::vector<float> data(size_bytes / sizeof(float));
-        std::copy(
-            buf_mapped,
-            buf_mapped + data.size(),
-            data.data()
-        );
-        return data;
+        // convert to RGBA F32 and flip if needed, then store in a vector
+        std::vector<float> pixels_rgbaf32(width * height * 4);
+        if (image->config().format == VK_FORMAT_R32G32B32A32_SFLOAT)
+        {
+            if (vflip)
+            {
+                // copy row by row in reverse order
+                for (size_t y = 0; y < height; y++)
+                {
+                    size_t src_red_idx = ((height - y - 1) * width) * 4;
+                    size_t dst_red_idx = (y * width) * 4;
+
+                    // copy an entire row at once
+                    std::copy(
+                        buf_mapped + src_red_idx,
+                        buf_mapped + src_red_idx + (width * 4),
+                        pixels_rgbaf32.data() + dst_red_idx
+                    );
+                }
+            }
+            else
+            {
+                std::copy(
+                    buf_mapped,
+                    buf_mapped + pixels_rgbaf32.size(),
+                    pixels_rgbaf32.data()
+                );
+            }
+        }
+        else if (image->config().format == VK_FORMAT_R32_SFLOAT)
+        {
+            if (vflip)
+            {
+                for (size_t y = 0; y < height; y++)
+                {
+                    for (size_t x = 0; x < width; x++)
+                    {
+                        size_t src_pixel_idx = x + ((height - y - 1) * width);
+                        size_t dst_red_idx = (x + (y * width)) * 4;
+
+                        float v = buf_mapped[src_pixel_idx];
+                        pixels_rgbaf32[dst_red_idx + 0] = v;
+                        pixels_rgbaf32[dst_red_idx + 1] = v;
+                        pixels_rgbaf32[dst_red_idx + 2] = v;
+                        pixels_rgbaf32[dst_red_idx + 3] = 1.f;
+                    }
+                }
+            }
+            else
+            {
+                for (size_t y = 0; y < height; y++)
+                {
+                    for (size_t x = 0; x < width; x++)
+                    {
+                        size_t src_pixel_idx = x + (y * width);
+                        size_t dst_red_idx = src_pixel_idx * 4;
+
+                        float v = buf_mapped[src_pixel_idx];
+                        pixels_rgbaf32[dst_red_idx + 0] = v;
+                        pixels_rgbaf32[dst_red_idx + 1] = v;
+                        pixels_rgbaf32[dst_red_idx + 2] = v;
+                        pixels_rgbaf32[dst_red_idx + 3] = 1.f;
+                    }
+                }
+            }
+        }
+        else
+        {
+            throw std::logic_error(
+                "this should never happen because we already checked for the "
+                "format above."
+            );
+        }
+
+        return pixels_rgbaf32;
     }
 
     void generate_mipmaps(
