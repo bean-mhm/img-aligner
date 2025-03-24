@@ -2322,8 +2322,8 @@ namespace img_aligner
             }
 
             ImGui::TextWrapped(std::format(
-                "Elapsed: {:.1f} s",
-                total_elapsed
+                "Elapsed: {} s",
+                to_str(total_elapsed, 3, 0, 2)
             ).c_str());
 
             ImGui::TextWrapped(std::format(
