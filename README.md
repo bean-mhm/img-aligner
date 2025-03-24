@@ -114,6 +114,10 @@ level, tick the _flim_ checkbox to apply the
 [flim](https://github.com/bean-mhm/flim) transform on the image when displaying,
 or tick _Preview Grid_ to see a preview of the grid used for warping.
 
+Note that, every time you change the grid warper settings, the grid warper gets
+destroyed along with its images (the warped / difference / cost images) so you
+need to click on _Recreate Grid Warper_ again.
+
 # Command Line Interface
 
 To batch-process multiple images, you can call img-aligner from a terminal
