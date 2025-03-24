@@ -56,30 +56,36 @@ namespace img_aligner
 
     App::App(int argc, char** argv)
         : argc(argc), argv(argv)
-    {}
+    {
+        parse_command_line();
+    }
 
     void App::run()
     {
-        // determine if we're in GUI mode or command line mode
-        state.ui_mode = (argc < 2 || std::string(argv[1]) != "--cli");
-
-        if (state.ui_mode)
-        {
-            init();
-            main_loop();
-        }
-        else
+        if (state.cli_mode)
         {
             // this will call init() if necessary
             handle_command_line();
         }
-
+        else
+        {
+            init();
+            main_loop();
+        }
         cleanup();
     }
 
     void App::init()
     {
-        if (state.ui_mode)
+        if (state.cli_mode)
+        {
+            init_context();
+            setup_debug_messenger();
+            pick_physical_device();
+            create_logical_device();
+            create_memory_bank();
+        }
+        else
         {
             NFD_Init();
             init_window();
@@ -93,20 +99,12 @@ namespace img_aligner
             init_imgui_vk_window_data();
             init_imgui();
         }
-        else
-        {
-            init_context();
-            setup_debug_messenger();
-            pick_physical_device();
-            create_logical_device();
-            create_memory_bank();
-        }
     }
 
     void App::main_loop()
     {
         // do nothing in command line mode
-        if (!state.ui_mode)
+        if (state.cli_mode)
         {
             return;
         }
@@ -262,9 +260,10 @@ namespace img_aligner
     void App::cleanup()
     {
         // NOTE: this function should NOT assume that init() has been called and
-        // that all variables are initialized and non-null.
+        // that all variables are initialized and non-null. especially not in
+        // CLI mode because it's not guaranteed to call init().
 
-        if (state.ui_mode)
+        if (!state.cli_mode)
         {
             NFD_Quit();
         }
@@ -290,7 +289,7 @@ namespace img_aligner
             state.device->wait_idle();
         }
 
-        if (state.ui_mode)
+        if (!state.cli_mode)
         {
             ImGui_ImplVulkan_Shutdown();
             ImGui_ImplGlfw_Shutdown();
@@ -319,7 +318,7 @@ namespace img_aligner
         state.debug_messenger = nullptr;
         state.context = nullptr;
 
-        if (state.ui_mode)
+        if (!state.cli_mode)
         {
             glfwDestroyWindow(state.window);
             glfwTerminate();
@@ -375,7 +374,7 @@ namespace img_aligner
         std::vector<std::string> extensions;
 
         // extensions required by GLFW
-        if (state.ui_mode)
+        if (!state.cli_mode)
         {
             uint32_t glfw_ext_count = 0;
             const char** glfw_exts;
@@ -468,7 +467,7 @@ namespace img_aligner
             if (pdev.find_queue_family_indices(
                 VK_QUEUE_GRAPHICS_BIT,
                 0,
-                state.ui_mode ? state.surface : nullptr,
+                state.cli_mode ? nullptr : state.surface,
                 2
             ).empty())
             {
@@ -476,7 +475,7 @@ namespace img_aligner
             }
 
             // make sure the device supports our window surface
-            if (state.ui_mode)
+            if (!state.cli_mode)
             {
                 auto sc_support = pdev.fetch_swapchain_support(state.surface);
                 if (!sc_support.has_value())
@@ -619,7 +618,7 @@ namespace img_aligner
             state.physical_device->find_first_queue_family_index(
                 VK_QUEUE_GRAPHICS_BIT,
                 0,
-                state.ui_mode ? state.surface : nullptr,
+                state.cli_mode ? nullptr : state.surface,
                 2
             );
 
@@ -634,7 +633,7 @@ namespace img_aligner
         bv::PhysicalDeviceFeatures enabled_features{};
 
         std::vector<std::string> device_extensions;
-        if (state.ui_mode)
+        if (!state.cli_mode)
         {
             device_extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
         }
@@ -781,106 +780,105 @@ namespace img_aligner
         update_ui_scale_reload_fonts_and_style();
     }
 
-    void App::handle_command_line()
+    void App::parse_command_line()
     {
-        CLI::App cli(
+        cli_app = std::make_unique<CLI::App>(
             std::format("{} v{} ({})", APP_TITLE, APP_VERSION, APP_GITHUB_URL),
             APP_TITLE
         );
-        argv = cli.ensure_utf8(argv);
+        argv = cli_app->ensure_utf8(argv);
 
-        cli.add_flag("--cli", "enable command line mode");
+        cli_app->add_flag(
+            "--cli",
+            state.cli_mode,
+            "enable command line mode"
+        );
 
         // CLI11's exception-reliant way of handling version and help is weird
         // so I'm handling it manually.
-        bool flag_help = false;
-        cli.remove_option(cli.get_help_ptr());
-        cli.add_flag(
+        cli_app->remove_option(cli_app->get_help_ptr());
+        cli_app->add_flag(
             "-h,--help",
-            flag_help,
+            cli_params.flag_help,
             "print this help message and exit"
         );
 
         // CLI11's exception-reliant way of handling version and help is weird
         // so I'm handling it manually.
-        bool flag_version = false;
-        cli.remove_option(cli.get_version_ptr());
-        cli.add_flag(
+        cli_app->remove_option(cli_app->get_version_ptr());
+        cli_app->add_flag(
             "-v,--version",
-            flag_version,
+            cli_params.flag_version,
             "print app version and exit"
         );
 
-        std::string base_img_path;
-        cli.add_option(
+        cli_app->add_option(
             "-b,--base",
-            base_img_path,
+            cli_params.base_img_path,
             "path to the base image file (.exr)"
         );
 
-        std::string target_img_path;
-        cli.add_option(
+        cli_app->add_option(
             "-t,--target",
-            target_img_path,
+            cli_params.target_img_path,
             "path to the target image file (.exr)"
         );
 
-        std::string output_img_path;
-        cli.add_option(
+        cli_app->add_option(
             "-o,--output",
-            output_img_path,
+            cli_params.output_img_path,
             "optional path to the warped image file (.exr)"
         );
 
-        cli.add_option(
+        cli_app->add_option(
             "-x,--base-mul",
             grid_warp_params.base_img_mul,
             "base image multiplier"
         );
 
-        cli.add_option(
+        cli_app->add_option(
             "-y,--target-mul",
             grid_warp_params.target_img_mul,
             "target image multiplier"
         );
 
-        cli.add_option(
+        cli_app->add_option(
             "-g,--grid-res",
             grid_warp_params.grid_res_area,
             "area of the grid resolution"
         );
 
-        cli.add_option(
+        cli_app->add_option(
             "-p,--grid-padding",
             grid_warp_params.grid_padding,
             "grid padding"
         );
 
-        cli.add_option(
+        cli_app->add_option(
             "-r,--interm-res",
             grid_warp_params.intermediate_res_area,
             "area of the intermediate resolution"
         );
 
-        cli.add_option(
+        cli_app->add_option(
             "-c,--cost-res",
             grid_warp_params.cost_res_area,
             "area of the cost resolution"
         );
 
-        cli.add_option(
+        cli_app->add_option(
             "-s,--seed",
             grid_warp_params.rng_seed,
             "seed number to use for pseudo-random number generators"
         );
 
-        cli.add_option(
+        cli_app->add_option(
             "-w,--warp-strength",
             optimization_params.max_warp_strength,
             "maximum amount of warping in every iteration"
         );
 
-        cli.add_option(
+        cli_app->add_option(
             "-m,--min-change-in-cost",
             optimization_params.min_change_in_cost_in_last_n_iters,
             std::format(
@@ -890,58 +888,56 @@ namespace img_aligner
             )
         );
 
-        cli.add_option(
+        cli_app->add_option(
             "-i,--max-iters",
             optimization_params.max_iters,
             "maximum number of iterations"
         );
 
-        cli.add_option(
+        cli_app->add_option(
             "-R,--max-runtime",
             optimization_params.max_runtime_sec,
             "maximum run time in seconds"
         );
 
-        bool flag_silent = false;
-        cli.add_flag(
+        cli_app->add_flag(
             "-n,--silent",
-            flag_silent,
+            cli_params.flag_silent,
             "don't print statistics during optimization"
         );
 
-        cli.add_flag(
+        cli_app->add_flag(
             "-P,--meta-params",
             metadata_export_options.params_and_res,
             "include parameters and resolutions when exporting metadata"
         );
 
-        cli.add_flag(
+        cli_app->add_flag(
             "-O,--meta-opt",
             metadata_export_options.optimization_info,
             "include optimization parameters and statistics when exporting "
             "metadata"
         );
 
-        cli.add_flag(
+        cli_app->add_flag(
             "-V,--meta-vert",
             metadata_export_options.grid_vertices,
             "include grid vertex data when exporting metadata"
         );
 
-        cli.add_flag(
+        cli_app->add_flag(
             "-K,--meta-pretty",
             metadata_export_options.pretty_print,
             "produce pretty printed JSON when exporting metadata"
         );
 
-        std::string metadata_path;
-        cli.add_option(
+        cli_app->add_option(
             "-M,--meta",
-            metadata_path,
+            cli_params.metadata_path,
             "optional path to the metadata file (.json)"
         );
 
-        cli.add_option(
+        cli_app->add_option(
             "-G,--gpu",
             physical_device_idx,
             "physical device index. use -1 to prompt the user to pick one or "
@@ -949,15 +945,24 @@ namespace img_aligner
         );
 
         // parse
-        cli.parse(argc, argv);
+        cli_app->parse(argc, argv);
+    }
 
-        if (flag_help || argc <= 2)
+    void App::handle_command_line()
+    {
+        // do nothing if not in command line mode
+        if (!state.cli_mode)
         {
-            std::cout << cli.help() << '\n';
             return;
         }
 
-        if (flag_version)
+        if (cli_params.flag_help || argc <= 2)
+        {
+            std::cout << cli_app->help() << '\n';
+            return;
+        }
+
+        if (cli_params.flag_version)
         {
             std::cout << APP_VERSION << '\n';
             return;
@@ -966,18 +971,23 @@ namespace img_aligner
         // we can call init() now
         init();
 
-        if (base_img_path.empty())
+        if (cli_params.base_img_path.empty())
         {
             throw std::invalid_argument("base image path is required");
         }
-        if (target_img_path.empty())
+        if (cli_params.target_img_path.empty())
         {
             throw std::invalid_argument("target image path is required");
         }
 
         try
         {
-            load_image(base_img_path, base_img, base_img_mem, base_imgview);
+            load_image(
+                cli_params.base_img_path,
+                base_img,
+                base_img_mem,
+                base_imgview
+            );
         }
         catch (const std::exception& e)
         {
@@ -990,7 +1000,7 @@ namespace img_aligner
         try
         {
             load_image(
-                target_img_path,
+                cli_params.target_img_path,
                 target_img,
                 target_img_mem,
                 target_imgview
@@ -1022,7 +1032,7 @@ namespace img_aligner
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
-            if (flag_silent)
+            if (cli_params.flag_silent)
             {
                 continue;
             }
@@ -1032,11 +1042,11 @@ namespace img_aligner
 
         try
         {
-            if (!output_img_path.empty())
+            if (!cli_params.output_img_path.empty())
             {
                 save_image(
                     grid_warper->get_warped_hires_img(),
-                    output_img_path
+                    cli_params.output_img_path
                 );
             }
         }
@@ -1050,9 +1060,9 @@ namespace img_aligner
 
         try
         {
-            if (!metadata_path.empty())
+            if (!cli_params.metadata_path.empty())
             {
-                export_metadata(metadata_path);
+                export_metadata(cli_params.metadata_path);
             }
         }
         catch (const std::exception& e)
@@ -1483,7 +1493,7 @@ namespace img_aligner
             grid_warper = nullptr;
         }
 
-        if (state.ui_mode)
+        if (!state.cli_mode)
         {
             recreate_ui_pass();
 
@@ -1507,7 +1517,7 @@ namespace img_aligner
         if (grid_warper != nullptr)
         {
             grid_warper = nullptr;
-            if (state.ui_mode && recreate_ui_pass_if_destroyed_grid_warper)
+            if (!state.cli_mode && recreate_ui_pass_if_destroyed_grid_warper)
             {
                 recreate_ui_pass();
             }
@@ -1648,7 +1658,7 @@ namespace img_aligner
                 }
 
                 // switch to warped hires image in ui pass
-                if (state.ui_mode && ui_pass != nullptr)
+                if (!state.cli_mode && ui_pass != nullptr)
                 {
                     select_ui_pass_image(grid_warp::WARPED_HIRES_IMAGE_NAME);
                     need_to_run_ui_pass = true;

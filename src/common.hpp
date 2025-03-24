@@ -89,7 +89,9 @@ namespace img_aligner
 
     struct AppState
     {
-        bool ui_mode = true;
+        // true means command line mode is enabled and the GUI is disabled
+        bool cli_mode = false;
+
         GLFWwindow* window = nullptr;
         ImGuiIO* io = nullptr;
 

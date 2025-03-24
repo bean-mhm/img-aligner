@@ -7,6 +7,21 @@
 namespace img_aligner
 {
 
+    // values parsed from command line arguments that don't belong anywhere
+    // else. for example, --max-iters can be bound to
+    // optimization_params.max_runtime_sec but these values have no home.
+    struct CliParams
+    {
+        bool flag_help = false;
+        bool flag_version = false;
+        bool flag_silent = false;
+
+        std::string base_img_path;
+        std::string target_img_path;
+        std::string output_img_path;
+        std::string metadata_path;
+    };
+
     struct GridWarpOptimizationParams
     {
         float max_warp_strength = .0001f;
@@ -76,6 +91,8 @@ namespace img_aligner
 
         int argc;
         char** argv;
+        std::unique_ptr<CLI::App> cli_app = nullptr;
+        CliParams cli_params;
 
         AppState state;
 
@@ -158,6 +175,7 @@ namespace img_aligner
         void init_imgui();
 
     private:
+        void parse_command_line();
         void handle_command_line();
 
         void recreate_image(
