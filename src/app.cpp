@@ -1007,6 +1007,10 @@ namespace img_aligner
 
         try
         {
+            if (!cli_params.flag_silent)
+            {
+                std::cout << "loading base image\n";
+            }
             load_image(
                 cli_params.base_img_path,
                 base_img,
@@ -1024,6 +1028,10 @@ namespace img_aligner
 
         try
         {
+            if (!cli_params.flag_silent)
+            {
+                std::cout << "loading target image\n";
+            }
             load_image(
                 cli_params.target_img_path,
                 target_img,
@@ -1041,6 +1049,10 @@ namespace img_aligner
 
         try
         {
+            if (!cli_params.flag_silent)
+            {
+                std::cout << "creating grid warper\n";
+            }
             recreate_grid_warper();
         }
         catch (const std::exception& e)
@@ -1185,7 +1197,7 @@ namespace img_aligner
         if (!cli_params.flag_silent)
         {
             std::cout << std::format(
-                "everything is done ({} s)\n",
+                "done ({} s)\n",
                 to_str(elapsed_sec(time_start))
             );
         }
@@ -1802,7 +1814,7 @@ namespace img_aligner
         }
 
         std::cout << std::format(
-            "elapsed: {} s\n"
+            "\nelapsed: {} s\n"
             "total iterations: {}\n"
             "good iterations: {} ({:.1f}%)\n"
             "max local diff.: {}\n"
