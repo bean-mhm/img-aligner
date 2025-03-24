@@ -815,19 +815,25 @@ namespace img_aligner
         cli_app->add_option(
             "-b,--base",
             cli_params.base_img_path,
-            "path to the base image file (.exr)"
+            "input path to the base image file (.exr)"
         );
 
         cli_app->add_option(
             "-t,--target",
             cli_params.target_img_path,
-            "path to the target image file (.exr)"
+            "input path to the target image file (.exr)"
         );
 
         cli_app->add_option(
             "-o,--output",
             cli_params.output_img_path,
-            "optional path to the warped image file (.exr)"
+            "optional output path to the warped image file (.exr)"
+        );
+
+        cli_app->add_option(
+            "-d,--diff",
+            cli_params.difference_img_path,
+            "optional output path to the difference image file (.exr)"
         );
 
         cli_app->add_option(
@@ -934,7 +940,7 @@ namespace img_aligner
         cli_app->add_option(
             "-M,--meta",
             cli_params.metadata_path,
-            "optional path to the metadata file (.json)"
+            "optional output path to the metadata file (.json)"
         );
 
         cli_app->add_option(
@@ -1054,6 +1060,24 @@ namespace img_aligner
         {
             throw std::runtime_error(std::format(
                 "failed to save warped image: {}",
+                e.what()
+            ).c_str());
+        }
+
+        try
+        {
+            if (!cli_params.difference_img_path.empty())
+            {
+                save_image(
+                    grid_warper->get_difference_img(),
+                    cli_params.difference_img_path
+                );
+            }
+        }
+        catch (const std::exception& e)
+        {
+            throw std::runtime_error(std::format(
+                "failed to save difference image: {}",
                 e.what()
             ).c_str());
         }
@@ -2217,21 +2241,25 @@ namespace img_aligner
 
         imgui_div();
 
-        ImGui::BeginDisabled(
-            !grid_warper || optimization_info.n_iters < 1 || is_optimizing
-        );
+        ImGui::BeginDisabled(!grid_warper || is_optimizing);
 
-        imgui_bold("EXPORT IMAGE");
+        imgui_bold("EXPORT IMAGES");
 
         // export warped image
-        if (imgui_button_full_width("Export Warped Image")
-            && grid_warper != nullptr
-            && optimization_info.n_iters > 0
-            && !is_optimizing)
+        ImGui::BeginDisabled(optimization_info.n_iters < 1);
+        if (imgui_button_full_width("Export Warped Image"))
         {
             browse_and_save_image(grid_warper->get_warped_hires_img());
         }
         imgui_tooltip("Export the warped image at full resolution");
+        ImGui::EndDisabled();
+
+        // export difference image
+        if (imgui_button_full_width("Export Difference"))
+        {
+            browse_and_save_image(grid_warper->get_difference_img());
+        }
+        imgui_tooltip("Export the difference image");
 
         ImGui::EndDisabled();
 

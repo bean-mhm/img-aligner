@@ -19,6 +19,7 @@ namespace img_aligner
         std::string base_img_path;
         std::string target_img_path;
         std::string output_img_path;
+        std::string difference_img_path;
         std::string metadata_path;
     };
 
