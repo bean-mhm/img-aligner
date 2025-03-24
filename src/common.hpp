@@ -390,4 +390,6 @@ namespace img_aligner
         bv::ImageViewPtr& out_imgview
     );
 
+    const char* VkPhysicalDeviceType_to_str(VkPhysicalDeviceType v);
+
 }

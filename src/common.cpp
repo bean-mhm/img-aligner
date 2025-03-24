@@ -815,4 +815,21 @@ namespace img_aligner
         staging_buf_mem = nullptr;
     }
 
+    const char* VkPhysicalDeviceType_to_str(VkPhysicalDeviceType v)
+    {
+        switch (v)
+        {
+        case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
+            return "integrated GPU";
+        case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
+            return "discrete GPU";
+        case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
+            return "virtual GPU";
+        case VK_PHYSICAL_DEVICE_TYPE_CPU:
+            return "CPU";
+        default:
+            return "unknown device type";
+        }
+    }
+
 }
