@@ -117,10 +117,9 @@ or tick _Preview Grid_ to see a preview of the grid used for warping.
 # Command Line Interface
 
 To batch-process multiple images, you can call img-aligner from a terminal
-or another program using `--cli` as the first argument to enable command line
-mode. If no other arguments are provided, a help text will be
-printed. The options are basically identical to that of the graphical user
-interface (GUI).
+or another program with the `--cli` argument to enable command line mode.
+If no other arguments are provided, a help text will be printed. The options are
+basically identical to that of the graphical user interface (GUI).
 
 ```bash
 img-aligner --cli
