@@ -2259,7 +2259,9 @@ namespace img_aligner
         {
             browse_and_save_image(grid_warper->get_difference_img());
         }
-        imgui_tooltip("Export the difference image");
+        imgui_tooltip(
+            "Export the difference image at the intermediate resolution"
+        );
 
         ImGui::EndDisabled();
 
