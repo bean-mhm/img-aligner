@@ -8,6 +8,32 @@
 namespace img_aligner
 {
 
+    ScopedTimer::ScopedTimer(
+        bool should_print,
+        std::string start_message,
+        std::string end_message
+    ) : start_time(std::chrono::high_resolution_clock::now()),
+        should_print(should_print),
+        end_message(std::move(end_message))
+    {
+        if (should_print && !start_message.empty())
+        {
+            std::cout << start_message;
+        }
+    }
+
+    ScopedTimer::~ScopedTimer()
+    {
+        if (!should_print || end_message.empty())
+        {
+            return;
+        }
+        std::cout << std::vformat(
+            end_message,
+            std::make_format_args(to_str(elapsed_sec(start_time)))
+        );
+    }
+
     const bv::CommandPoolPtr& AppState::cmd_pool(bool transient)
     {
         if (!device)

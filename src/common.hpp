@@ -91,6 +91,24 @@ namespace img_aligner
 
     using TimePoint = std::chrono::high_resolution_clock::time_point;
 
+    class ScopedTimer
+    {
+    public:
+        ScopedTimer(
+            bool should_print = true,
+            std::string start_message = "processing",
+            std::string end_message = " ({} s)\n"
+        );
+        ~ScopedTimer();
+
+    private:
+        TimePoint start_time;
+
+        bool should_print;
+        std::string end_message;
+
+    };
+
     struct AppState
     {
         // true means command line mode is enabled and the GUI is disabled

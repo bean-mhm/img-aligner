@@ -77,6 +77,12 @@ namespace img_aligner
 
     void App::init()
     {
+        ScopedTimer timer(
+            !cli_params.flag_silent,
+            "",
+            "done initializing ({} s)\n"
+        );
+
         if (state.cli_mode)
         {
             init_context();
@@ -262,6 +268,12 @@ namespace img_aligner
         // NOTE: this function should NOT assume that init() has been called and
         // that all variables are initialized and non-null. especially not in
         // CLI mode because it's not guaranteed to call init().
+
+        ScopedTimer timer(
+            !cli_params.flag_silent,
+            "",
+            "done cleaning up ({} s)\n"
+        );
 
         if (!state.cli_mode)
         {
@@ -1007,10 +1019,7 @@ namespace img_aligner
 
         try
         {
-            if (!cli_params.flag_silent)
-            {
-                std::cout << "loading base image\n";
-            }
+            ScopedTimer timer(!cli_params.flag_silent, "loading base image");
             load_image(
                 cli_params.base_img_path,
                 base_img,
@@ -1028,10 +1037,7 @@ namespace img_aligner
 
         try
         {
-            if (!cli_params.flag_silent)
-            {
-                std::cout << "loading target image\n";
-            }
+            ScopedTimer timer(!cli_params.flag_silent, "loading target image");
             load_image(
                 cli_params.target_img_path,
                 target_img,
@@ -1049,10 +1055,7 @@ namespace img_aligner
 
         try
         {
-            if (!cli_params.flag_silent)
-            {
-                std::cout << "creating grid warper\n";
-            }
+            ScopedTimer timer(!cli_params.flag_silent, "creating grid warper");
             recreate_grid_warper();
         }
         catch (const std::exception& e)
@@ -1067,11 +1070,10 @@ namespace img_aligner
         {
             if (!cli_params.difference_img_before_optimization_path.empty())
             {
-                if (!cli_params.flag_silent)
-                {
-                    std::cout <<
-                        "exporting difference image before optimization\n";
-                }
+                ScopedTimer timer(
+                    !cli_params.flag_silent,
+                    "exporting difference image before optimization"
+                );
                 save_image(
                     grid_warper->get_difference_img(),
                     cli_params.difference_img_before_optimization_path
@@ -1135,10 +1137,10 @@ namespace img_aligner
         {
             if (!cli_params.output_img_path.empty())
             {
-                if (!cli_params.flag_silent)
-                {
-                    std::cout << "exporting warped image\n";
-                }
+                ScopedTimer timer(
+                    !cli_params.flag_silent,
+                    "exporting warped image"
+                );
                 save_image(
                     grid_warper->get_warped_hires_img(),
                     cli_params.output_img_path
@@ -1157,10 +1159,10 @@ namespace img_aligner
         {
             if (!cli_params.difference_img_path.empty())
             {
-                if (!cli_params.flag_silent)
-                {
-                    std::cout << "exporting difference image\n";
-                }
+                ScopedTimer timer(
+                    !cli_params.flag_silent,
+                    "exporting difference image"
+                );
                 save_image(
                     grid_warper->get_difference_img(),
                     cli_params.difference_img_path
@@ -1179,10 +1181,10 @@ namespace img_aligner
         {
             if (!cli_params.metadata_path.empty())
             {
-                if (!cli_params.flag_silent)
-                {
-                    std::cout << "exporting metadata\n";
-                }
+                ScopedTimer timer(
+                    !cli_params.flag_silent,
+                    "exporting metadata"
+                );
                 export_metadata(cli_params.metadata_path);
             }
         }
@@ -1197,7 +1199,7 @@ namespace img_aligner
         if (!cli_params.flag_silent)
         {
             std::cout << std::format(
-                "done ({} s)\n",
+                "everything is done ({} s)\n",
                 to_str(elapsed_sec(time_start))
             );
         }
