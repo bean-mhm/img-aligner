@@ -846,16 +846,17 @@ namespace img_aligner
         );
 
         cli_app->add_option(
-            "-d,--diff",
-            cli_params.difference_img_path,
-            "optional output path to the difference image file (.exr)"
+            "-d,--diff0",
+            cli_params.difference_img_before_opt_path,
+            "optional output path to the difference image file (.exr) exported "
+            "before optimization"
         );
 
         cli_app->add_option(
-            "-D,--idiff",
-            cli_params.difference_img_before_optimization_path,
+            "-D,--diff1",
+            cli_params.difference_img_after_opt_path,
             "optional output path to the difference image file (.exr) exported "
-            "before optimization."
+            "after optimization"
         );
 
         cli_app->add_option(
@@ -1068,7 +1069,7 @@ namespace img_aligner
 
         try
         {
-            if (!cli_params.difference_img_before_optimization_path.empty())
+            if (!cli_params.difference_img_before_opt_path.empty())
             {
                 ScopedTimer timer(
                     !cli_params.flag_silent,
@@ -1076,7 +1077,7 @@ namespace img_aligner
                 );
                 save_image(
                     grid_warper->get_difference_img(),
-                    cli_params.difference_img_before_optimization_path
+                    cli_params.difference_img_before_opt_path
                 );
             }
         }
@@ -1157,22 +1158,22 @@ namespace img_aligner
 
         try
         {
-            if (!cli_params.difference_img_path.empty())
+            if (!cli_params.difference_img_after_opt_path.empty())
             {
                 ScopedTimer timer(
                     !cli_params.flag_silent,
-                    "exporting difference image"
+                    "exporting difference image after optimization"
                 );
                 save_image(
                     grid_warper->get_difference_img(),
-                    cli_params.difference_img_path
+                    cli_params.difference_img_after_opt_path
                 );
             }
         }
         catch (const std::exception& e)
         {
             throw std::runtime_error(std::format(
-                "failed to save difference image: {}",
+                "failed to save difference image after optimization: {}",
                 e.what()
             ).c_str());
         }
