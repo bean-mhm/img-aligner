@@ -1705,8 +1705,8 @@ namespace img_aligner
                     }
 
                     // stop condition: max iters
-                    if (optimization_params.max_iters >= 0
-                        && optimization_info.n_iters > optimization_params
+                    if (optimization_params.max_iters > 0
+                        && optimization_info.n_iters >= optimization_params
                         .max_iters)
                     {
                         optimization_info.stop_reason =
