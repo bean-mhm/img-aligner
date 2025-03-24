@@ -27,6 +27,7 @@ namespace img_aligner
         std::string target_img_path;
         std::string output_img_path;
         std::string difference_img_path;
+        std::string difference_img_before_optimization_path;
         std::string metadata_path;
 
         CliGridWarpOptimizationStatsMode optimization_stats_mode =

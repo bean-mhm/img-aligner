@@ -840,6 +840,13 @@ namespace img_aligner
         );
 
         cli_app->add_option(
+            "-D,--idiff",
+            cli_params.difference_img_before_optimization_path,
+            "optional output path to the difference image file (.exr) exported "
+            "before optimization."
+        );
+
+        cli_app->add_option(
             "-x,--base-mul",
             grid_warp_params.base_img_mul,
             "base image multiplier"
@@ -1040,6 +1047,29 @@ namespace img_aligner
         {
             throw std::runtime_error(std::format(
                 "failed to create grid warper: {}",
+                e.what()
+            ).c_str());
+        }
+
+        try
+        {
+            if (!cli_params.difference_img_before_optimization_path.empty())
+            {
+                if (!cli_params.flag_silent)
+                {
+                    std::cout <<
+                        "exporting difference image before optimization\n";
+                }
+                save_image(
+                    grid_warper->get_difference_img(),
+                    cli_params.difference_img_before_optimization_path
+                );
+            }
+        }
+        catch (const std::exception& e)
+        {
+            throw std::runtime_error(std::format(
+                "failed to save difference image before optimization: {}",
                 e.what()
             ).c_str());
         }
