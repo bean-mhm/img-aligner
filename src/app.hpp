@@ -24,10 +24,10 @@ namespace img_aligner
         ReachedMaxRuntime
     };
 
-    const char* GridWarpOptimizationStopReason_to_string(
+    const char* GridWarpOptimizationStopReason_to_str(
         GridWarpOptimizationStopReason reason
     );
-    const char* GridWarpOptimizationStopReason_to_string_friendly(
+    const char* GridWarpOptimizationStopReason_to_str_friendly(
         GridWarpOptimizationStopReason reason
     );
 
@@ -70,10 +70,16 @@ namespace img_aligner
         static constexpr auto BASE_IMAGE_NAME = "Base Image";
         static constexpr auto TARGET_IMAGE_NAME = "Target Image";
 
+        // these can be used for physical_device_idx
+        static constexpr int32_t PHYSICAL_DEVICE_IDX_AUTO = -2;
+        static constexpr int32_t PHYSICAL_DEVICE_IDX_PROMPT = -1;
+
         int argc;
         char** argv;
 
         AppState state;
+
+        int32_t physical_device_idx = PHYSICAL_DEVICE_IDX_AUTO;
 
         // base image, mipmapped
         bv::ImagePtr base_img = nullptr;

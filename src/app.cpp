@@ -16,7 +16,7 @@ namespace img_aligner
     static void glfw_error_callback(int error, const char* description);
     static void imgui_check_vk_result(VkResult err);
 
-    const char* GridWarpOptimizationStopReason_to_string(
+    const char* GridWarpOptimizationStopReason_to_str(
         GridWarpOptimizationStopReason reason
     )
     {
@@ -35,7 +35,7 @@ namespace img_aligner
         }
     }
 
-    const char* GridWarpOptimizationStopReason_to_string_friendly(
+    const char* GridWarpOptimizationStopReason_to_str_friendly(
         GridWarpOptimizationStopReason reason
     )
     {
@@ -60,23 +60,25 @@ namespace img_aligner
 
     void App::run()
     {
-        try
+        // determine if we're in GUI mode or command line mode
+        state.ui_mode = (argc < 2 || std::string(argv[1]) != "--cli");
+
+        if (state.ui_mode)
         {
             init();
             main_loop();
-            cleanup();
         }
-        catch (const bv::Error& e)
+        else
         {
-            throw std::runtime_error(e.to_string().c_str());
+            // this will call init() if necessary
+            handle_command_line();
         }
+
+        cleanup();
     }
 
     void App::init()
     {
-        // determine if we're in GUI mode or command line mode
-        state.ui_mode = (argc < 2 || std::string(argv[1]) != "--cli");
-
         if (state.ui_mode)
         {
             NFD_Init();
@@ -98,8 +100,6 @@ namespace img_aligner
             pick_physical_device();
             create_logical_device();
             create_memory_bank();
-
-            handle_command_line();
         }
     }
 
@@ -261,6 +261,9 @@ namespace img_aligner
 
     void App::cleanup()
     {
+        // NOTE: this function should NOT assume that init() has been called and
+        // that all variables are initialized and non-null.
+
         if (state.ui_mode)
         {
             NFD_Quit();
@@ -282,7 +285,10 @@ namespace img_aligner
         target_img_mem = nullptr;
         target_imgview = nullptr;
 
-        state.device->wait_idle();
+        if (state.device != nullptr)
+        {
+            state.device->wait_idle();
+        }
 
         if (state.ui_mode)
         {
@@ -505,65 +511,104 @@ namespace img_aligner
 
             supported_physical_devices.push_back(pdev);
         }
+
         if (supported_physical_devices.empty())
         {
             throw std::runtime_error("no supported physical devices");
         }
 
-        std::cout << "pick a physical device by entering its index:\n";
-        for (size_t i = 0; i < supported_physical_devices.size(); i++)
+        int32_t actual_pdev_idx = 0;
+
+        // at first, we'll always pick a device automatically but we might
+        // change it later. we do this to have an idea of which device
+        // *would be* automatically chosen if it was automatic. after this
+        // block, actual_pdev_idx will contain the index of the device that
+        // would be chosen if the selection was automatic.
         {
-            const auto& pdev = supported_physical_devices[i];
+            // pick the first device as a fallback
+            actual_pdev_idx = 0;
 
-            std::string s_device_type = "unknown device type";
-            switch (pdev.properties().device_type)
+            // pick the first discrete GPU if there's any
+            for (int32_t i = 0; i < supported_physical_devices.size(); i++)
             {
-            case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
-                s_device_type = "integrated GPU";
-                break;
-            case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
-                s_device_type = "discrete GPU";
-                break;
-            case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
-                s_device_type = "virtual GPU";
-                break;
-            case VK_PHYSICAL_DEVICE_TYPE_CPU:
-                s_device_type = "CPU";
-                break;
-            default:
-                break;
+                if (supported_physical_devices[i].properties().device_type
+                    == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+                {
+                    actual_pdev_idx = i;
+                    break;
+                }
             }
+        }
 
+        if (physical_device_idx == PHYSICAL_DEVICE_IDX_AUTO)
+        {
+            // we've already selected a device automatically so we'll do nothing
+            // except print the device we selected.
+            const auto& pdev = supported_physical_devices[actual_pdev_idx];
             std::cout << std::format(
-                "{}: {} ({})\n",
-                i,
+                "automatically selected physical device {}: {} ({})\n\n",
+                actual_pdev_idx,
                 pdev.properties().device_name,
-                s_device_type
+                VkPhysicalDeviceType_to_str(pdev.properties().device_type)
             );
         }
-
-        int32_t idx;
-        while (true)
+        else if (physical_device_idx == PHYSICAL_DEVICE_IDX_PROMPT)
         {
-            std::string s_idx;
-            std::getline(std::cin, s_idx);
-            try
+            std::cout << "pick a physical device by entering its index:\n";
+            for (size_t i = 0; i < supported_physical_devices.size(); i++)
             {
-                idx = std::stoi(s_idx);
-                if (idx < 0 || idx >= supported_physical_devices.size())
-                {
-                    throw std::exception();
-                }
-                break;
-            }
-            catch (const std::exception&)
-            {
-                std::cout << "enter a valid physical device index\n";
-            }
-        }
-        std::cout << '\n';
+                const auto& pdev = supported_physical_devices[i];
 
-        state.physical_device = supported_physical_devices[idx];
+                std::cout << std::format(
+                    "{}: {} ({})",
+                    i,
+                    pdev.properties().device_name,
+                    VkPhysicalDeviceType_to_str(pdev.properties().device_type)
+                );
+
+                // remember from above, actual_pdev_idx contains the index of
+                // the device that *would be* chosen if the selection was
+                // automatic.
+                if (i == actual_pdev_idx)
+                {
+                    std::cout << " (default)";
+                }
+
+                std::cout << '\n';
+            }
+
+            while (true)
+            {
+                std::string s_idx;
+                std::getline(std::cin, s_idx);
+                try
+                {
+                    actual_pdev_idx = std::stoi(s_idx);
+                    if (actual_pdev_idx < 0
+                        || actual_pdev_idx >= supported_physical_devices.size())
+                    {
+                        throw std::exception();
+                    }
+                    break;
+                }
+                catch (const std::exception&)
+                {
+                    std::cout << "enter a valid physical device index\n";
+                }
+            }
+            std::cout << '\n';
+        }
+        else if (physical_device_idx < 0
+            || physical_device_idx >= supported_physical_devices.size())
+        {
+            throw std::runtime_error("invalid physical device index");
+        }
+        else
+        {
+            actual_pdev_idx = physical_device_idx;
+        }
+
+        state.physical_device = supported_physical_devices[actual_pdev_idx];
 
         glfwShowWindow(state.window);
     }
@@ -896,6 +941,13 @@ namespace img_aligner
             "optional path to the metadata file (.json)"
         );
 
+        cli.add_option(
+            "-G,--gpu",
+            physical_device_idx,
+            "physical device index. use -1 to prompt the user to pick one or "
+            "-2 to select one automatically (default behavior)."
+        );
+
         // parse
         cli.parse(argc, argv);
 
@@ -910,6 +962,9 @@ namespace img_aligner
             std::cout << APP_VERSION << '\n';
             return;
         }
+
+        // we can call init() now
+        init();
 
         if (base_img_path.empty())
         {
@@ -1331,7 +1386,7 @@ namespace img_aligner
             );
 
             j2["accum_elapsed"] = to_str_hp(optimization_info.accum_elapsed);
-            j2["stop_reason"] = GridWarpOptimizationStopReason_to_string(
+            j2["stop_reason"] = GridWarpOptimizationStopReason_to_str(
                 optimization_info.stop_reason
             );
 
@@ -2093,7 +2148,7 @@ namespace img_aligner
             {
                 ImGui::TextWrapped(
                     "Stop reason: %s",
-                    GridWarpOptimizationStopReason_to_string_friendly(
+                    GridWarpOptimizationStopReason_to_str_friendly(
                         optimization_info.stop_reason
                     )
                 );
