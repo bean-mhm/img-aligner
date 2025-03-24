@@ -7,6 +7,13 @@
 namespace img_aligner
 {
 
+    enum class CliGridWarpOptimizationStatsMode : uint32_t
+    {
+        Disabled,
+        AtEnd,
+        Realtime,
+    };
+
     // values parsed from command line arguments that don't belong anywhere
     // else. for example, --max-iters can be bound to
     // optimization_params.max_runtime_sec but these values have no home.
@@ -21,6 +28,9 @@ namespace img_aligner
         std::string output_img_path;
         std::string difference_img_path;
         std::string metadata_path;
+
+        CliGridWarpOptimizationStatsMode optimization_stats_mode =
+            CliGridWarpOptimizationStatsMode::Realtime;
     };
 
     struct GridWarpOptimizationParams
@@ -31,7 +41,7 @@ namespace img_aligner
         float max_runtime_sec = 600.f;
     };
 
-    enum class GridWarpOptimizationStopReason
+    enum class GridWarpOptimizationStopReason : uint32_t
     {
         None,
         ManuallyStopped,
@@ -211,6 +221,8 @@ namespace img_aligner
 
         void start_optimization();
         void stop_optimization();
+
+        void print_optimization_statistics(bool clear);
 
     private:
         // exclusively UI-related

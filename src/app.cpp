@@ -542,14 +542,17 @@ namespace img_aligner
         if (physical_device_idx == PHYSICAL_DEVICE_IDX_AUTO)
         {
             // we've already selected a device automatically so we'll do nothing
-            // except print the device we selected.
-            const auto& pdev = supported_physical_devices[actual_pdev_idx];
-            std::cout << std::format(
-                "automatically selected physical device {}: {} ({})\n\n",
-                actual_pdev_idx,
-                pdev.properties().device_name,
-                VkPhysicalDeviceType_to_str(pdev.properties().device_type)
-            );
+            // except print which device we selected.
+            if (!cli_params.flag_silent)
+            {
+                const auto& pdev = supported_physical_devices[actual_pdev_idx];
+                std::cout << std::format(
+                    "automatically selected physical device {}: {} ({})\n\n",
+                    actual_pdev_idx,
+                    pdev.properties().device_name,
+                    VkPhysicalDeviceType_to_str(pdev.properties().device_type)
+                );
+            }
         }
         else if (physical_device_idx == PHYSICAL_DEVICE_IDX_PROMPT)
         {
@@ -909,8 +912,15 @@ namespace img_aligner
         cli_app->add_flag(
             "-n,--silent",
             cli_params.flag_silent,
-            "don't print statistics during optimization"
+            "don't print log"
         );
+
+        cli_app->add_option(
+            "-S,--stat",
+            (uint32_t&)cli_params.optimization_stats_mode,
+            "0: don't print optimization statistics. 1: print statistics at "
+            "the end. 2: print realtime statistics."
+        )->check(CLI::Range(2));
 
         cli_app->add_flag(
             "-P,--meta-params",
@@ -974,6 +984,8 @@ namespace img_aligner
             return;
         }
 
+        TimePoint time_start = std::chrono::high_resolution_clock::now();
+
         // we can call init() now
         init();
 
@@ -1032,24 +1044,59 @@ namespace img_aligner
             ).c_str());
         }
 
+        if (!cli_params.flag_silent)
+        {
+            std::cout << "starting optimization\n";
+        }
+
         start_optimization();
 
+        TimePoint last_time_print_stats;
         while (is_optimizing)
         {
-            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
-            if (cli_params.flag_silent)
+            // print realtime statistics at fixed intervals if enabled
+            if (cli_params.optimization_stats_mode ==
+                CliGridWarpOptimizationStatsMode::Realtime
+                && elapsed_sec(last_time_print_stats) >
+                GRID_WARP_OPTIMIZATION_CLI_REALTIME_STATS_INTERVAL)
             {
-                continue;
+                print_optimization_statistics(true);
+                last_time_print_stats =
+                    std::chrono::high_resolution_clock::now();
             }
+        }
 
-            std::cout << optimization_info.n_iters << '\n';
+        if (cli_params.optimization_stats_mode ==
+            CliGridWarpOptimizationStatsMode::Realtime)
+        {
+            print_optimization_statistics(true);
+        }
+        else if (cli_params.optimization_stats_mode ==
+            CliGridWarpOptimizationStatsMode::AtEnd)
+        {
+            print_optimization_statistics(false);
+        }
+
+        if (!cli_params.flag_silent)
+        {
+            std::cout << std::format(
+                "done optimizing. stop reason: {}\n",
+                GridWarpOptimizationStopReason_to_str_friendly(
+                    optimization_info.stop_reason
+                )
+            );
         }
 
         try
         {
             if (!cli_params.output_img_path.empty())
             {
+                if (!cli_params.flag_silent)
+                {
+                    std::cout << "exporting warped image\n";
+                }
                 save_image(
                     grid_warper->get_warped_hires_img(),
                     cli_params.output_img_path
@@ -1068,6 +1115,10 @@ namespace img_aligner
         {
             if (!cli_params.difference_img_path.empty())
             {
+                if (!cli_params.flag_silent)
+                {
+                    std::cout << "exporting difference image\n";
+                }
                 save_image(
                     grid_warper->get_difference_img(),
                     cli_params.difference_img_path
@@ -1086,6 +1137,10 @@ namespace img_aligner
         {
             if (!cli_params.metadata_path.empty())
             {
+                if (!cli_params.flag_silent)
+                {
+                    std::cout << "exporting metadata\n";
+                }
                 export_metadata(cli_params.metadata_path);
             }
         }
@@ -1095,6 +1150,14 @@ namespace img_aligner
                 "failed to export metadata: {}",
                 e.what()
             ).c_str());
+        }
+
+        if (!cli_params.flag_silent)
+        {
+            std::cout << std::format(
+                "everything is done ({} s)\n",
+                to_str(elapsed_sec(time_start))
+            );
         }
     }
 
@@ -1691,6 +1754,49 @@ namespace img_aligner
         optimization_thread_stop = true;
         optimization_thread->join();
         optimization_thread = nullptr;
+    }
+
+    void App::print_optimization_statistics(bool clear)
+    {
+        std::scoped_lock lock(optimization_info_mutex);
+
+        if (clear)
+        {
+            clear_console();
+        }
+
+        float total_elapsed = optimization_info.accum_elapsed;
+        if (is_optimizing)
+        {
+            total_elapsed += elapsed_sec(optimization_info.start_time);
+        }
+
+        std::cout << std::format(
+            "elapsed: {} s\n"
+            "total iterations: {}\n"
+            "good iterations: {} ({:.1f}%)\n"
+            "max local diff.: {}\n"
+            "change in cost in {} iters.: {}\n"
+            "cost: {}\n\n",
+
+            to_str(total_elapsed),
+            optimization_info.n_iters,
+            optimization_info.n_good_iters,
+
+            100.f * (float)optimization_info.n_good_iters
+            / (float)optimization_info.n_iters,
+
+            to_str(*grid_warper->get_initial_max_local_diff()),
+            grid_warp::N_ITERS_TO_CHECK_CHANGE_IN_COST,
+
+            optimization_info.change_in_cost_in_last_n_iters >= FLT_MAX
+            ? "-"
+            : to_str(optimization_info.change_in_cost_in_last_n_iters),
+
+            optimization_info.cost_history.empty()
+            ? "-"
+            : to_str(optimization_info.cost_history.back())
+        );
     }
 
     void App::recreate_ui_pass()

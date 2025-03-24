@@ -86,6 +86,9 @@ namespace img_aligner
     // running.
     static constexpr float GRID_WARP_OPTIMIZATION_UI_UPDATE_INTERVAL = .7f;
 
+    static constexpr float GRID_WARP_OPTIMIZATION_CLI_REALTIME_STATS_INTERVAL =
+        .3f;
+
     using TimePoint = std::chrono::high_resolution_clock::time_point;
 
     struct AppState
