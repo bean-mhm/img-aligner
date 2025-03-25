@@ -58,7 +58,7 @@ namespace img_aligner
     static constexpr auto APP_GITHUB_URL =
         "https://github.com/bean-mhm/img-aligner";
 
-    static constexpr uint32_t INITIAL_WIDTH = 960;
+    static constexpr uint32_t INITIAL_WIDTH = 1024;
     static constexpr uint32_t INITIAL_HEIGHT = 720;
 
     static constexpr ImVec4 COLOR_BG{ .04f, .03f, .08f, 1.f };
