@@ -2150,7 +2150,7 @@ namespace img_aligner
             "##cost_res",
             ImGuiDataType_U32,
             &grid_warp_params.cost_res_area,
-            20.f
+            1.f
         ))
         {
             grid_warp_params.cost_res_area = std::clamp(
