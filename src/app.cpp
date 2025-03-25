@@ -942,7 +942,7 @@ namespace img_aligner
 
         cli_app->add_option(
             "-S,--stat",
-            (uint32_t&)cli_params.optimization_stats_mode,
+            cli_params.optimization_stats_mode,
             "0: don't print optimization statistics. 1: print statistics at "
             "the end. 2: print realtime statistics."
         )->check(CLI::Range(2, "[0 - 2]"));

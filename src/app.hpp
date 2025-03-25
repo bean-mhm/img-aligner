@@ -11,7 +11,7 @@ namespace img_aligner
     {
         Disabled,
         AtEnd,
-        Realtime,
+        Realtime
     };
 
     // values parsed from command line arguments that don't belong anywhere
@@ -31,7 +31,7 @@ namespace img_aligner
         std::string metadata_path;
 
         CliGridWarpOptimizationStatsMode optimization_stats_mode =
-            CliGridWarpOptimizationStatsMode::Realtime;
+            CliGridWarpOptimizationStatsMode::AtEnd;
     };
 
     struct GridWarpOptimizationParams
