@@ -223,7 +223,7 @@ namespace img_aligner
 
         {
             std::vector<uint8_t> shader_code = read_file(
-                "./shaders/fullscreen_quad_vert.spv"
+                exec_dir() / "shaders/fullscreen_quad_vert.spv"
             );
             fullscreen_quad_vert_shader_module = bv::ShaderModule::create(
                 state.device,
@@ -238,7 +238,7 @@ namespace img_aligner
             };
 
             shader_code = read_file(
-                "./shaders/ui_pass_frag.spv"
+                exec_dir() / "shaders/ui_pass_frag.spv"
             );
             uip_frag_shader_module = bv::ShaderModule::create(
                 state.device,

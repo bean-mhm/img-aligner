@@ -765,6 +765,11 @@ namespace img_aligner
         ImGui::CreateContext();
         state.io = &ImGui::GetIO();
 
+        // path to imgui.ini. we want the string to live forever so we won't
+        // delete it.
+        auto ini_path = new std::string((exec_dir() / "imgui.ini").string());
+        state.io->IniFilename = ini_path->c_str();
+
         // enable keyboard and gamepad controls
         state.io->ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
         state.io->ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
@@ -2843,11 +2848,11 @@ namespace img_aligner
         // reload fonts
         state.io->Fonts->Clear();
         font = state.io->Fonts->AddFontFromFileTTF(
-            FONT_PATH,
+            (exec_dir() / FONT_PATH).string().c_str(),
             FONT_SIZE * ui_scale
         );
         font_bold = state.io->Fonts->AddFontFromFileTTF(
-            FONT_BOLD_PATH,
+            (exec_dir() / FONT_BOLD_PATH).string().c_str(),
             FONT_SIZE * ui_scale
         );
         if (!font || !font_bold)

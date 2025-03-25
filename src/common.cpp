@@ -83,14 +83,30 @@ namespace img_aligner
         return std::chrono::duration<double>(now - *t).count();
     }
 
-    std::vector<uint8_t> read_file(const std::string& filename)
+    const std::filesystem::path& exec_dir(
+        const std::filesystem::path& new_value
+    )
     {
-        std::ifstream f(filename, std::ios::ate | std::ios::binary);
+        static std::filesystem::path dir;
+        if (!new_value.empty())
+        {
+            dir = new_value;
+        }
+        else if (dir.empty())
+        {
+            throw std::runtime_error("executable directory has not been set");
+        }
+        return dir;
+    }
+
+    std::vector<uint8_t> read_file(const std::filesystem::path& path)
+    {
+        std::ifstream f(path, std::ios::ate | std::ios::binary);
         if (!f.is_open())
         {
             throw std::runtime_error(std::format(
                 "failed to read file \"{}\"",
-                filename
+                path.string()
             ).c_str());
         }
 

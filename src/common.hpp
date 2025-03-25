@@ -68,8 +68,8 @@ namespace img_aligner
     static constexpr ImVec4 COLOR_ERROR_TEXT{ .95f, .3f, .23f, 1.f };
 
     static constexpr float FONT_SIZE = 20.f;
-    static constexpr auto FONT_PATH = "./fonts/Outfit-Regular.ttf";
-    static constexpr auto FONT_BOLD_PATH = "./fonts/Outfit-Bold.ttf";
+    static constexpr auto FONT_PATH = "fonts/Outfit-Regular.ttf";
+    static constexpr auto FONT_BOLD_PATH = "fonts/Outfit-Bold.ttf";
 
     static constexpr VkFormat RGBA_FORMAT = VK_FORMAT_R32G32B32A32_SFLOAT;
     static constexpr VkFormat R_FORMAT = VK_FORMAT_R32_SFLOAT;
@@ -146,7 +146,10 @@ namespace img_aligner
     double elapsed_sec(const TimePoint& t);
     double elapsed_sec(const std::optional<TimePoint>& t);
 
-    std::vector<uint8_t> read_file(const std::string& filename);
+    const std::filesystem::path& exec_dir(
+        const std::filesystem::path& new_value = {}
+    );
+    std::vector<uint8_t> read_file(const std::filesystem::path& path);
     void open_url(std::string_view url);
     void clear_console();
 

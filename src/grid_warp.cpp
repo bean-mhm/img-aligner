@@ -785,7 +785,7 @@ namespace img_aligner::grid_warp
 
         {
             std::vector<uint8_t> shader_code = read_file(
-                "./shaders/fullscreen_quad_vert.spv"
+                exec_dir() / "shaders/fullscreen_quad_vert.spv"
             );
             fullscreen_quad_vert_shader_module = bv::ShaderModule::create(
                 state.device,
@@ -800,7 +800,7 @@ namespace img_aligner::grid_warp
             };
 
             shader_code = read_file(
-                "./shaders/grid_warp_pass_vert.spv"
+                exec_dir() / "shaders/grid_warp_pass_vert.spv"
             );
             gwp_vert_shader_module = bv::ShaderModule::create(
                 state.device,
@@ -815,7 +815,7 @@ namespace img_aligner::grid_warp
             };
 
             shader_code = read_file(
-                "./shaders/grid_warp_pass_frag.spv"
+                exec_dir() / "shaders/grid_warp_pass_frag.spv"
             );
             gwp_frag_shader_module = bv::ShaderModule::create(
                 state.device,
@@ -830,7 +830,7 @@ namespace img_aligner::grid_warp
             };
 
             shader_code = read_file(
-                "./shaders/difference_pass_frag.spv"
+                exec_dir() / "shaders/difference_pass_frag.spv"
             );
             dfp_frag_shader_module = bv::ShaderModule::create(
                 state.device,
@@ -845,7 +845,7 @@ namespace img_aligner::grid_warp
             };
 
             shader_code = read_file(
-                "./shaders/cost_pass_frag.spv"
+                exec_dir() / "shaders/cost_pass_frag.spv"
             );
             csp_frag_shader_module = bv::ShaderModule::create(
                 state.device,

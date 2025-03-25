@@ -4,6 +4,7 @@
 #include "beva/beva.hpp"
 
 #include "app.hpp"
+#include "common.hpp"
 
 static void pause_on_error()
 {
@@ -13,8 +14,7 @@ static void pause_on_error()
 
 int main(int argc, char** argv)
 {
-    // set working directory to the exectuable's parent directory
-    std::filesystem::current_path(
+    img_aligner::exec_dir(
         std::filesystem::weakly_canonical(argv[0]).parent_path()
     );
 
