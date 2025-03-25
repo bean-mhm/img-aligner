@@ -335,7 +335,7 @@ namespace img_aligner::grid_warp
     }
 
     bool GridWarper::optimize(
-        float max_warp_strength,
+        float warp_strength,
         const bv::QueuePtr& queue
     )
     {
@@ -384,7 +384,7 @@ namespace img_aligner::grid_warp
         float radius = std::exp(log_radius);
 
         // strength
-        float strength = (max_warp_strength * dist(rng)) * radius;
+        float strength = (warp_strength * dist(rng)) * radius;
 
         // direction
         float angle = glm::tau<float>() * dist(rng);

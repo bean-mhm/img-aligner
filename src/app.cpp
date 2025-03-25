@@ -908,8 +908,7 @@ namespace img_aligner
 
         cli_app->add_option(
             "-w,--warp-strength",
-            optimization_params.max_warp_strength,
-            "maximum amount of warping in every iteration"
+            optimization_params.warp_strength
         );
 
         cli_app->add_option(
@@ -1447,8 +1446,8 @@ namespace img_aligner
         {
             json j2;
 
-            j2["max_warp_strength"] = to_str_hp(
-                optimization_params.max_warp_strength
+            j2["warp_strength"] = to_str_hp(
+                optimization_params.warp_strength
             );
 
             j2["min_change_in_cost_in_last_n_iters"] = to_str_hp(
@@ -1666,7 +1665,7 @@ namespace img_aligner
                     optimization_mutex.lock();
 
                     bool decreased_cost = grid_warper->optimize(
-                        optimization_params.max_warp_strength,
+                        optimization_params.warp_strength,
                         state.queue_grid_warp_optimize
                     );
 
@@ -2201,11 +2200,10 @@ namespace img_aligner
         // warp strength
         imgui_small_div();
         ImGui::TextWrapped("Warp Strength");
-        imgui_tooltip("Maximum amount of warping in every iteration");
         ImGui::SetNextItemWidth(-FLT_MIN);
         ImGui::DragFloat(
             "##warp_strength",
-            &optimization_params.max_warp_strength,
+            &optimization_params.warp_strength,
             .0001f,
             .000001f,
             .1f,

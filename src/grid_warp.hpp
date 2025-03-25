@@ -198,13 +198,15 @@ namespace img_aligner::grid_warp
 
         // displace the grid vertices using an unnormalized gaussian
         // distribution with randomly generated center point, radius (standard
-        // deviation), displacement direction and strength. the grid warp and
-        // difference passes will then be run. if the displacement caused the
-        // cost to increase, we will undo the displacement and return false,
-        // otherwise we'll keep the changes and return true. ideally, you would
-        // call this many times in a row to minimize the difference between the
-        // warped image and the target image.
-        bool optimize(float max_warp_strength, const bv::QueuePtr& queue);
+        // deviation), displacement direction and strength. the grid warp,
+        // difference, and cost passes will then be run. if the displacement
+        // caused the cost (average difference) or the maximum local difference
+        // (max value in the cost image) to increase, we will undo the
+        // displacement and return false, otherwise we'll keep the changes and
+        // return true. ideally, you would call this many times in a row to
+        // minimize the difference between the warped image and the target
+        // image.
+        bool optimize(float warp_strength, const bv::QueuePtr& queue);
 
     private:
         void create_vertex_and_index_buffer_and_generate_vertices(
