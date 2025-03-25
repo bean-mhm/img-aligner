@@ -2,3 +2,5 @@
 /.vs/**
 /.vscode/**
 *.aps
+
+/stuff/**
