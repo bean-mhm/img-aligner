@@ -58,10 +58,12 @@ in the beginning, and not the one from the previous iteration.
 
 Here's what the algorithm looks like in every iteration:
 1. Warp the grid vertices using a gaussian distribution with a random center,
-  direction, and strength.  The ranges of the random values are calculated based
-  on parameters.
-2. Recalculate the cost (average difference) and the maximum value in the cost image.
-3. If (cost > previous iteration's cost) or (maximum > initial maximum) the undo the warping.
+radius, direction, and strength. The ranges of the random values are
+calculated based on parameters (warp strength, grid resolution, etc.).
+2. Recalculate the cost (average difference) and the maximum value in the cost
+image (max local difference).
+3. If (cost > previous iteration's cost) or (max local diff. > initial max) then
+undo the warping.
 4. Break the loop if stop conditions are met.
 
 For increased performance, grid warping and cost calculation are performed at
@@ -97,26 +99,61 @@ hard to configure and build with CMake, and I got errors after errors.
 section to open a file dialog and choose the image you want to distort. Next,
 hit _Load Target Image_ to load the target image.
 
-> If one of the images is darker or brighter than the other by a linear factor (as is the case for exposure bracketed images), you can adjust the _Base / Target Image Multiplier_ to compensate for that.
+2. Use sliders in the _TRANSFORM_ section to apply a linear transform to the
+grid vertices.
 
-2. Adjust grid warping settings in the _GRID WARPER_ section and hit
+3. Adjust grid warping settings in the _GRID WARPER_ section and hit
 _Recreate Grid Warper_.
 
-3. Adjust optimization settings in the _OPTIMIZATION_ section and hit
+4. Adjust optimization settings in the _OPTIMIZATION_ section and hit
 _Start Alignin'_ to start minimizing the cost.
 
-4. Observe optimization statistics and a plot of the cost over time in the
-_STATS_ section.
+5. Observe optimization statistics and a plot of the cost over time in the
+_STATS_ section. The image viewer will switch to the difference image and update
+it in realtime.
 
 You can see the currently selected image in the _Image Viewer_ tab, and you can
 choose to display another image. You can also adjust the exposure and the zoom
-level, tick the _flim_ checkbox to apply the
-[flim](https://github.com/bean-mhm/flim) transform on the image when displaying,
-or tick _Preview Grid_ to see a preview of the grid used for warping.
+level, check _flim_ to apply the [flim](https://github.com/bean-mhm/flim)
+color transform on the image when displaying, or check _Preview Grid_ to see a
+preview of the grid used for warping.
 
 Note that, every time you change the grid warper settings, the grid warper gets
 destroyed along with its images (the warped / difference / cost images) so you
 need to click on _Recreate Grid Warper_ again.
+
+# Getting Better Results
+
+img-aligner is designed to work with images that are already extremely similar,
+i.e. the initial difference should be low. If the two images are so different
+that most features don't overlap, img-aligner will do a pretty bad job.
+
+## Uniform Transform
+
+For a better start, you can adjust sliders in the _TRANSFORM_ section to apply a
+uniform offset, scale, and rotation to the grid vertices. If set properly, this
+can help reduce the initial difference.
+
+## Images with Different Brightnesses
+
+If one of the base or target images is brighter or darker than the other by a
+linear factor (as is the case for exposure-bracketed images), adjust the
+_Base / Target Image Multiplier_ in the _IMAGES_ section to compensate for that.
+
+## Warp Strength Decay
+
+By default, the warp strength is constant and has a tiny value. This works well
+for images with tiny differences, but for larger differences, you can increase
+both the _Warp Strength_ and the _Warp Strength Decay_ which controls the rate
+of decay of the warp strength. That is, the warp strength will be scaled by
+`e^(-di)` where `d` is the decay rate and `i` is the number of iterations.
+A typical value could be 0.001. To avoid getting near zero after decaying for
+too long, you can set the _Min Warp Strength_ value to clamp the warp strength
+at a lower limit.
+
+This decay lets us start with a high warp strength to cancel out larger
+differences between the images and slowly turn down the warp strength to work on
+smaller differences.
 
 # Command Line Interface
 
