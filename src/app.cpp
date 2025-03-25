@@ -559,7 +559,7 @@ namespace img_aligner
             {
                 const auto& pdev = supported_physical_devices[actual_pdev_idx];
                 std::cout << std::format(
-                    "automatically selected physical device {}: {} ({})\n\n",
+                    "automatically selected physical device {}: {} ({})\n",
                     actual_pdev_idx,
                     pdev.properties().device_name,
                     VkPhysicalDeviceType_to_str(pdev.properties().device_type)
