@@ -77,6 +77,8 @@ namespace img_aligner
 
     void App::init()
     {
+        init_was_called = true;
+
         ScopedTimer timer(
             !cli_params.flag_silent,
             "",
@@ -265,9 +267,10 @@ namespace img_aligner
 
     void App::cleanup()
     {
-        // NOTE: this function should NOT assume that init() has been called and
-        // that all variables are initialized and non-null. especially not in
-        // CLI mode because it's not guaranteed to call init().
+        if (!init_was_called)
+        {
+            return;
+        }
 
         ScopedTimer timer(
             !cli_params.flag_silent,

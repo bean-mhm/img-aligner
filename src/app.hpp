@@ -108,6 +108,7 @@ namespace img_aligner
 
         AppState state;
 
+        bool init_was_called = false;
         int32_t physical_device_idx = PHYSICAL_DEVICE_IDX_AUTO;
 
         // base image, mipmapped
