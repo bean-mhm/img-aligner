@@ -62,7 +62,7 @@ namespace img_aligner::grid_warp
         float target_img_mul = 1.f;
 
         uint32_t grid_res_area = 200;
-        float grid_padding = .05f;
+        float grid_padding = .1f;
 
         uint32_t intermediate_res_area = 1200000;
         uint32_t cost_res_area = 60;
@@ -95,6 +95,7 @@ namespace img_aligner::grid_warp
         GridWarper(
             AppState& state,
             const Params& params,
+            const Transform2d& grid_transform,
             const bv::QueuePtr& queue
         );
         ~GridWarper();
@@ -196,6 +197,8 @@ namespace img_aligner::grid_warp
             return cost_img;
         }
 
+        void regenerate_grid_vertices(const Transform2d& grid_transform);
+
         // displace the grid vertices using an unnormalized gaussian
         // distribution with randomly generated center point, radius (standard
         // deviation), displacement direction and strength. the grid warp,
@@ -210,16 +213,18 @@ namespace img_aligner::grid_warp
 
     private:
         void create_vertex_and_index_buffer_and_generate_vertices(
+            const Transform2d& grid_transform,
             const bv::QueuePtr& queue
         );
-        void make_copy_of_vertices();
-        void restore_copy_of_vertices();
         void create_sampler_and_images(const bv::QueuePtr& queue);
         void create_passes();
 
         bv::CommandBufferPtr create_grid_warp_pass_cmd_buf(bool hires);
         bv::CommandBufferPtr create_difference_pass_cmd_buf();
         bv::CommandBufferPtr create_cost_pass_cmd_buf();
+
+        void make_copy_of_vertices();
+        void restore_copy_of_vertices();
 
     private:
         AppState& state;

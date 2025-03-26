@@ -36,6 +36,7 @@ namespace img_aligner::grid_warp
     GridWarper::GridWarper(
         AppState& state,
         const Params& params,
+        const Transform2d& grid_transform,
         const bv::QueuePtr& queue
     )
         : state(state),
@@ -189,7 +190,10 @@ namespace img_aligner::grid_warp
         gwp_frag_push_constants.base_img_mul = params.base_img_mul;
         dfp_frag_push_constants.target_img_mul = params.target_img_mul;
 
-        create_vertex_and_index_buffer_and_generate_vertices(queue);
+        create_vertex_and_index_buffer_and_generate_vertices(
+            grid_transform,
+            queue
+        );
         make_copy_of_vertices();
         create_sampler_and_images(queue);
         create_passes();
@@ -334,6 +338,66 @@ namespace img_aligner::grid_warp
         );
     }
 
+    void GridWarper::regenerate_grid_vertices(const Transform2d& grid_transform)
+    {
+        float cell_width = 1.f / (float)grid_res_x;
+        float cell_height = 1.f / (float)grid_res_y;
+
+        int32_t horizontal_pad = (int32_t)(padded_grid_res_x - grid_res_x) / 2;
+        int32_t vertical_pad = (int32_t)(padded_grid_res_y - grid_res_y) / 2;
+
+        glm::vec2 interm_res{ intermediate_res_x, intermediate_res_y };
+        float interm_res_area_sqrt = std::sqrt(
+            interm_res.x * interm_res.y
+        );
+
+        bool no_transform = grid_transform.is_identity();
+
+        for (int32_t y = 0; y <= (int32_t)padded_grid_res_y; y++)
+        {
+            for (int32_t x = 0; x <= (int32_t)padded_grid_res_x; x++)
+            {
+                // remove the offset caused by padding
+                int32_t ax = x - horizontal_pad;
+                int32_t ay = y - vertical_pad;
+
+                // original position before transformation
+                glm::vec2 p{
+                    (float)ax * cell_width,
+                    (float)ay * cell_height
+                };
+
+                glm::vec2 p_transformed;
+                if (no_transform)
+                {
+                    p_transformed = p;
+                }
+                else
+                {
+                    // before applying the transform, we should convert to a
+                    // zero-centered and aspect-ratio-adjusted UV space.
+                    glm::vec2 uv = p * 2.f - 1.f; // zero-centered
+                    uv = uv * interm_res / interm_res_area_sqrt; // aspect ratio
+
+                    // apply the transform in UV space
+                    uv = grid_transform.apply(uv);
+
+                    // go back to normalized space
+                    p_transformed =
+                        (uv * interm_res_area_sqrt / interm_res)
+                        * .5f + .5f;
+                }
+
+                // update the vertex
+                ACCESS_2D(vertex_buf_mapped, x, y, padded_grid_res_x + 1) = {
+                    .warped_pos = p_transformed,
+                    .orig_pos = p
+                };
+            }
+        }
+        vertex_buf_mem->flush();
+    }
+
     bool GridWarper::optimize(
         float warp_strength,
         const bv::QueuePtr& queue
@@ -438,6 +502,7 @@ namespace img_aligner::grid_warp
     }
 
     void GridWarper::create_vertex_and_index_buffer_and_generate_vertices(
+        const Transform2d& grid_transform,
         const bv::QueuePtr& queue
     )
     {
@@ -540,56 +605,7 @@ namespace img_aligner::grid_warp
             staging_buf_mem = nullptr;
         }
 
-        // calculate and set the initial positions of the vertices
-
-        float cell_width = 1.f / (float)grid_res_x;
-        float cell_height = 1.f / (float)grid_res_y;
-
-        int32_t horizontal_pad = (int32_t)(padded_grid_res_x - grid_res_x) / 2;
-        int32_t vertical_pad = (int32_t)(padded_grid_res_y - grid_res_y) / 2;
-
-        for (int32_t y = 0; y <= (int32_t)padded_grid_res_y; y++)
-        {
-            for (int32_t x = 0; x <= (int32_t)padded_grid_res_x; x++)
-            {
-                // remove the offset caused by padding
-                int32_t ax = x - horizontal_pad;
-                int32_t ay = y - vertical_pad;
-
-                glm::vec2 p{ (float)ax * cell_width, (float)ay * cell_height };
-
-                ACCESS_2D(vertex_buf_mapped, x, y, padded_grid_res_x + 1) = {
-                    .warped_pos = p,
-                    .orig_pos = p
-                };
-            }
-        }
-        vertex_buf_mem->flush();
-    }
-
-    void GridWarper::make_copy_of_vertices()
-    {
-        vertices_copy.resize(n_vertices);
-        std::copy(
-            vertex_buf_mapped,
-            vertex_buf_mapped + n_vertices,
-            vertices_copy.data()
-        );
-    }
-
-    void GridWarper::restore_copy_of_vertices()
-    {
-        if (vertices_copy.size() != n_vertices)
-        {
-            throw std::runtime_error(
-                "the vertices copy vector doesn't have the expected size"
-            );
-        }
-        std::copy(
-            vertices_copy.data(),
-            vertices_copy.data() + vertices_copy.size(),
-            vertex_buf_mapped
-        );
+        regenerate_grid_vertices(grid_transform);
     }
 
     void GridWarper::create_sampler_and_images(const bv::QueuePtr& queue)
@@ -1954,6 +1970,31 @@ namespace img_aligner::grid_warp
         cmd_buf->end();
 
         return cmd_buf;
+    }
+
+    void GridWarper::make_copy_of_vertices()
+    {
+        vertices_copy.resize(n_vertices);
+        std::copy(
+            vertex_buf_mapped,
+            vertex_buf_mapped + n_vertices,
+            vertices_copy.data()
+        );
+    }
+
+    void GridWarper::restore_copy_of_vertices()
+    {
+        if (vertices_copy.size() != n_vertices)
+        {
+            throw std::runtime_error(
+                "the vertices copy vector doesn't have the expected size"
+            );
+        }
+        std::copy(
+            vertices_copy.data(),
+            vertices_copy.data() + vertices_copy.size(),
+            vertex_buf_mapped
+        );
     }
 
 }
