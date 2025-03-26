@@ -37,6 +37,9 @@ namespace img_aligner
     struct GridWarpOptimizationParams
     {
         float warp_strength = .0001f;
+        float warp_strength_decay_rate = 0.f;
+        float min_warp_strength = .00001f;
+
         float min_change_in_cost_in_last_n_iters = .00001f;
         uint32_t max_iters = 10000;
         float max_runtime_sec = 600.f;

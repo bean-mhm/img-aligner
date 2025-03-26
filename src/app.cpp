@@ -871,48 +871,61 @@ namespace img_aligner
             "-x,--base-mul",
             grid_warp_params.base_img_mul,
             "base image multiplier"
-        );
+        )->capture_default_str();
 
         cli_app->add_option(
             "-y,--target-mul",
             grid_warp_params.target_img_mul,
             "target image multiplier"
-        );
+        )->capture_default_str();
 
         cli_app->add_option(
             "-g,--grid-res",
             grid_warp_params.grid_res_area,
             "area of the grid resolution"
-        );
+        )->capture_default_str();
 
         cli_app->add_option(
             "-p,--grid-padding",
             grid_warp_params.grid_padding,
             "grid padding"
-        );
+        )->capture_default_str();
 
         cli_app->add_option(
             "-r,--interm-res",
             grid_warp_params.intermediate_res_area,
             "area of the intermediate resolution"
-        );
+        )->capture_default_str();
 
         cli_app->add_option(
             "-c,--cost-res",
             grid_warp_params.cost_res_area,
             "area of the cost resolution"
-        );
+        )->capture_default_str();
 
         cli_app->add_option(
             "-s,--seed",
             grid_warp_params.rng_seed,
             "seed number to use for pseudo-random number generators"
-        );
+        )->capture_default_str();
 
         cli_app->add_option(
             "-w,--warp-strength",
             optimization_params.warp_strength
-        );
+        )->capture_default_str();
+
+        cli_app->add_option(
+            "-X,--warp-strength-decay",
+            optimization_params.warp_strength_decay_rate,
+            "warp strength will be scaled by e^(-di) where d is the decay rate "
+            "and i is the number of iterations."
+        )->capture_default_str();
+
+        cli_app->add_option(
+            "-Y,--min-warp-strength",
+            optimization_params.min_warp_strength,
+            "minimum warp strength after decaying"
+        )->capture_default_str();
 
         cli_app->add_option(
             "-m,--min-change-in-cost",
@@ -922,19 +935,19 @@ namespace img_aligner
                 "value in {} iterations",
                 grid_warp::N_ITERS_TO_CHECK_CHANGE_IN_COST
             )
-        );
+        )->capture_default_str();
 
         cli_app->add_option(
             "-i,--max-iters",
             optimization_params.max_iters,
             "maximum number of iterations"
-        );
+        )->capture_default_str();
 
         cli_app->add_option(
             "-R,--max-runtime",
             optimization_params.max_runtime_sec,
             "maximum run time in seconds"
-        );
+        )->capture_default_str();
 
         cli_app->add_flag(
             "-n,--silent",
@@ -947,31 +960,38 @@ namespace img_aligner
             cli_params.optimization_stats_mode,
             "0: don't print optimization statistics. 1: print statistics at "
             "the end. 2: print realtime statistics."
-        )->check(CLI::Range(2, "[0 - 2]"));
+        )->check(CLI::Range(2, "[0 - 2]"))->capture_default_str();
 
-        cli_app->add_flag(
+        cli_add_toggle(
+            *cli_app,
             "-P,--meta-params",
             metadata_export_options.params_and_res,
-            "include parameters and resolutions when exporting metadata"
+            "toggle whether to include parameters and resolutions when "
+            "exporting metadata."
         );
 
-        cli_app->add_flag(
+        cli_add_toggle(
+            *cli_app,
             "-O,--meta-opt",
             metadata_export_options.optimization_info,
-            "include optimization parameters and statistics when exporting "
-            "metadata"
+            "toggle whether to include optimization parameters and statistics "
+            "when exporting metadata."
         );
 
-        cli_app->add_flag(
+        cli_add_toggle(
+            *cli_app,
             "-V,--meta-vert",
             metadata_export_options.grid_vertices,
-            "include grid vertex data when exporting metadata"
+            "toggle whether to include grid vertex data when exporting "
+            "metadata."
         );
 
-        cli_app->add_flag(
+        cli_add_toggle(
+            *cli_app,
             "-K,--meta-pretty",
             metadata_export_options.pretty_print,
-            "produce pretty printed JSON when exporting metadata"
+            "toggle whether to produce pretty printed JSON when exporting "
+            "metadata."
         );
 
         cli_app->add_option(
@@ -984,10 +1004,9 @@ namespace img_aligner
             "-G,--gpu",
             physical_device_idx,
             "physical device index. use -1 to prompt the user to pick one or "
-            "-2 to select one automatically (default behavior)."
-        );
+            "-2 to select one automatically."
+        )->capture_default_str();
 
-        // parse
         cli_app->parse(argc, argv);
     }
 
@@ -2213,6 +2232,39 @@ namespace img_aligner
             "%.6f",
             ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat
         );
+
+        // warp strength decay rate
+        imgui_small_div();
+        ImGui::TextWrapped("Warp Strength Decay Rate");
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        ImGui::DragFloat(
+            "##warp_strength_decay",
+            &optimization_params.warp_strength_decay_rate,
+            .00001f,
+            0.f,
+            .05f,
+            "%.6f",
+            ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat
+        );
+        imgui_tooltip(
+            "Warp strength will be scaled by e^(-di) where d is the decay rate "
+            "and i is the number of iterations."
+        );
+
+        // min warp strength
+        imgui_small_div();
+        ImGui::TextWrapped("Min Warp Strength");
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        ImGui::DragFloat(
+            "##min_warp_strength",
+            &optimization_params.min_warp_strength,
+            .0001f,
+            0.f,
+            .1f,
+            "%.6f",
+            ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat
+        );
+        imgui_tooltip("Minimum warp strength after decaying");
 
         imgui_div();
         imgui_bold("STOP IF");

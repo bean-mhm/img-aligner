@@ -292,6 +292,23 @@ namespace img_aligner
         std::vector<T>().swap(vec);
     }
 
+    static void cli_add_toggle(
+        CLI::App& cli_app,
+        const std::string& flag_name,
+        bool& flag_result,
+        const std::string& flag_description = "toggle flag"
+    )
+    {
+        cli_app.add_flag_callback(
+            flag_name,
+            [&flag_result]()
+            {
+                flag_result = !flag_result;
+            },
+            std::format("{} (default: {})", flag_description, flag_result)
+        );
+    }
+
     // if use_transfer_pool is true, the command buffer will be allocated
     // from transfer_cmd_pool instead of cmd_pool. transfer_cmd_pool has the
     // VK_COMMAND_POOL_CREATE_TRANSIENT_BIT flag enabled which might be of
