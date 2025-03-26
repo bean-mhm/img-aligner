@@ -1631,6 +1631,7 @@ namespace img_aligner
             grid_warper = std::make_unique<grid_warp::GridWarper>(
                 state,
                 grid_warp_params,
+                grid_transform,
                 state.queue_main
             );
 
@@ -2236,23 +2237,122 @@ namespace img_aligner
         }
 
         imgui_div();
+        imgui_bold("TRANSFORM");
+
+        imgui_small_div();
+        ImGui::TextWrapped(
+            "Modifying the transform will reset any previous warping or "
+            "optimization."
+        );
+
+        bool grid_transform_changed = false;
+
+        imgui_small_div();
+        ImGui::TextWrapped("Scale");
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        if (ImGui::SliderFloat2(
+            "##transform_scale",
+            (float*)&grid_transform.scale,
+            0.f,
+            2.f,
+            "%.3f",
+            ImGuiSliderFlags_NoRoundToFormat
+        ))
+        {
+            if (glfwGetKey(state.window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS
+                || glfwGetKey(state.window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS)
+            {
+                float avg = glm::dot(grid_transform.scale, glm::vec2(.5f));
+                grid_transform.scale = glm::vec2(avg);
+            }
+
+            grid_transform_changed = true;
+        }
+        imgui_tooltip("Hold [Shift] to lock");
+
+        imgui_small_div();
+        ImGui::TextWrapped("Rotation");
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        if (ImGui::DragFloat(
+            "##transform_rotation",
+            &grid_transform.rotation,
+            .1f,
+            0.f,
+            360.f,
+            "%.3f",
+            ImGuiSliderFlags_WrapAround | ImGuiSliderFlags_NoRoundToFormat
+        ))
+        {
+            grid_transform_changed = true;
+        }
+
+        imgui_small_div();
+        ImGui::TextWrapped("Offset");
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        if (ImGui::DragFloat2(
+            "##transform_offset",
+            (float*)&grid_transform.offset,
+            .001f,
+            -1.f,
+            1.f,
+            "%.3f",
+            ImGuiSliderFlags_NoRoundToFormat
+        ))
+        {
+            grid_transform_changed = true;
+        }
+
+        imgui_small_div();
+        if (imgui_button_full_width("Reset"))
+        {
+            grid_transform = Transform2d();
+            grid_transform_changed = true;
+        }
+
+        // if the grid transform was modified, regenerate grid vertices, run
+        // grid warp, difference, and cost passes, and switch to the difference
+        // image.
+        if (grid_transform_changed)
+        {
+            // reset optimization
+            optimization_info = GridWarpOptimizationInfo{};
+
+            if (grid_warper != nullptr)
+            {
+                grid_warper->regenerate_grid_vertices(grid_transform);
+
+                grid_warper->run_grid_warp_pass(false, state.queue_main);
+                grid_warper->run_difference_and_cost_pass(state.queue_main);
+
+                if (ui_pass != nullptr)
+                {
+                    select_ui_pass_image(grid_warp::DIFFERENCE_IMAGE_NAME);
+                    need_to_run_ui_pass = true;
+                }
+
+                copy_grid_vertices_for_ui_preview();
+            }
+        }
+
+        imgui_div();
         imgui_bold("OPTIMIZATION");
+
+        bool should_update_warp_strength_plot = false;
 
         // warp strength
         imgui_small_div();
         ImGui::TextWrapped("Warp Strength");
         ImGui::SetNextItemWidth(-FLT_MIN);
-        if (ImGui::DragFloat(
+        if (ImGui::SliderFloat(
             "##warp_strength",
             &optimization_params.warp_strength,
-            .0001f,
             .000001f,
             .1f,
             "%.6f",
             ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat
         ))
         {
-            need_to_update_warp_strength_plot = true;
+            should_update_warp_strength_plot = true;
         }
 
         // warp strength decay rate
@@ -2263,17 +2363,16 @@ namespace img_aligner
             "and i is the number of iterations."
         );
         ImGui::SetNextItemWidth(-FLT_MIN);
-        if (ImGui::DragFloat(
+        if (ImGui::SliderFloat(
             "##warp_strength_decay_rate",
             &optimization_params.warp_strength_decay_rate,
-            .0001f,
             0.f,
             .05f,
             "%.6f",
             ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat
         ))
         {
-            need_to_update_warp_strength_plot = true;
+            should_update_warp_strength_plot = true;
         }
 
         // min warp strength
@@ -2281,24 +2380,21 @@ namespace img_aligner
         ImGui::TextWrapped("Min Warp Strength");
         imgui_tooltip("Lower limit of warp strength");
         ImGui::SetNextItemWidth(-FLT_MIN);
-        if (ImGui::DragFloat(
+        if (ImGui::SliderFloat(
             "##min_warp_strength",
             &optimization_params.min_warp_strength,
-            .0001f,
             0.f,
-            .1f,
+            .01f,
             "%.6f",
             ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat
         ))
         {
-            need_to_update_warp_strength_plot = true;
+            should_update_warp_strength_plot = true;
         }
 
         // update warp strength plot if needed
-        if (need_to_update_warp_strength_plot)
+        if (should_update_warp_strength_plot || warp_strength_plot.empty())
         {
-            need_to_update_warp_strength_plot = false;
-
             warp_strength_plot.resize(
                 GRID_WARP_OPTIMIZATION_WARP_STRENGTH_PLOT_N_ITERS
             );
@@ -2342,11 +2438,10 @@ namespace img_aligner
             grid_warp::N_ITERS_TO_CHECK_CHANGE_IN_COST
         ).c_str());
         ImGui::SetNextItemWidth(-FLT_MIN);
-        ImGui::DragFloat(
+        ImGui::SliderFloat(
             "##min_change_in_cost_in_last_n_iters",
             &optimization_params.min_change_in_cost_in_last_n_iters,
-            .000005f,
-            .000001f,
+            0.f,
             .001f,
             "%.6f",
             ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat

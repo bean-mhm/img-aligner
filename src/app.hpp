@@ -130,6 +130,7 @@ namespace img_aligner
 
         // grid warper params and itself
         grid_warp::Params grid_warp_params;
+        Transform2d grid_transform;
         std::unique_ptr<grid_warp::GridWarper> grid_warper = nullptr;
 
         // grid warp optimization thread
@@ -182,7 +183,6 @@ namespace img_aligner
         bool preview_grid = true;
 
         std::vector<float> warp_strength_plot;
-        bool need_to_update_warp_strength_plot = true;
 
     private:
         // initialization functions
