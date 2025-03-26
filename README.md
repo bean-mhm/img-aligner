@@ -56,19 +56,23 @@ warping to the cost before warping (stored in the previous iteration). However,
 for the maximum value, we only compare it to the initial maximum value that we got
 in the beginning, and not the one from the previous iteration.
 
+## The Algorithm
+
 Here's what the algorithm looks like in every iteration:
 1. Warp the grid vertices using a gaussian distribution with a random center,
 radius, direction, and strength. The ranges of the random values are
 calculated based on parameters (warp strength, grid resolution, etc.).
-2. Recalculate the cost (average difference) and the maximum value in the cost
-image (max local difference).
+2. Recalculate the cost (average difference) and the maximum local difference
+(max value in the cost image).
 3. If (cost > previous iteration's cost) or (max local diff. > initial max) then
 undo the warping.
 4. Break the loop if stop conditions are met.
 
-For increased performance, grid warping and cost calculation are performed at
-a lower resolution (called the __intermediate resolution__) on the graphics
-processing unit (GPU) using the Vulkan API.
+## Performance
+
+For increased performance and efficiency, grid warping and cost calculation are
+performed at a lower resolution (called the __intermediate resolution__) on the
+graphics processing unit (GPU) using the Vulkan API.
 
 # Color Spaces & Image Formats
 
@@ -99,6 +103,10 @@ hard to configure and build with CMake, and I got errors after errors.
 section to open a file dialog and choose the image you want to distort. Next,
 hit _Load Target Image_ to load the target image.
 
+> [!TIP]
+> Hold \[Ctrl] and click on a slider to type in a value. Hold \[Alt] while
+> adjusting a drag control to slow down or \[Shift] to speed up.
+
 2. Use sliders in the _TRANSFORM_ section to apply a linear transform to the
 grid vertices.
 
@@ -112,27 +120,31 @@ _Start Alignin'_ to start minimizing the cost.
 _STATS_ section. The image viewer will switch to the difference image and update
 it in realtime.
 
+> [!NOTE]
+> Every time you change the grid warper settings, the grid warper gets
+> destroyed along with its images (warped / difference / cost) so you need to
+> click on _Recreate Grid Warper_ again.
+
+## Image Viewer
+
 You can see the currently selected image in the _Image Viewer_ tab, and you can
 choose to display another image. You can also adjust the exposure and the zoom
 level, check _flim_ to apply the [flim](https://github.com/bean-mhm/flim)
 color transform on the image when displaying, or check _Preview Grid_ to see a
 preview of the grid used for warping.
 
-Note that, every time you change the grid warper settings, the grid warper gets
-destroyed along with its images (the warped / difference / cost images) so you
-need to click on _Recreate Grid Warper_ again.
-
 # Getting Better Results
 
 img-aligner is designed to work with images that are already extremely similar,
 i.e. the initial difference should be low. If the two images are so different
-that most features don't overlap, img-aligner will do a pretty bad job.
+that most features don't overlap, img-aligner will do a pretty bad job. Below
+are some methods to improve the results.
 
-## Uniform Transform
+## Grid Transformation
 
 For a better start, you can adjust sliders in the _TRANSFORM_ section to apply a
-uniform offset, scale, and rotation to the grid vertices. If set properly, this
-can help reduce the initial difference.
+scale, rotation, and offset to the grid vertices. If set properly, this can help
+reduce the initial difference.
 
 ## Images with Different Brightnesses
 
@@ -144,12 +156,14 @@ _Base / Target Image Multiplier_ in the _IMAGES_ section to compensate for that.
 
 By default, the warp strength is constant and has a tiny value. This works well
 for images with tiny differences, but for larger differences, you can increase
-both the _Warp Strength_ and the _Warp Strength Decay_ which controls the rate
-of decay of the warp strength. That is, the warp strength will be scaled by
-`e^(-di)` where `d` is the decay rate and `i` is the number of iterations.
-A typical value could be 0.001. To avoid getting near zero after decaying for
-too long, you can set the _Min Warp Strength_ value to clamp the warp strength
-at a lower limit.
+both the _Warp Strength_ and the _Warp Strength Decay Rate_ which controls the
+rate of decay of the warp strength. More precisely, the warp strength will be
+scaled by `e^(-di)` where `d` is the decay rate and `i` is the number of
+iterations.
+
+A typical value for the decay rate could be 0.001. To avoid getting near zero after decaying
+for too long, you can set the _Min Warp Strength_ value to clamp the warp
+strength at a lower limit.
 
 This decay lets us start with a high warp strength to cancel out larger
 differences between the images and slowly turn down the warp strength to work on
@@ -177,7 +191,6 @@ following libraries.
 | [CLI11](https://github.com/CLIUtils/CLI11) | Command line interface |
 | [GLFW](https://www.glfw.org/) | Window management |
 | [Dear ImGui](https://github.com/ocornut/imgui) | Graphical user interface |
-| [FreeType](https://github.com/freetype/freetype) | Font rendering |
 | [NFD Extended](https://github.com/btzy/nativefiledialog-extended) | Native file dialogs |
 | [beva](https://github.com/bean-mhm/beva) | Vulkan wrapper |
 | [OpenEXR](https://openexr.com) | Reading and writing OpenEXR images |
@@ -190,10 +203,13 @@ This project uses CMake as its build system (if it works it works).
 
 ## Tools
 
-Make sure you've installed [Git](https://git-scm.com/),
-[CMake](https://cmake.org/), the [Ninja](https://ninja-build.org/) build system, and proper C++ compilers. On Windows, you
-can use [MSYS2](https://www.msys2.org/) which comes with GCC, mingw-w64,
-and other useful tools and libraries.
+Make sure you've installed [Git](https://git-scm.com/) (version control),
+[CMake](https://cmake.org/), the [Ninja](https://ninja-build.org/) build system,
+a text editor or an IDE (like
+[Visual Studio Code](https://code.visualstudio.com/)), and proper C++ compilers.
+
+On Windows, you can use [MSYS2](https://www.msys2.org/) which comes with GCC,
+mingw-w64, and other useful tools and libraries.
 
 ## Building
 
@@ -213,9 +229,11 @@ cd build
 ```
 
 3. Generate CMake configuration with Ninja.
+
 ```bash
 cmake -G "Ninja" ..
 ```
+
 Make sure you have a stable internet connection so that unavailable packages
 can be fetched online. You only need to regenerate this in certain cases, like
 when you add or remove source files or modify `CMakeLists.txt`.
