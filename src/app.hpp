@@ -43,6 +43,10 @@ namespace img_aligner
         float min_change_in_cost_in_last_n_iters = .00001f;
         uint32_t max_iters = 10000;
         float max_runtime_sec = 600.f;
+
+        // calculate warp strength based on number of iterations (apply decaying
+        // and clamping).
+        float calc_warp_strength(size_t n_iters);
     };
 
     enum class GridWarpOptimizationStopReason : uint32_t
@@ -176,6 +180,9 @@ namespace img_aligner
         bool image_viewer_use_flim = false;
 
         bool preview_grid = true;
+
+        std::vector<float> warp_strength_plot;
+        bool need_to_update_warp_strength_plot = true;
 
     private:
         // initialization functions

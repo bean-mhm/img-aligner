@@ -16,6 +16,22 @@ namespace img_aligner
     static void glfw_error_callback(int error, const char* description);
     static void imgui_check_vk_result(VkResult err);
 
+    float GridWarpOptimizationParams::calc_warp_strength(size_t n_iters)
+    {
+        // warp strength decay
+        float decayed_warp_strength =
+            warp_strength
+            * std::exp(-warp_strength_decay_rate * (float)n_iters);
+
+        // min warp strength
+        decayed_warp_strength = std::max(
+            decayed_warp_strength,
+            min_warp_strength
+        );
+
+        return decayed_warp_strength;
+    }
+
     const char* GridWarpOptimizationStopReason_to_str(
         GridWarpOptimizationStopReason reason
     )
@@ -1686,8 +1702,11 @@ namespace img_aligner
                 {
                     optimization_mutex.lock();
 
-                    bool decreased_cost = grid_warper->optimize(
-                        optimization_params.warp_strength,
+                    // optimize
+                    bool cost_decreased = grid_warper->optimize(
+                        optimization_params.calc_warp_strength(
+                            optimization_info.n_iters
+                        ),
                         state.queue_grid_warp_optimize
                     );
 
@@ -1696,7 +1715,7 @@ namespace img_aligner
 
                     // update the number of iterations
                     optimization_info.n_iters++;
-                    if (decreased_cost)
+                    if (cost_decreased)
                     {
                         optimization_info.n_good_iters++;
                     }
@@ -2223,7 +2242,7 @@ namespace img_aligner
         imgui_small_div();
         ImGui::TextWrapped("Warp Strength");
         ImGui::SetNextItemWidth(-FLT_MIN);
-        ImGui::DragFloat(
+        if (ImGui::DragFloat(
             "##warp_strength",
             &optimization_params.warp_strength,
             .0001f,
@@ -2231,21 +2250,27 @@ namespace img_aligner
             .1f,
             "%.6f",
             ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat
-        );
+        ))
+        {
+            need_to_update_warp_strength_plot = true;
+        }
 
         // warp strength decay rate
         imgui_small_div();
         ImGui::TextWrapped("Warp Strength Decay Rate");
         ImGui::SetNextItemWidth(-FLT_MIN);
-        ImGui::DragFloat(
-            "##warp_strength_decay",
+        if (ImGui::DragFloat(
+            "##warp_strength_decay_rate",
             &optimization_params.warp_strength_decay_rate,
-            .00001f,
+            .0001f,
             0.f,
             .05f,
             "%.6f",
             ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat
-        );
+        ))
+        {
+            need_to_update_warp_strength_plot = true;
+        }
         imgui_tooltip(
             "Warp strength will be scaled by e^(-di) where d is the decay rate "
             "and i is the number of iterations."
@@ -2255,7 +2280,7 @@ namespace img_aligner
         imgui_small_div();
         ImGui::TextWrapped("Min Warp Strength");
         ImGui::SetNextItemWidth(-FLT_MIN);
-        ImGui::DragFloat(
+        if (ImGui::DragFloat(
             "##min_warp_strength",
             &optimization_params.min_warp_strength,
             .0001f,
@@ -2263,8 +2288,49 @@ namespace img_aligner
             .1f,
             "%.6f",
             ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat
-        );
+        ))
+        {
+            need_to_update_warp_strength_plot = true;
+        }
         imgui_tooltip("Minimum warp strength after decaying");
+
+        // update warp strength plot if needed
+        if (need_to_update_warp_strength_plot)
+        {
+            need_to_update_warp_strength_plot = false;
+
+            warp_strength_plot.resize(
+                GRID_WARP_OPTIMIZATION_WARP_STRENGTH_PLOT_N_ITERS
+            );
+            for (size_t i = 0; i < warp_strength_plot.size(); i++)
+            {
+                warp_strength_plot[i] =
+                    optimization_params.calc_warp_strength(i);
+            }
+        }
+
+        // draw warp strength plot
+        imgui_small_div();
+        {
+            ImGui::TextWrapped(std::format(
+                "Warp Strength in {} Iterations",
+                GRID_WARP_OPTIMIZATION_WARP_STRENGTH_PLOT_N_ITERS
+            ).c_str());
+
+            ImGui::PlotLines(
+                "##",
+                warp_strength_plot.data(),
+                (int)warp_strength_plot.size(),
+                0,
+                "##",
+                0.f,
+                optimization_params.warp_strength,
+                ImVec2{
+                    -FLT_MIN,
+                    120.f * ui_scale
+                }
+            );
+        }
 
         imgui_div();
         imgui_bold("STOP IF");

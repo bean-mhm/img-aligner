@@ -89,6 +89,9 @@ namespace img_aligner
     static constexpr float GRID_WARP_OPTIMIZATION_CLI_REALTIME_STATS_INTERVAL =
         .3f;
 
+    static constexpr size_t GRID_WARP_OPTIMIZATION_WARP_STRENGTH_PLOT_N_ITERS
+        = 5000;
+
     using TimePoint = std::chrono::high_resolution_clock::time_point;
 
     class ScopedTimer
