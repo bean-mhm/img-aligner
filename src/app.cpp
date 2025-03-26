@@ -2258,6 +2258,10 @@ namespace img_aligner
         // warp strength decay rate
         imgui_small_div();
         ImGui::TextWrapped("Warp Strength Decay Rate");
+        imgui_tooltip(
+            "Warp strength will be scaled by e^(-di) where d is the decay rate "
+            "and i is the number of iterations."
+        );
         ImGui::SetNextItemWidth(-FLT_MIN);
         if (ImGui::DragFloat(
             "##warp_strength_decay_rate",
@@ -2271,14 +2275,11 @@ namespace img_aligner
         {
             need_to_update_warp_strength_plot = true;
         }
-        imgui_tooltip(
-            "Warp strength will be scaled by e^(-di) where d is the decay rate "
-            "and i is the number of iterations."
-        );
 
         // min warp strength
         imgui_small_div();
         ImGui::TextWrapped("Min Warp Strength");
+        imgui_tooltip("Lower limit of warp strength");
         ImGui::SetNextItemWidth(-FLT_MIN);
         if (ImGui::DragFloat(
             "##min_warp_strength",
@@ -2292,7 +2293,6 @@ namespace img_aligner
         {
             need_to_update_warp_strength_plot = true;
         }
-        imgui_tooltip("Minimum warp strength after decaying");
 
         // update warp strength plot if needed
         if (need_to_update_warp_strength_plot)
