@@ -45,6 +45,7 @@
 #include "glm/gtc/matrix_transform.hpp"
 
 #include "circular_buffer.hpp"
+#include "transform2d.hpp"
 
 // access element in 2D array with row-major ordering
 #define ACCESS_2D(arr, ix, iy, res_x) ((arr)[(ix) + (iy) * (res_x)])
