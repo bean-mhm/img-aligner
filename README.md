@@ -108,7 +108,7 @@ hit _Load Target Image_ to load the target image.
 > adjusting a drag control to slow down or \[Shift] to speed up.
 
 2. Use sliders in the _TRANSFORM_ section to apply a linear transform to the
-grid vertices.
+grid vertices to potentially make the difference smaller.
 
 3. Adjust grid warping settings in the _GRID WARPER_ section and hit
 _Recreate Grid Warper_ to prepare resources for grid warping. This will switch
