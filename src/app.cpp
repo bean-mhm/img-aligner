@@ -2778,6 +2778,23 @@ namespace img_aligner
         const auto& sel_img_info =
             ui_pass->images()[selected_image_idx];
 
+        // this is a hack thanks to ImGui. I'm not even gonna explain what it's
+        // fixing. disable it and see for yourself.
+        {
+            float original_padding = ImGui::GetWindowContentRegionMin().x;
+            original_padding = std::max(original_padding, FLT_MIN);
+
+            float old_alpha = ImGui::GetStyle().Alpha;
+            ImGui::GetStyle().Alpha = 0.f;
+            {
+                bool unused;
+                ImGui::Checkbox("##", &unused);
+            }
+            ImGui::GetStyle().Alpha = old_alpha;
+
+            ImGui::SameLine(original_padding);
+        }
+
         // image size
         ImGui::Text("%ux%u", sel_img_info.width, sel_img_info.height);
 
