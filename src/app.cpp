@@ -3009,7 +3009,7 @@ namespace img_aligner
 
     void App::setup_imgui_style()
     {
-        // img-aligner style from ImThemes
+        // img-aligner 2 style from ImThemes
         ImGuiStyle& style = ImGui::GetStyle();
 
         style.Alpha = 1.0;
@@ -3045,18 +3045,18 @@ namespace img_aligner
 
         style.Colors[ImGuiCol_Text] = ImVec4(1.0, 1.0, 1.0, 1.0);
         style.Colors[ImGuiCol_TextDisabled] = ImVec4(0.3625971674919128, 0.3366090059280396, 0.4470588266849518, 1.0);
-        style.Colors[ImGuiCol_WindowBg] = ImVec4(0.08638960868120193, 0.07073255628347397, 0.1373390555381775, 1.0);
-        style.Colors[ImGuiCol_ChildBg] = ImVec4(0.07058823853731155, 0.05098039284348488, 0.1294117718935013, 1.0);
-        style.Colors[ImGuiCol_PopupBg] = ImVec4(0.1274803578853607, 0.1039600074291229, 0.2039215713739395, 1.0);
+        style.Colors[ImGuiCol_WindowBg] = ImVec4(0.09609425067901611, 0.08342945575714111, 0.1372549086809158, 1.0);
+        style.Colors[ImGuiCol_ChildBg] = ImVec4(0.08734812587499619, 0.07234141230583191, 0.125490203499794, 1.0);
+        style.Colors[ImGuiCol_PopupBg] = ImVec4(0.1503584384918213, 0.1302575916051865, 0.2156862765550613, 1.0);
         style.Colors[ImGuiCol_Border] = ImVec4(1.0, 1.0, 1.0, 0.0313725508749485);
         style.Colors[ImGuiCol_BorderShadow] = ImVec4(0.0784313753247261, 0.08627451211214066, 0.1019607856869698, 0.0);
-        style.Colors[ImGuiCol_FrameBg] = ImVec4(0.1323726028203964, 0.1103575527667999, 0.2039215713739395, 1.0);
-        style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(0.1686917990446091, 0.1392547339200974, 0.2575107216835022, 1.0);
+        style.Colors[ImGuiCol_FrameBg] = ImVec4(0.1421570628881454, 0.1231526285409927, 0.2039215713739395, 1.0);
+        style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(0.1805853843688965, 0.1532641500234604, 0.2588235437870026, 1.0);
         style.Colors[ImGuiCol_FrameBgActive] = ImVec4(0.22197425365448, 0.1358246803283691, 0.501960813999176, 1.0);
         style.Colors[ImGuiCol_TitleBg] = ImVec4(0.04083044454455376, 0.03529411926865578, 0.05882352963089943, 1.0);
-        style.Colors[ImGuiCol_TitleBgActive] = ImVec4(0.04689064249396324, 0.02564054541289806, 0.1030042767524719, 1.0);
+        style.Colors[ImGuiCol_TitleBgActive] = ImVec4(0.06465748697519302, 0.0499807745218277, 0.1019607856869698, 1.0);
         style.Colors[ImGuiCol_TitleBgCollapsed] = ImVec4(0.04100684449076653, 0.03552479669451714, 0.05882352963089943, 1.0);
-        style.Colors[ImGuiCol_MenuBarBg] = ImVec4(0.04689064249396324, 0.02564054541289806, 0.1030042767524719, 1.0);
+        style.Colors[ImGuiCol_MenuBarBg] = ImVec4(0.06465748697519302, 0.0499807745218277, 0.1019607856869698, 1.0);
         style.Colors[ImGuiCol_ScrollbarBg] = ImVec4(9.999899930335232e-07, 9.999932899518171e-07, 9.999999974752427e-07, 0.1759656667709351);
         style.Colors[ImGuiCol_ScrollbarGrab] = ImVec4(0.9999899864196777, 0.9999949932098389, 1.0, 0.1072961091995239);
         style.Colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.9999899864196777, 0.9999949932098389, 1.0, 0.1459227204322815);
@@ -3071,8 +3071,8 @@ namespace img_aligner
         style.Colors[ImGuiCol_HeaderHovered] = ImVec4(0.6791232824325562, 0.5803921222686768, 1.0, 0.08627451211214066);
         style.Colors[ImGuiCol_HeaderActive] = ImVec4(0.2269732505083084, 0.1357733607292175, 0.5021458864212036, 1.0);
         style.Colors[ImGuiCol_Separator] = ImVec4(0.1727046072483063, 0.1486197710037231, 0.250980406999588, 1.0);
-        style.Colors[ImGuiCol_SeparatorHovered] = ImVec4(0.213542565703392, 0.1777155846357346, 0.2875536680221558, 1.0);
-        style.Colors[ImGuiCol_SeparatorActive] = ImVec4(0.213542565703392, 0.1777155846357346, 0.2875536680221558, 1.0);
+        style.Colors[ImGuiCol_SeparatorHovered] = ImVec4(0.2416060566902161, 0.2003998607397079, 0.3254902064800262, 1.0);
+        style.Colors[ImGuiCol_SeparatorActive] = ImVec4(0.2416060566902161, 0.2003998607397079, 0.3254902064800262, 1.0);
         style.Colors[ImGuiCol_ResizeGrip] = ImVec4(0.1703480333089828, 0.1491580158472061, 0.239215686917305, 1.0);
         style.Colors[ImGuiCol_ResizeGripHovered] = ImVec4(0.2113431394100189, 0.1846674382686615, 0.2980392277240753, 1.0);
         style.Colors[ImGuiCol_ResizeGripActive] = ImVec4(0.3330428004264832, 0.2171164900064468, 0.7098039388656616, 1.0);
@@ -3081,11 +3081,11 @@ namespace img_aligner
         style.Colors[ImGuiCol_TabActive] = ImVec4(0.3330428004264832, 0.2171164900064468, 0.7098039388656616, 1.0);
         style.Colors[ImGuiCol_TabUnfocused] = ImVec4(0.1514349430799484, 0.1328719705343246, 0.2117647081613541, 1.0);
         style.Colors[ImGuiCol_TabUnfocusedActive] = ImVec4(0.276118129491806, 0.1752556711435318, 0.6039215922355652, 1.0);
-        style.Colors[ImGuiCol_PlotLines] = ImVec4(0.4254842102527618, 0.3235217034816742, 0.7568627595901489, 1.0);
+        style.Colors[ImGuiCol_PlotLines] = ImVec4(0.4413722157478333, 0.3442983329296112, 0.7568627595901489, 1.0);
         style.Colors[ImGuiCol_PlotLinesHovered] = ImVec4(0.831504225730896, 0.6952790021896362, 1.0, 1.0);
-        style.Colors[ImGuiCol_PlotHistogram] = ImVec4(0.3840422034263611, 0.2874279022216797, 0.6980392336845398, 1.0);
-        style.Colors[ImGuiCol_PlotHistogramHovered] = ImVec4(0.5856620073318481, 0.4077253341674805, 1.0, 1.0);
-        style.Colors[ImGuiCol_TableHeaderBg] = ImVec4(0.5411763191223145, 0.3999999761581421, 1.0, 0.1803921610116959);
+        style.Colors[ImGuiCol_PlotHistogram] = ImVec4(0.4208443462848663, 0.3162475824356079, 0.7607843279838562, 1.0);
+        style.Colors[ImGuiCol_PlotHistogramHovered] = ImVec4(0.5916955471038818, 0.4117646813392639, 1.0, 1.0);
+        style.Colors[ImGuiCol_TableHeaderBg] = ImVec4(0.5414839386940002, 0.4209150075912476, 0.9333333373069763, 0.1803921610116959);
         style.Colors[ImGuiCol_TableBorderStrong] = ImVec4(9.999899930335232e-07, 9.999934036386549e-07, 9.999999974752427e-07, 0.1931330561637878);
         style.Colors[ImGuiCol_TableBorderLight] = ImVec4(1.0, 1.0, 1.0, 0.05098039284348488);
         style.Colors[ImGuiCol_TableRowBg] = ImVec4(0.08918920159339905, 0.06957323849201202, 0.1529411822557449, 1.0);
