@@ -1510,6 +1510,21 @@ namespace img_aligner
             j["grid_warp_resolutions"] = j2;
         }
 
+        if (metadata_export_options.params_and_res)
+        {
+            json j2;
+
+            j2["scale"].push_back(to_str_hp(grid_transform.scale.x));
+            j2["scale"].push_back(to_str_hp(grid_transform.scale.y));
+
+            j2["rotation"] = to_str_hp(grid_transform.rotation);
+
+            j2["offset"].push_back(to_str_hp(grid_transform.offset.x));
+            j2["offset"].push_back(to_str_hp(grid_transform.offset.y));
+
+            j["grid_transform"] = j2;
+        }
+
         if (metadata_export_options.optimization_info)
         {
             json j2;
