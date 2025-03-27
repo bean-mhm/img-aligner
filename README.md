@@ -104,11 +104,14 @@ section to open a file dialog and choose the image you want to distort. Next,
 hit _Load Target Image_ to load the target image.
 
 > [!TIP]
-> Hold \[Ctrl] and click on a slider to type in a value. Hold \[Alt] while
-> adjusting a drag control to slow down or \[Shift] to speed up.
+> Hold \[Ctrl] and click on a slider to type in a value.
 
 2. Use sliders in the _TRANSFORM_ section to apply a linear transform to the
 grid vertices to potentially make the difference smaller.
+
+> [!TIP]
+> Hold \[Alt] while adjusting a drag control to slow down or \[Shift] to speed
+> up.
 
 3. Adjust grid warping settings in the _GRID WARPER_ section and hit
 _Recreate Grid Warper_ to prepare resources for grid warping. This will switch
