@@ -2405,9 +2405,6 @@ namespace img_aligner
 
         // min warp strength
         imgui_small_div();
-        ImGui::TextWrapped("Min Warp Strength");
-        imgui_tooltip("Lower limit of warp strength");
-        ImGui::SetNextItemWidth(-FLT_MIN);
         if (imgui_slider_or_drag(
             "Min Warp Strength",
             "##min_warp_strength",
