@@ -2442,7 +2442,7 @@ namespace img_aligner
             ).c_str());
 
             ImGui::PlotLines(
-                "##",
+                "##warp_strength_plot",
                 warp_strength_plot.data(),
                 (int)warp_strength_plot.size(),
                 0,
@@ -2609,7 +2609,7 @@ namespace img_aligner
                 ).c_str());
 
                 ImGui::PlotLines(
-                    "##",
+                    "##cost_history_plot",
                     optimization_info.cost_history.data(),
                     (int)optimization_info.cost_history.size(),
                     0,
