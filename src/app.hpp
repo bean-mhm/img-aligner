@@ -277,6 +277,131 @@ namespace img_aligner
 
         void select_ui_pass_image(std::string_view name);
 
+        template<typename T>
+        bool imgui_slider_or_drag(
+            std::string_view label, // "Example"
+            std::string_view tag, // "##example"
+            std::string_view tooltip, // use "" to disable
+            T* v,
+            T min, // set both to 0 to disable (only for drag)
+            T max, // set both to 0 to disable (only for drag)
+            float drag_speed = -1.f, // negative: draw slider instead of drag
+            int32_t precision = -1, // negative: use default value
+            bool logarithmic = false,
+            uint32_t n_components = 1, // >1 components will use fixed precision
+            bool force_clamp = false,
+            bool wrap_around = false
+        )
+        {
+            // default precision
+            if (precision < 0)
+            {
+                precision = 3;
+            }
+
+            if (!label.empty())
+            {
+                ImGui::TextWrapped(label.data());
+                imgui_tooltip(tooltip);
+            }
+
+            ImGuiDataType data_type;
+            if constexpr (std::is_same_v<T, float>)
+            {
+                data_type = ImGuiDataType_Float;
+            }
+            else if constexpr (std::is_same_v<T, double>)
+            {
+                data_type = ImGuiDataType_Double;
+            }
+            else if constexpr (std::is_same_v<T, int32_t>)
+            {
+                data_type = ImGuiDataType_S32;
+            }
+            else if constexpr (std::is_same_v<T, uint32_t>)
+            {
+                data_type = ImGuiDataType_U32;
+            }
+            else if constexpr (std::is_same_v<T, int64_t>)
+            {
+                data_type = ImGuiDataType_S64;
+            }
+            else if constexpr (std::is_same_v<T, uint64_t>)
+            {
+                data_type = ImGuiDataType_U64;
+            }
+            else
+            {
+                throw std::invalid_argument(
+                    "unsupported type for slider or drag"
+                );
+            }
+
+            std::string format;
+            if constexpr (std::is_floating_point_v<T>)
+            {
+                if (n_components > 1)
+                {
+                    format = std::format("%.{}f", precision);
+                }
+                else
+                {
+                    // unused because ImGui is buggy
+                    /*format = determine_precision_for_imgui(
+                        *v,
+                        5,
+                        min_precision
+                    );*/
+
+                    format = std::format("%.{}f", precision);
+                }
+            }
+
+            ImGuiSliderFlags flags = ImGuiSliderFlags_NoRoundToFormat;
+            if (logarithmic)
+            {
+                flags |= ImGuiSliderFlags_Logarithmic;
+            }
+            if (force_clamp)
+            {
+                flags |= ImGuiSliderFlags_AlwaysClamp;
+            }
+            if (wrap_around)
+            {
+                flags |= ImGuiSliderFlags_WrapAround;
+            }
+
+            ImGui::SetNextItemWidth(-FLT_MIN);
+            if (drag_speed < 0.f)
+            {
+                return ImGui::SliderScalarN(
+                    tag.data(),
+                    data_type,
+                    v,
+                    (int)n_components,
+                    &min,
+                    &max,
+                    format.empty() ? nullptr : format.c_str(),
+                    flags
+                );
+            }
+            else
+            {
+                bool no_clamp = (min == (T)0 && max == (T)0);
+                return ImGui::DragScalarN(
+                    tag.data(),
+                    data_type,
+                    v,
+                    (int)n_components,
+                    drag_speed,
+                    no_clamp ? nullptr : &min,
+                    no_clamp ? nullptr : &max,
+                    format.empty() ? nullptr : format.c_str(),
+                    flags
+                );
+            }
+        }
+
     };
 
 }
