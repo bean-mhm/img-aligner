@@ -926,19 +926,49 @@ namespace img_aligner
         )->capture_default_str();
 
         cli_app->add_option(
+            "-X,--scalex",
+            grid_transform.scale.x,
+            "grid transform: scale in the X axis"
+        );
+
+        cli_app->add_option(
+            "-Y,--scaley",
+            grid_transform.scale.y,
+            "grid transform: scale in the Y axis"
+        );
+
+        cli_app->add_option(
+            "-R,--rot",
+            grid_transform.rotation,
+            "grid transform: rotation in degrees"
+        );
+
+        cli_app->add_option(
+            "-Q,--offsx",
+            grid_transform.offset.x,
+            "grid transform: offset in the X axis"
+        );
+
+        cli_app->add_option(
+            "-W,--offsy",
+            grid_transform.offset.y,
+            "grid transform: offset in the Y axis"
+        );
+
+        cli_app->add_option(
             "-w,--warp-strength",
             optimization_params.warp_strength
         )->capture_default_str();
 
         cli_app->add_option(
-            "-X,--warp-strength-decay",
+            "-Z,--warp-strength-decay",
             optimization_params.warp_strength_decay_rate,
             "warp strength will be scaled by e^(-di) where d is the decay rate "
             "and i is the number of iterations."
         )->capture_default_str();
 
         cli_app->add_option(
-            "-Y,--min-warp-strength",
+            "-C,--min-warp-strength",
             optimization_params.min_warp_strength,
             "minimum warp strength after decaying"
         )->capture_default_str();
@@ -960,7 +990,7 @@ namespace img_aligner
         )->capture_default_str();
 
         cli_app->add_option(
-            "-R,--max-runtime",
+            "-T,--max-runtime",
             optimization_params.max_runtime_sec,
             "maximum run time in seconds"
         )->capture_default_str();
