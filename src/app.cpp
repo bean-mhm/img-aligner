@@ -2849,6 +2849,9 @@ namespace img_aligner
         {
             need_to_run_ui_pass = true;
         }
+        imgui_tooltip(
+            "Use flim color transform (https://github.com/bean-mhm/flim)"
+        );
 
         imgui_horiz_div();
 
