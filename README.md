@@ -111,7 +111,8 @@ hit _Load Target Image_ to load the target image.
 grid vertices.
 
 3. Adjust grid warping settings in the _GRID WARPER_ section and hit
-_Recreate Grid Warper_.
+_Recreate Grid Warper_ to prepare resources for grid warping. This will switch
+the current image in the _Image Viewer_ to the _Difference Image_.
 
 4. Adjust optimization settings in the _OPTIMIZATION_ section and hit
 _Start Alignin'_ to start minimizing the cost.
