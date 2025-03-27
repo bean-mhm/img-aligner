@@ -2809,7 +2809,13 @@ namespace img_aligner
 
         // fit
         ImGui::SameLine();
-        ImGui::Checkbox("Fit", &image_viewer_fit);
+        if (ImGui::Checkbox("Fit", &image_viewer_fit))
+        {
+            if (image_viewer_fit)
+            {
+                image_viewer_zoom = 1.f;
+            }
+        }
 
         imgui_horiz_div();
 
