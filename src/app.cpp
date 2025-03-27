@@ -2225,6 +2225,13 @@ namespace img_aligner
             try
             {
                 recreate_grid_warper();
+
+                // switch to the difference image
+                if (ui_pass != nullptr)
+                {
+                    select_ui_pass_image(grid_warp::DIFFERENCE_IMAGE_NAME);
+                    need_to_run_ui_pass = true;
+                }
             }
             catch (const std::exception& e)
             {
