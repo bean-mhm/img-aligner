@@ -237,7 +237,8 @@ cmake -G "Ninja" ..
 
 Make sure you have a stable internet connection so that unavailable packages
 can be fetched online. You only need to regenerate this in certain cases, like
-when you add or remove source files or modify `CMakeLists.txt`.
+when you add or remove source files, modify `CMakeLists.txt`, or switch between
+debug and release builds.
 
 4. Build & Run.
 ```bash
