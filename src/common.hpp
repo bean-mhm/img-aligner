@@ -55,7 +55,7 @@ namespace img_aligner
 {
 
     static constexpr auto APP_TITLE = "img-aligner";
-    static constexpr auto APP_VERSION = "0.1.0-dev";
+    static constexpr auto APP_VERSION = "0.1.0-alpha";
     static constexpr auto APP_GITHUB_URL =
         "https://github.com/bean-mhm/img-aligner";
 
