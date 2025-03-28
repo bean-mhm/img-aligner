@@ -4,9 +4,9 @@ simple steps to align a few example images that come with img-aligner.
 
 > [!IMPORTANT]
 > This tutorial assumes you have fully read the [README](../../README.md) and
-> have a basic understanding of how the underlying algorithm works. If you
-> haven't read the README, expect to be confused. If the parameters don't make
-> sense, you probaby haven't read the README patiently.
+> have a basic understanding of the underlying algorithm. If you haven't read
+> the README, expect to be confused. If the parameters don't make sense, you
+> probaby haven't read the README patiently.
 
 # Base & Target
 
@@ -19,11 +19,13 @@ make use of.
 section to open a file dialog and choose `demo/images/1-house-base.exr`. Next,
 hit _Load Target Image_ and choose `demo/images/1-house-target.exr`.
 
+You'll notice two controls in the _IMAGES_ section named _Base Image Multiplier_
+and _Target Image Multiplier_. We'll address these in later examples.
+
 # Image Viewer
 
 After loading the images, the _Image Viewer_ tab will be displaying the image
 that's currently selected. You can choose to display another image at the top.
-
 You can also adjust the exposure and the zoom level, check _flim_ to apply the
 [flim](https://github.com/bean-mhm/flim) color transform on the image when
 displaying, or check _Preview Grid_ to see a preview of the grid used for
@@ -33,11 +35,9 @@ warping.
 
 The grid warper is the underlying construct that warps the base image and
 calculates the difference between the warped image and the target image. We
-can adjust grid warping settings in the _GRID WARPER_ section.
-
-If you hold the cursor over a control's name, a tooltip may show up explaining
-what it does. For this tutorial, we'll leave these intact and use the default
-values.
+can adjust grid warping settings in the _GRID WARPER_ section. If you hold the
+cursor over a control's name, a tooltip may show up explaining what it does. For
+this tutorial, we'll leave these intact and use the default values.
 
 2. Hit _Recreate Grid Warper_ to prepare resources for grid warping. This will
 switch the current image in the _Image Viewer_ to the _Difference Image_.
@@ -57,7 +57,7 @@ If you keep switching between the base image and the target image in the
 _Image Viewer_, you'll notice the target image has been slightly translated to
 the right. You can adjust the _Offset_ parameter to compensate for this.
 
-3. Adjust the _Offset_ in the X axis until the difference image becomes darker.
+3. Adjust the _Offset_ until the difference image becomes darker.
 
 > [!TIP]
 > Hold \[Alt] while adjusting a drag control to slow down or \[Shift] to speed
@@ -80,8 +80,8 @@ example.
 
 Once optimization starts, a new section named _STATS_ will show up which will
 display optimization statistics and a plot of the cost. Also, the image viewer
-will switch to the difference image and update it and the grid preview in
-realtime.
+will switch to the difference image which is updated in realtime along with
+the grid preview.
 
 # Another Example
 
@@ -101,7 +101,7 @@ sudden jump in brightness. This is bad for optimization, so let's fix it.
 6. In the _IMAGES_ section, set _Base Image Multiplier_ to 2.8.
 
 > [!TIP]
-> You can check _flim_ in the _Image Viewer_ to apply a filmic transform when
+> Check _flim_ in the _Image Viewer_ to apply a filmic color transform when
 > displaying images.
 
 If you switch between the images _now_, you'll notice that the brightness
@@ -151,8 +151,8 @@ are some methods to improve the results.
 ## Grid Transformation
 
 For a better initial difference, you can adjust sliders in the _TRANSFORM_
-section to apply a scale, rotation, and offset to the grid vertices. This might
-not work on all images.
+section to apply a scale, rotation, and offset to the grid vertices to
+potentially make the difference image darker. This might not work on all images.
 
 ## Images with Different Brightnesses
 
