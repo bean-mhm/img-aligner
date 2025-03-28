@@ -2033,6 +2033,11 @@ namespace img_aligner
 
     void App::layout_controls()
     {
+        // these are used to know if we should update certain stuff when related
+        // parameters are modified.
+        bool grid_transform_changed = false;
+        bool should_update_warp_strength_plot = false;
+
         ImGui::Begin("Controls");
 
         ImGui::BeginDisabled(is_optimizing);
@@ -2049,6 +2054,7 @@ namespace img_aligner
             ))
             {
                 destroy_grid_warper(false);
+
                 recreate_ui_pass();
                 select_ui_pass_image(BASE_IMAGE_NAME);
             }
@@ -2064,6 +2070,7 @@ namespace img_aligner
             ))
             {
                 destroy_grid_warper(false);
+
                 recreate_ui_pass();
                 select_ui_pass_image(TARGET_IMAGE_NAME);
             }
@@ -2268,8 +2275,6 @@ namespace img_aligner
             "optimization."
         );
 
-        bool grid_transform_changed = false;
-
         imgui_small_div();
         if (imgui_slider_or_drag(
             "Scale",
@@ -2365,8 +2370,6 @@ namespace img_aligner
 
         imgui_div();
         imgui_bold("OPTIMIZATION");
-
-        bool should_update_warp_strength_plot = false;
 
         // warp strength
         imgui_small_div();
