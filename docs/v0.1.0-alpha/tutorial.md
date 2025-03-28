@@ -1,3 +1,5 @@
+# Tutorial
+
 This a step-by-step tutorial on how to get started with
 [img-aligner](https://github.com/bean-mhm/img-aligner) v0.1.0-alpha. Below are
 simple steps to align a few example images that come with img-aligner.
@@ -21,6 +23,10 @@ hit _Load Target Image_ and choose `demo/images/1-house-target.exr`.
 
 You'll notice two controls in the _IMAGES_ section named _Base Image Multiplier_
 and _Target Image Multiplier_. We'll address these in later examples.
+
+> [!NOTE]
+> If you're wondering why img-aligner only supports OpenEXR images, you almost
+> certainly haven't fully read the [README](../../README.md).
 
 # Image Viewer
 
