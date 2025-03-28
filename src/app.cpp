@@ -2284,7 +2284,7 @@ namespace img_aligner
             0.f,
             2.f,
             -1.f,
-            -1,
+            4,
             false,
             2
         ))
@@ -2309,7 +2309,7 @@ namespace img_aligner
             0.f,
             360.f,
             .1f,
-            -1,
+            4,
             false,
             1,
             false,
@@ -2328,7 +2328,7 @@ namespace img_aligner
             -1.f,
             1.f,
             .001f,
-            -1,
+            4,
             false,
             2
         ))
