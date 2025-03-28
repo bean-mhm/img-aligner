@@ -128,11 +128,13 @@ add_custom_command(TARGET img-aligner
 # copy resource files (make sure source directories have /. at the end)
 mkdir_if_needed("${CMAKE_BINARY_DIR}/bin/licenses")
 mkdir_if_needed("${CMAKE_BINARY_DIR}/bin/fonts")
+mkdir_if_needed("${CMAKE_BINARY_DIR}/bin/demo")
 add_custom_command(TARGET img-aligner
     POST_BUILD
     COMMAND echo copying resource files
     COMMAND ${CMD_RCOPY_PREFIX} "\"${CMAKE_SOURCE_DIR}/licenses/.\" \"${CMAKE_BINARY_DIR}/bin/licenses\"" ${CMD_RCOPY_SUFFIX}
     COMMAND ${CMD_RCOPY_PREFIX} "\"${CMAKE_SOURCE_DIR}/fonts/.\" \"${CMAKE_BINARY_DIR}/bin/fonts\"" ${CMD_RCOPY_SUFFIX}
+    COMMAND ${CMD_RCOPY_PREFIX} "\"${CMAKE_SOURCE_DIR}/demo/.\" \"${CMAKE_BINARY_DIR}/bin/demo\"" ${CMD_RCOPY_SUFFIX}
     COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/imgui.ini" "${CMAKE_BINARY_DIR}/bin/imgui.ini"
     COMMAND echo done copying resource files
 )
