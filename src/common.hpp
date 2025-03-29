@@ -47,6 +47,10 @@
 #include "circular_buffer.hpp"
 #include "transform2d.hpp"
 
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+#define WINDOWS
+#endif
+
 // access element in 2D array with row-major ordering
 #define ACCESS_2D(arr, ix, iy, res_x) ((arr)[(ix) + (iy) * (res_x)])
 #define INDEX_2D(ix, iy, res_x) ((ix) + (iy) * (res_x))

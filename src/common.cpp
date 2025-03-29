@@ -1,6 +1,6 @@
 #include "common.hpp"
 
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+#ifdef WINDOWS
 #define NOMINMAX
 #include <Windows.h>
 #endif
