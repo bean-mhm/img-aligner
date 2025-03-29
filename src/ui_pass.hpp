@@ -1,6 +1,11 @@
 #pragma once
 
-#include "common.hpp"
+#include "misc/common.hpp"
+#include "misc/app_state.hpp"
+#include "misc/constants.hpp"
+#include "misc/io.hpp"
+#include "misc/numbers.hpp"
+#include "misc/vk_utils.hpp"
 
 namespace img_aligner
 {

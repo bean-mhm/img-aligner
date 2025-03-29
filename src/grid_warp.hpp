@@ -1,6 +1,13 @@
 #pragma once
 
-#include "common.hpp"
+#include "misc/common.hpp"
+#include "misc/app_state.hpp"
+#include "misc/constants.hpp"
+#include "misc/io.hpp"
+#include "misc/numbers.hpp"
+#include "misc/transform2d.hpp"
+#include "misc/vk_utils.hpp"
+
 #include "ui_pass.hpp"
 
 namespace img_aligner::grid_warp

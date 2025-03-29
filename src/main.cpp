@@ -1,10 +1,6 @@
-#include <iostream>
-#include <filesystem>
-
-#include "beva/beva.hpp"
+#include "misc/common.hpp"
 
 #include "app.hpp"
-#include "common.hpp"
 
 static void pause_on_error()
 {
