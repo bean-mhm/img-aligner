@@ -145,6 +145,7 @@ following libraries.
 | [NFD Extended](https://github.com/btzy/nativefiledialog-extended) | Native file dialogs |
 | [beva](https://github.com/bean-mhm/beva) | Vulkan wrapper |
 | [OpenEXR](https://openexr.com) | Reading and writing OpenEXR images |
+| [stb_image](https://github.com/nothings/stb) | Reading images |
 | [GLM](https://github.com/g-truc/glm) | Math |
 | [nlohmann/json](https://github.com/nlohmann/json) | JSON serialization |
 
