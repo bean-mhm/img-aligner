@@ -23,38 +23,10 @@ else()
     set(EXEC_FILE_EXT "")
 endif()
 
-if(WINDOWS)
-    # compile resources (also containing icon). this will run at configure time,
-    # so if the resources change we should reconfigure CMake.
-    find_program(WINDRES_EXECUTABLE windres REQUIRED)
-    execute_process(
-        COMMAND ${WINDRES_EXECUTABLE} app.rc -o ${CMAKE_BINARY_DIR}/${PROJECT_NAME}.o
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        RESULT_VARIABLE WINDRES_RESULT
-        ERROR_VARIABLE WINDRES_ERROR
-        # OUTPUT_VARIABLE UNUSED
-        # OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
-
-    if(NOT WINDRES_RESULT EQUAL 0)
-        message(FATAL_ERROR "failed to compile resources: ${WINDRES_ERROR}")
-    endif()
-
-    set(COMPILED_RESOURCE_FILE ${CMAKE_BINARY_DIR}/${PROJECT_NAME}.o)
-else()
-    message(WARNING "compiling resources and icons isn't yet implemented on non-Windows platforms")
-    set(COMPILED_RESOURCE_FILE "")
-endif()
-
 # main executable
 file(GLOB_RECURSE SRC_CPP_FILES src/*.cpp)
 file(GLOB_RECURSE SRC_C_FILES src/*.c)
-add_executable(
-    img-aligner
-    ${SRC_CPP_FILES}
-    ${SRC_C_FILES}
-    ${COMPILED_RESOURCE_FILE}
-)
+add_executable(img-aligner ${SRC_CPP_FILES} ${SRC_C_FILES})
 
 # set binary output directory
 set_target_properties(img-aligner PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/$<0:>")
@@ -76,6 +48,22 @@ endif()
 # include dirs
 target_include_directories(img-aligner PUBLIC src/lib)
 
+# setup icon and resources
+if(WINDOWS)
+    set(RC_FILE ${CMAKE_BINARY_DIR}/resources/app.rc)
+    file(WRITE ${RC_FILE} "IDI_ICON1 ICON DISCARDABLE \"${CMAKE_SOURCE_DIR}/resources/icon.ico\"\n")
+    target_sources(img-aligner PRIVATE ${RC_FILE})
+elseif(APPLE)
+    # IDK if this will work. I haven't tested it. I got it from AI.
+    set(MACOSX_BUNDLE_ICON_FILE ${CMAKE_SOURCE_DIR}/resources/icon.icns)
+    set_source_files_properties(${MACOSX_BUNDLE_ICON_FILE} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+    set_target_properties(img-aligner PROPERTIES
+        MACOSX_BUNDLE TRUE
+        MACOSX_BUNDLE_ICON_FILE ${MACOSX_BUNDLE_ICON_FILE}
+    )
+    target_sources(img-aligner PRIVATE ${MACOSX_BUNDLE_ICON_FILE})
+endif()
+
 # Vulkan
 find_package(Vulkan REQUIRED)
 target_include_directories(img-aligner PUBLIC ${Vulkan_INCLUDE_DIRS})
@@ -88,6 +76,7 @@ target_include_directories(img-aligner PUBLIC ${GLFW_SOURCE_DIR}/include)
 target_link_libraries(img-aligner PUBLIC glfw)
 
 # OpenEXR
+set(OPENEXR_BUILD_TOOLS OFF CACHE BOOL "disable OpenEXR tools")
 add_subdirectory(thirdparty/openexr)
 target_include_directories(img-aligner PUBLIC thirdparty/openexr/src/lib)
 target_link_libraries(img-aligner PUBLIC OpenEXR)
@@ -149,27 +138,6 @@ else()
     set(CMD_RCOPY_PREFIX "cp -ra")
     set(CMD_RCOPY_SUFFIX "")
 endif()
-
-# post build: clean up OpenEXR executables
-add_custom_command(TARGET img-aligner
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E echo performing post-build cleanup
-    COMMAND ${CMAKE_COMMAND} -E remove "${CMAKE_BINARY_DIR}/bin/exr2aces${EXEC_FILE_EXT}"
-    COMMAND ${CMAKE_COMMAND} -E remove "${CMAKE_BINARY_DIR}/bin/exrcheck${EXEC_FILE_EXT}"
-    COMMAND ${CMAKE_COMMAND} -E remove "${CMAKE_BINARY_DIR}/bin/exrenvmap${EXEC_FILE_EXT}"
-    COMMAND ${CMAKE_COMMAND} -E remove "${CMAKE_BINARY_DIR}/bin/exrheader${EXEC_FILE_EXT}"
-    COMMAND ${CMAKE_COMMAND} -E remove "${CMAKE_BINARY_DIR}/bin/exrinfo${EXEC_FILE_EXT}"
-    COMMAND ${CMAKE_COMMAND} -E remove "${CMAKE_BINARY_DIR}/bin/exrmakepreview${EXEC_FILE_EXT}"
-    COMMAND ${CMAKE_COMMAND} -E remove "${CMAKE_BINARY_DIR}/bin/exrmaketiled${EXEC_FILE_EXT}"
-    COMMAND ${CMAKE_COMMAND} -E remove "${CMAKE_BINARY_DIR}/bin/exrmanifest${EXEC_FILE_EXT}"
-    COMMAND ${CMAKE_COMMAND} -E remove "${CMAKE_BINARY_DIR}/bin/exrmetrics${EXEC_FILE_EXT}"
-    COMMAND ${CMAKE_COMMAND} -E remove "${CMAKE_BINARY_DIR}/bin/exrmultipart${EXEC_FILE_EXT}"
-    COMMAND ${CMAKE_COMMAND} -E remove "${CMAKE_BINARY_DIR}/bin/exrmultiview${EXEC_FILE_EXT}"
-    COMMAND ${CMAKE_COMMAND} -E remove "${CMAKE_BINARY_DIR}/bin/exrstdattr${EXEC_FILE_EXT}"
-    COMMAND ${CMAKE_COMMAND} -E remove "${CMAKE_BINARY_DIR}/bin/OpenEXRExamples${EXEC_FILE_EXT}"
-    COMMAND ${CMAKE_COMMAND} -E echo done performing post-build cleanup
-    DEPENDS ALWAYS
-)
 
 # post build: compile shaders
 set(GLSLC_PATH "C:/Program Files/VulkanSDK/1.3.250.1/Bin/glslc.exe")
