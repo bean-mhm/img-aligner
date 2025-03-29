@@ -76,7 +76,8 @@ target_include_directories(img-aligner PUBLIC ${GLFW_SOURCE_DIR}/include)
 target_link_libraries(img-aligner PUBLIC glfw)
 
 # OpenEXR
-set(OPENEXR_BUILD_TOOLS OFF CACHE BOOL "disable OpenEXR tools")
+set(OPENEXR_BUILD_TOOLS OFF CACHE BOOL "disable unwanted OpenEXR binaries")
+set(OPENEXR_BUILD_EXAMPLES OFF CACHE BOOL "disable unwanted OpenEXR binaries")
 add_subdirectory(thirdparty/openexr)
 target_include_directories(img-aligner PUBLIC thirdparty/openexr/src/lib)
 target_link_libraries(img-aligner PUBLIC OpenEXR)
