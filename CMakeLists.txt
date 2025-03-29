@@ -51,7 +51,12 @@ target_include_directories(img-aligner PUBLIC src/lib)
 # setup icon and resources
 if(WINDOWS)
     set(RC_FILE ${CMAKE_BINARY_DIR}/resources/app.rc)
-    file(WRITE ${RC_FILE} "IDI_ICON1 ICON DISCARDABLE \"${CMAKE_SOURCE_DIR}/resources/icon.ico\"\n")
+    file(
+        WRITE
+        ${RC_FILE}
+        "IDI_ICON1 ICON DISCARDABLE \"${CMAKE_SOURCE_DIR}/resources/icon.ico\"\n"
+        "GLFW_ICON ICON \"${CMAKE_SOURCE_DIR}/resources/icon.ico\"\n"
+    )
     target_sources(img-aligner PRIVATE ${RC_FILE})
 elseif(APPLE)
     # IDK if this will work. I haven't tested it. I got it from AI.
