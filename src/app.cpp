@@ -10,11 +10,40 @@
 #include <nlohmann/json.hpp>
 using json = nlohmann::ordered_json;
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb/stb_image.h"
+
 namespace img_aligner
 {
 
     static void glfw_error_callback(int error, const char* description);
     static void imgui_check_vk_result(VkResult err);
+
+    static stbi_uc* stbi_load_throw(
+        char const* filename,
+        int* x,
+        int* y,
+        int* comp,
+        int req_comp
+    )
+    {
+        auto result = stbi_load(
+            filename,
+            x,
+            y,
+            comp,
+            req_comp
+        );
+        if (!result)
+        {
+            throw std::runtime_error(std::format(
+                "failed to load image from file \"{}\": {}",
+                filename,
+                stbi_failure_reason()
+            ).c_str());
+        }
+        return result;
+    }
 
     float GridWarpOptimizationParams::calc_warp_strength(size_t n_iters)
     {
