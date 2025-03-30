@@ -3371,7 +3371,6 @@ namespace img_aligner
         nfdu8char_t* nfd_filename;
         nfdsavedialogu8args_t args{ 0 };
         nfdu8filteritem_t filters[]{
-            { "Images", "exr,png,jpg,jpeg" },
             { "OpenEXR", "exr" },
             { "PNG", "png" },
             { "JPEG", "jpg,jpeg" }
