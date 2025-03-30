@@ -209,27 +209,6 @@ namespace img_aligner
         void parse_command_line();
         void handle_command_line();
 
-        void recreate_image(
-            bv::ImagePtr& img,
-            bv::MemoryChunkPtr& img_mem,
-            bv::ImageViewPtr& imgview,
-            uint32_t width,
-            uint32_t height,
-            std::span<float> pixels_rgba
-        );
-
-        void load_image(
-            const std::filesystem::path& path,
-            bv::ImagePtr& img,
-            bv::MemoryChunkPtr& img_mem,
-            bv::ImageViewPtr& imgview
-        );
-
-        void save_image(
-            const bv::ImagePtr& img,
-            const std::filesystem::path& path
-        );
-
         void export_metadata(
             const std::filesystem::path& path
         );

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common.hpp"
+#include "app_state.hpp"
 
 namespace img_aligner
 {
@@ -64,5 +65,19 @@ namespace img_aligner
             filename, x, y, comp, req_comp
         );
     }
+
+    void load_image(
+        AppState& state,
+        const std::filesystem::path& path,
+        bv::ImagePtr& img,
+        bv::MemoryChunkPtr& img_mem,
+        bv::ImageViewPtr& imgview
+    );
+
+    void save_image(
+        AppState& state,
+        const bv::ImagePtr& img,
+        const std::filesystem::path& path
+    );
 
 }

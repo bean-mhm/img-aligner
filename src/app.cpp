@@ -1,10 +1,5 @@
 #include "app.hpp"
 
-#include "OpenEXR/ImfRgbaFile.h"
-#include "OpenEXR/ImfOutputFile.h"
-#include "OpenEXR/ImfArray.h"
-#include "OpenEXR/ImfChannelList.h"
-
 #include "nfd.hpp"
 
 #include <nlohmann/json.hpp>
@@ -866,21 +861,21 @@ namespace img_aligner
         cli_app->add_option(
             "-o,--output",
             cli_params.output_img_path,
-            "optional output path to the warped image file (.exr)"
+            "optional output path to the warped image file"
         );
 
         cli_app->add_option(
             "-d,--diff0",
             cli_params.difference_img_before_opt_path,
-            "optional output path to the difference image file (.exr) exported "
-            "before optimization"
+            "optional output path to the difference image file exported before "
+            "optimization"
         );
 
         cli_app->add_option(
             "-D,--diff1",
             cli_params.difference_img_after_opt_path,
-            "optional output path to the difference image file (.exr) exported "
-            "after optimization"
+            "optional output path to the difference image file exported after "
+            "optimization"
         );
 
         cli_app->add_option(
@@ -1094,6 +1089,7 @@ namespace img_aligner
         {
             ScopedTimer timer(!cli_params.flag_silent, "loading base image");
             load_image(
+                state,
                 cli_params.base_img_path,
                 base_img,
                 base_img_mem,
@@ -1112,6 +1108,7 @@ namespace img_aligner
         {
             ScopedTimer timer(!cli_params.flag_silent, "loading target image");
             load_image(
+                state,
                 cli_params.target_img_path,
                 target_img,
                 target_img_mem,
@@ -1148,6 +1145,7 @@ namespace img_aligner
                     "exporting difference image before optimization"
                 );
                 save_image(
+                    state,
                     grid_warper->get_difference_img(),
                     cli_params.difference_img_before_opt_path
                 );
@@ -1215,6 +1213,7 @@ namespace img_aligner
                     "exporting warped image"
                 );
                 save_image(
+                    state,
                     grid_warper->get_warped_hires_img(),
                     cli_params.output_img_path
                 );
@@ -1237,6 +1236,7 @@ namespace img_aligner
                     "exporting difference image after optimization"
                 );
                 save_image(
+                    state,
                     grid_warper->get_difference_img(),
                     cli_params.difference_img_after_opt_path
                 );
@@ -1276,209 +1276,6 @@ namespace img_aligner
                 to_str(elapsed_sec(time_start))
             );
         }
-    }
-
-    void App::recreate_image(
-        bv::ImagePtr& img,
-        bv::MemoryChunkPtr& img_mem,
-        bv::ImageViewPtr& imgview,
-        uint32_t width,
-        uint32_t height,
-        std::span<float> pixels_rgba
-    )
-    {
-        if (pixels_rgba.size() != (size_t)width * (size_t)height * (size_t)4)
-        {
-            throw std::invalid_argument(
-                "provided pixel data doesn't have the expected size"
-            );
-        }
-        create_texture(
-            state,
-            state.queue_main,
-            width,
-            height,
-            RGBA_FORMAT,
-            pixels_rgba.data(),
-            pixels_rgba.size_bytes(),
-            true,
-            img,
-            img_mem,
-            imgview
-        );
-    }
-
-    void App::load_image(
-        const std::filesystem::path& path,
-        bv::ImagePtr& img,
-        bv::MemoryChunkPtr& img_mem,
-        bv::ImageViewPtr& imgview
-    )
-    {
-        if (!std::filesystem::exists(path))
-        {
-            throw std::runtime_error("file doesn't exist");
-        }
-        if (std::filesystem::is_directory(path))
-        {
-            throw std::runtime_error(
-                "provided path is a directory, not a file"
-            );
-        }
-
-        int32_t width = 0, height = 0;
-        std::vector<float> pixels_f32;
-
-        // get the file extension
-        std::string file_ext = lowercase(path.extension().string());
-
-        if (file_ext == ".exr")
-        {
-            Imf::RgbaInputFile f(path.string().c_str());
-            Imath::Box2i dw = f.dataWindow();
-            width = dw.max.x - dw.min.x + 1;
-            height = dw.max.y - dw.min.y + 1;
-
-            std::vector<Imf::Rgba> pixels(width * height);
-
-            f.setFrameBuffer(pixels.data(), 1, width);
-            f.readPixels(dw.min.y, dw.max.y);
-
-            // copy pixels by pixels while flipping vertically and converting
-            // from half float to float.
-            pixels_f32.resize(width * height * 4);
-            for (int32_t y = 0; y < height; y++)
-            {
-                for (int32_t x = 0; x < width; x++)
-                {
-                    // flip vertically
-                    int32_t src_pixel_idx = x + (height - y - 1) * width;
-                    int32_t dst_red_idx = (x + (y * width)) * 4;
-
-                    pixels_f32[dst_red_idx + 0] =
-                        (float)pixels[src_pixel_idx].r;
-                    pixels_f32[dst_red_idx + 1] =
-                        (float)pixels[src_pixel_idx].g;
-                    pixels_f32[dst_red_idx + 2] =
-                        (float)pixels[src_pixel_idx].b;
-                    pixels_f32[dst_red_idx + 3] =
-                        (float)pixels[src_pixel_idx].a;
-                }
-            }
-        }
-        else if (file_ext == ".png"
-            || file_ext == ".jpg"
-            || file_ext == ".jpeg")
-        {
-            // this will perform the necessary conversions from sRGB 2.2 to
-            // Linear BT.709 I-D65 if needed.
-            float* pixels = stbi_loadf_throw(
-                path.string().c_str(),
-                &width,
-                &height,
-                nullptr,
-                4 // RGBA
-            );
-
-            // copy row by row while flipping vertically
-            pixels_f32.resize(width * height * 4);
-            for (int32_t y = 0; y < height; y++)
-            {
-                int32_t src_red_idx = ((height - y - 1) * width) * 4;
-                int32_t dst_red_idx = (y * width) * 4;
-
-                std::copy(
-                    pixels + src_red_idx,
-                    pixels + src_red_idx + (width * 4),
-                    pixels_f32.data() + dst_red_idx
-                );
-            }
-
-            stbi_image_free(pixels);
-        }
-        else
-        {
-            throw std::invalid_argument(
-                "unsupported file extension for loading images"
-            );
-        }
-
-        recreate_image(
-            img,
-            img_mem,
-            imgview,
-            (uint32_t)width,
-            (uint32_t)height,
-            { pixels_f32.data(), pixels_f32.size() }
-        );
-    }
-
-    void App::save_image(
-        const bv::ImagePtr& img,
-        const std::filesystem::path& path
-    )
-    {
-        std::vector<float> pixels_rgbaf32 =
-            read_back_image_rgbaf32(state, img, state.queue_main, true);
-
-        uint32_t width = img->config().extent.width;
-        uint32_t height = img->config().extent.height;
-
-        Imf::Header header(
-            (int)width,
-            (int)height,
-            1.f,
-            { 0.f, 0.f },
-            1.f,
-            Imf::LineOrder::INCREASING_Y,
-            Imf::Compression::ZIP_COMPRESSION
-        );
-        header.channels().insert("R", Imf::Channel(Imf::PixelType::FLOAT));
-        header.channels().insert("G", Imf::Channel(Imf::PixelType::FLOAT));
-        header.channels().insert("B", Imf::Channel(Imf::PixelType::FLOAT));
-        header.channels().insert("A", Imf::Channel(Imf::PixelType::FLOAT));
-
-        Imf::FrameBuffer fb;
-        fb.insert(
-            "R",
-            Imf::Slice(
-                Imf::FLOAT,
-                (char*)pixels_rgbaf32.data(),
-                4 * sizeof(float),
-                width * 4 * sizeof(float)
-            )
-        );
-        fb.insert(
-            "G",
-            Imf::Slice(
-                Imf::FLOAT,
-                (char*)(pixels_rgbaf32.data() + 1),
-                4 * sizeof(float),
-                width * 4 * sizeof(float)
-            )
-        );
-        fb.insert(
-            "B",
-            Imf::Slice(
-                Imf::FLOAT,
-                (char*)(pixels_rgbaf32.data() + 2),
-                4 * sizeof(float),
-                width * 4 * sizeof(float)
-            )
-        );
-        fb.insert(
-            "A",
-            Imf::Slice(
-                Imf::FLOAT,
-                (char*)(pixels_rgbaf32.data() + 3),
-                4 * sizeof(float),
-                width * 4 * sizeof(float)
-            )
-        );
-
-        Imf::OutputFile f(path.string().c_str(), header);
-        f.setFrameBuffer(fb);
-        f.writePixels(height);
     }
 
     void App::export_metadata(
@@ -3531,6 +3328,7 @@ namespace img_aligner
         };
         args.filterList = filters;
         args.filterCount = sizeof(filters) / sizeof(nfdu8filteritem_t);
+
         nfdresult_t result = NFD_OpenDialogU8_With(&nfd_filename, &args);
         if (result == NFD_OKAY)
         {
@@ -3539,7 +3337,7 @@ namespace img_aligner
 
             try
             {
-                load_image(filename, img, img_mem, imgview);
+                load_image(state, filename, img, img_mem, imgview);
                 return true;
             }
             catch (const std::exception& e)
@@ -3572,9 +3370,15 @@ namespace img_aligner
     {
         nfdu8char_t* nfd_filename;
         nfdsavedialogu8args_t args{ 0 };
-        nfdu8filteritem_t filters[1] = { { "OpenEXR", "exr" } };
+        nfdu8filteritem_t filters[]{
+            { "Images", "exr,png,jpg,jpeg" },
+            { "OpenEXR", "exr" },
+            { "PNG", "png" },
+            { "JPEG", "jpg,jpeg" }
+        };
         args.filterList = filters;
         args.filterCount = sizeof(filters) / sizeof(nfdu8filteritem_t);
+
         nfdresult_t result = NFD_SaveDialogU8_With(&nfd_filename, &args);
         if (result == NFD_OKAY)
         {
@@ -3583,7 +3387,7 @@ namespace img_aligner
 
             try
             {
-                save_image(img, filename);
+                save_image(state, img, filename);
             }
             catch (const std::exception& e)
             {
