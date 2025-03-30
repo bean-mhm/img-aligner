@@ -45,6 +45,7 @@
 #include "glm/gtc/matrix_transform.hpp"
 
 #include "stb/stb_image.h"
+#include "stb/stb_image_write.h"
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 #define WINDOWS
