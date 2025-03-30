@@ -24,10 +24,6 @@ hit _Load Target Image_ and choose `demo/images/1-house-target.exr`.
 You'll notice two controls in the _IMAGES_ section named _Base Image Multiplier_
 and _Target Image Multiplier_. We'll address these in later examples.
 
-> [!NOTE]
-> If you're wondering why img-aligner only supports OpenEXR images, you almost
-> certainly haven't fully read the [README](../../README.md).
-
 # Image Viewer
 
 After loading the images, the _Image Viewer_ tab will be displaying the image

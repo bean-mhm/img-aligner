@@ -86,12 +86,14 @@ graphics processing unit (GPU) using the Vulkan API.
 
 Unlike typical images you might see on the internet which can only store RGB
 (red, green, blue) values in the [0, 1] range, linear images allow any real
-number (even negative) for the RGB values in their pixels.
+number (even negative) for the RGB values in their pixels. img-aligner performs
+its calculations in a linear color space using 32-bit floating point values.
 
-img-aligner only supports OpenEXR images. It performs calculations in a linear
-color space using 32-bit floating point values. All images are assumed to be
-in Linear BT.709 (AKA Linear Rec. 709) or something similar, like
-Linear BT.2020.
+img-aligner supports the [OpenEXR](https://openexr.com) image format for linear
+images and PNG and JPEG for nonlinear images. All linear images are assumed to
+be in Linear BT.709 I-D65 (AKA Linear Rec. 709) or something similar like Linear
+BT.2020 I-E. Nonlinear images will go through an sRGB to Linear BT.709
+conversion upon loading and the opposite when exporting.
 
 img-aligner always assumes your display device uses the sRGB standard. If you're
 using a P3 or BT.2020 device, linear images that were originally intended to
