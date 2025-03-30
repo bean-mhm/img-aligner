@@ -65,6 +65,36 @@ namespace img_aligner
         std::vector<T>().swap(vec);
     }
 
+    template <typename T>
+    std::basic_string<T> lowercase(std::basic_string<T> s)
+    {
+        std::transform(
+            s.begin(),
+            s.end(),
+            s.begin(),
+            [](const T v)
+            {
+                return static_cast<T>(std::tolower(v));
+            }
+        );
+        return s;
+    }
+
+    template <typename T>
+    std::basic_string<T> uppercase(std::basic_string<T> s)
+    {
+        std::transform(
+            s.begin(),
+            s.end(),
+            s.begin(),
+            [](const T v)
+            {
+                return static_cast<T>(std::toupper(v));
+            }
+        );
+        return s;
+    }
+
     static void cli_add_toggle(
         CLI::App& cli_app,
         const std::string& flag_name,
