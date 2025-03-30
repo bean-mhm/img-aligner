@@ -645,7 +645,7 @@ namespace img_aligner::grid_warp
             intermediate_res_y,
             1,
             VK_SAMPLE_COUNT_1_BIT,
-            RGBA_FORMAT,
+            VK_FORMAT_R32G32B32A32_SFLOAT,
             VK_IMAGE_TILING_OPTIMAL,
             VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -655,7 +655,7 @@ namespace img_aligner::grid_warp
         warped_imgview = create_image_view(
             state,
             warped_img,
-            RGBA_FORMAT,
+            VK_FORMAT_R32G32B32A32_SFLOAT,
             VK_IMAGE_ASPECT_COLOR_BIT,
             1
         );
@@ -674,7 +674,7 @@ namespace img_aligner::grid_warp
             img_height,
             1,
             VK_SAMPLE_COUNT_1_BIT,
-            RGBA_FORMAT,
+            VK_FORMAT_R32G32B32A32_SFLOAT,
             VK_IMAGE_TILING_OPTIMAL,
 
             VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
@@ -687,7 +687,7 @@ namespace img_aligner::grid_warp
         warped_hires_imgview = create_image_view(
             state,
             warped_hires_img,
-            RGBA_FORMAT,
+            VK_FORMAT_R32G32B32A32_SFLOAT,
             VK_IMAGE_ASPECT_COLOR_BIT,
             1
         );
@@ -706,7 +706,7 @@ namespace img_aligner::grid_warp
             intermediate_res_y,
             1,
             VK_SAMPLE_COUNT_1_BIT,
-            R_FORMAT,
+            VK_FORMAT_R32_SFLOAT,
             VK_IMAGE_TILING_OPTIMAL,
 
             VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
@@ -718,7 +718,7 @@ namespace img_aligner::grid_warp
         difference_imgview = create_image_view(
             state,
             difference_img,
-            R_FORMAT,
+            VK_FORMAT_R32_SFLOAT,
             VK_IMAGE_ASPECT_COLOR_BIT,
             1
         );
@@ -737,7 +737,7 @@ namespace img_aligner::grid_warp
             cost_res_y,
             1,
             VK_SAMPLE_COUNT_1_BIT,
-            R_FORMAT,
+            VK_FORMAT_R32_SFLOAT,
             VK_IMAGE_TILING_OPTIMAL,
 
             VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
@@ -750,7 +750,7 @@ namespace img_aligner::grid_warp
         cost_imgview = create_image_view(
             state,
             cost_img,
-            R_FORMAT,
+            VK_FORMAT_R32_SFLOAT,
             VK_IMAGE_ASPECT_COLOR_BIT,
             1
         );
@@ -946,7 +946,7 @@ namespace img_aligner::grid_warp
         {
             bv::Attachment color_attachment{
                 .flags = 0,
-                .format = RGBA_FORMAT,
+                .format = VK_FORMAT_R32G32B32A32_SFLOAT,
                 .samples = VK_SAMPLE_COUNT_1_BIT,
                 .load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
                 .store_op = VK_ATTACHMENT_STORE_OP_STORE,
@@ -1245,7 +1245,7 @@ namespace img_aligner::grid_warp
         {
             bv::Attachment color_attachment{
                 .flags = 0,
-                .format = R_FORMAT,
+                .format = VK_FORMAT_R32_SFLOAT,
                 .samples = VK_SAMPLE_COUNT_1_BIT,
                 .load_op = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
                 .store_op = VK_ATTACHMENT_STORE_OP_STORE,
@@ -1504,7 +1504,7 @@ namespace img_aligner::grid_warp
         {
             bv::Attachment color_attachment{
                 .flags = 0,
-                .format = R_FORMAT,
+                .format = VK_FORMAT_R32_SFLOAT,
                 .samples = VK_SAMPLE_COUNT_1_BIT,
                 .load_op = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
                 .store_op = VK_ATTACHMENT_STORE_OP_STORE,

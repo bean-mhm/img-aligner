@@ -23,8 +23,6 @@ namespace img_aligner
     static constexpr auto FONT_PATH = "fonts/Outfit-Regular.ttf";
     static constexpr auto FONT_BOLD_PATH = "fonts/Outfit-Bold.ttf";
 
-    static constexpr VkFormat RGBA_FORMAT = VK_FORMAT_R32G32B32A32_SFLOAT;
-    static constexpr VkFormat R_FORMAT = VK_FORMAT_R32_SFLOAT;
     static constexpr VkFormat UI_DISPLAY_IMG_FORMAT =
         VK_FORMAT_R16G16B16A16_SFLOAT;
 
