@@ -74,30 +74,4 @@ namespace img_aligner
 #endif
     }
 
-    stbi_uc* stbi_load_throw(
-        char const* filename,
-        int* x,
-        int* y,
-        int* comp,
-        int req_comp
-    )
-    {
-        auto result = stbi_load(
-            filename,
-            x,
-            y,
-            comp,
-            req_comp
-        );
-        if (!result)
-        {
-            throw std::runtime_error(std::format(
-                "failed to load image from file \"{}\": {}",
-                filename,
-                stbi_failure_reason()
-            ).c_str());
-        }
-        return result;
-    }
-
 }

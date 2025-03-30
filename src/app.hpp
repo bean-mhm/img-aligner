@@ -219,7 +219,7 @@ namespace img_aligner
         );
 
         void load_image(
-            std::string_view filename,
+            const std::filesystem::path& path,
             bv::ImagePtr& img,
             bv::MemoryChunkPtr& img_mem,
             bv::ImageViewPtr& imgview
@@ -227,11 +227,11 @@ namespace img_aligner
 
         void save_image(
             const bv::ImagePtr& img,
-            std::string_view filename
+            const std::filesystem::path& path
         );
 
         void export_metadata(
-            std::string_view filename
+            const std::filesystem::path& path
         );
 
         void recreate_grid_warper();

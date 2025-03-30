@@ -854,13 +854,13 @@ namespace img_aligner
         cli_app->add_option(
             "-b,--base",
             cli_params.base_img_path,
-            "input path to the base image file (.exr)"
+            "input path to the base image file"
         );
 
         cli_app->add_option(
             "-t,--target",
             cli_params.target_img_path,
-            "input path to the target image file (.exr)"
+            "input path to the target image file"
         );
 
         cli_app->add_option(
@@ -1309,68 +1309,113 @@ namespace img_aligner
     }
 
     void App::load_image(
-        std::string_view filename,
+        const std::filesystem::path& path,
         bv::ImagePtr& img,
         bv::MemoryChunkPtr& img_mem,
         bv::ImageViewPtr& imgview
     )
     {
-        if (!std::filesystem::exists(filename))
+        if (!std::filesystem::exists(path))
         {
             throw std::runtime_error("file doesn't exist");
         }
-        if (std::filesystem::is_directory(filename))
+        if (std::filesystem::is_directory(path))
         {
             throw std::runtime_error(
                 "provided path is a directory, not a file"
             );
         }
 
-        Imf::RgbaInputFile f(filename.data());
-        Imath::Box2i dw = f.dataWindow();
-        int32_t width = dw.max.x - dw.min.x + 1;
-        int32_t height = dw.max.y - dw.min.y + 1;
+        int32_t width = 0, height = 0;
+        std::vector<float> pixels_f32;
 
-        std::vector<Imf::Rgba> pixels(width * height);
+        // get the file extension
+        std::string file_ext = lowercase(path.extension().string());
 
-        f.setFrameBuffer(pixels.data(), 1, width);
-        f.readPixels(dw.min.y, dw.max.y);
-
-        std::vector<float> pixels_f32(width * height * 4);
-        for (int32_t y = 0; y < height; y++)
+        if (file_ext == ".exr")
         {
-            for (int32_t x = 0; x < width; x++)
+            Imf::RgbaInputFile f(path.string().c_str());
+            Imath::Box2i dw = f.dataWindow();
+            width = dw.max.x - dw.min.x + 1;
+            height = dw.max.y - dw.min.y + 1;
+
+            std::vector<Imf::Rgba> pixels(width * height);
+
+            f.setFrameBuffer(pixels.data(), 1, width);
+            f.readPixels(dw.min.y, dw.max.y);
+
+            // copy pixels by pixels while flipping vertically and converting
+            // from half float to float.
+            pixels_f32.resize(width * height * 4);
+            for (int32_t y = 0; y < height; y++)
             {
-                int32_t pixel_idx = x + y * width;
-                int32_t red_idx = pixel_idx * 4;
+                for (int32_t x = 0; x < width; x++)
+                {
+                    // flip vertically
+                    int32_t src_pixel_idx = x + (height - y - 1) * width;
+                    int32_t dst_red_idx = (x + (y * width)) * 4;
 
-                int32_t flipped_pixel_idx =
-                    x + (height - y - 1) * width;
-
-                pixels_f32[red_idx + 0] =
-                    (float)pixels[flipped_pixel_idx].r;
-                pixels_f32[red_idx + 1] =
-                    (float)pixels[flipped_pixel_idx].g;
-                pixels_f32[red_idx + 2] =
-                    (float)pixels[flipped_pixel_idx].b;
-                pixels_f32[red_idx + 3] =
-                    (float)pixels[flipped_pixel_idx].a;
+                    pixels_f32[dst_red_idx + 0] =
+                        (float)pixels[src_pixel_idx].r;
+                    pixels_f32[dst_red_idx + 1] =
+                        (float)pixels[src_pixel_idx].g;
+                    pixels_f32[dst_red_idx + 2] =
+                        (float)pixels[src_pixel_idx].b;
+                    pixels_f32[dst_red_idx + 3] =
+                        (float)pixels[src_pixel_idx].a;
+                }
             }
+        }
+        else if (file_ext == ".png"
+            || file_ext == ".jpg"
+            || file_ext == ".jpeg")
+        {
+            // this will perform the necessary conversions from sRGB 2.2 to
+            // Linear BT.709 I-D65 if needed.
+            float* pixels = stbi_loadf_throw(
+                path.string().c_str(),
+                &width,
+                &height,
+                nullptr,
+                4 // RGBA
+            );
+
+            // copy row by row while flipping vertically
+            pixels_f32.resize(width * height * 4);
+            for (int32_t y = 0; y < height; y++)
+            {
+                int32_t src_red_idx = ((height - y - 1) * width) * 4;
+                int32_t dst_red_idx = (y * width) * 4;
+
+                std::copy(
+                    pixels + src_red_idx,
+                    pixels + src_red_idx + (width * 4),
+                    pixels_f32.data() + dst_red_idx
+                );
+            }
+
+            stbi_image_free(pixels);
+        }
+        else
+        {
+            throw std::invalid_argument(
+                "unsupported file extension for loading images"
+            );
         }
 
         recreate_image(
             img,
             img_mem,
             imgview,
-            width,
-            height,
+            (uint32_t)width,
+            (uint32_t)height,
             { pixels_f32.data(), pixels_f32.size() }
         );
     }
 
     void App::save_image(
         const bv::ImagePtr& img,
-        std::string_view filename
+        const std::filesystem::path& path
     )
     {
         std::vector<float> pixels_rgbaf32 =
@@ -1431,13 +1476,13 @@ namespace img_aligner
             )
         );
 
-        Imf::OutputFile f(filename.data(), header);
+        Imf::OutputFile f(path.string().c_str(), header);
         f.setFrameBuffer(fb);
         f.writePixels(height);
     }
 
     void App::export_metadata(
-        std::string_view filename
+        const std::filesystem::path& path
     )
     {
         if (!grid_warper)
@@ -1628,7 +1673,7 @@ namespace img_aligner
         }
 
         std::ofstream f(
-            filename.data(),
+            path,
             std::ofstream::out | std::ofstream::trunc
         );
         if (!f.is_open())
@@ -3478,7 +3523,12 @@ namespace img_aligner
     {
         nfdu8char_t* nfd_filename;
         nfdopendialogu8args_t args{ 0 };
-        nfdu8filteritem_t filters[1] = { { "OpenEXR", "exr" } };
+        nfdu8filteritem_t filters[]{
+            { "Images", "exr,png,jpg,jpeg" },
+            { "OpenEXR", "exr" },
+            { "PNG", "png" },
+            { "JPEG", "jpg,jpeg" }
+        };
         args.filterList = filters;
         args.filterCount = sizeof(filters) / sizeof(nfdu8filteritem_t);
         nfdresult_t result = NFD_OpenDialogU8_With(&nfd_filename, &args);
