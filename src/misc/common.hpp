@@ -18,6 +18,8 @@
 #include <limits>
 #include <algorithm>
 #include <optional>
+#include <variant>
+#include <functional>
 #include <chrono>
 #include <random>
 #include <type_traits>
