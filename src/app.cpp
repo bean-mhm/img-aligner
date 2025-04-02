@@ -68,7 +68,6 @@ namespace img_aligner
     App::App(int argc, char** argv)
         : argc(argc), argv(argv)
     {
-        setup_params();
         parse_command_line();
     }
 
@@ -813,31 +812,6 @@ namespace img_aligner
 
         // load UI style and fonts
         update_ui_scale_reload_fonts_and_style();
-    }
-
-    void App::setup_params()
-    {
-        {
-            auto& section = param_sections.add(
-                params::Section("grid_warper", "Grid Warper")
-            );
-
-            section.add(params::Param(
-                "base_img_mul",
-                "Base Image Multiplier",
-                params::F32(
-                    "-x,--base-mul",
-                    params::NumericValueCliBehavior::Option,
-                    params::NumericValueGuiBehavior::Drag,
-                    1.f,
-                    0.f
-                )
-            ));
-
-            TODO;
-        }
-
-        TODO;
     }
 
     void App::parse_command_line()

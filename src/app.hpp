@@ -9,7 +9,6 @@
 #include "misc/transform2d.hpp"
 #include "misc/vk_utils.hpp"
 
-#include "params.hpp"
 #include "ui_pass.hpp"
 #include "grid_warp.hpp"
 
@@ -123,7 +122,6 @@ namespace img_aligner
         CliParams cli_params;
 
         AppState state;
-        params::SectionList param_sections;
 
         bool init_was_called = false;
         int32_t physical_device_idx = PHYSICAL_DEVICE_IDX_AUTO;
@@ -208,8 +206,6 @@ namespace img_aligner
         void init_imgui();
 
     private:
-        void setup_params();
-
         void parse_command_line();
         void handle_command_line();
 
