@@ -1683,11 +1683,11 @@ namespace img_aligner
                     optimization_info_mutex.lock();
 
                     // if transform optimization is enabled but the jitter
-                    // intensities are 0 then skip it entirely.
+                    // intensities are effectively 0 then skip it entirely.
                     if (optimization_info.n_iters == 0
                         && optimization_params.n_transform_optimization_iters >
                         0
-                        && optimization_params.scale_jitter == 0.f
+                        && optimization_params.scale_jitter == 1.f
                         && optimization_params.rotation_jitter == 0.f
                         && optimization_params.offset_jitter == 0.f)
                     {
