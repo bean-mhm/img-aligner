@@ -957,7 +957,7 @@ namespace img_aligner
             "transform will be jittered. if this is 1.25, for example, the "
             "scale of the current grid transform will itself be scaled by a "
             "random value ranging from (1 / 1.25 = 0.8) to 1.25."
-        );
+        )->capture_default_str();
 
         cli_app->add_option(
             "--rotation-jitter",
@@ -966,7 +966,7 @@ namespace img_aligner
             "transform will be jittered. if this is 2, for example, the "
             "rotation of the current grid transform will be offset by a random "
             "value ranging from -2 to 2."
-        );
+        )->capture_default_str();
 
         cli_app->add_option(
             "--offset-jitter",
@@ -976,14 +976,14 @@ namespace img_aligner
             "offset of the current grid transform will itself be offset by a "
             "random vector in a square with a radius of 0.01 units (in "
             "normalized, zero-centered, aspect-ratio-adjusted UV space)."
-        );
+        )->capture_default_str();
 
         cli_app->add_option(
             "--n-transform-iters",
             optimization_params.n_transform_optimization_iters,
             "number of transform optimization iterations. use 0 to disable "
             "transform optimization."
-        );
+        )->capture_default_str();
 
         cli_app->add_option(
             "-w,--warp-strength",
