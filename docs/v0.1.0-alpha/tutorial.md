@@ -65,17 +65,38 @@ the right. You can adjust the _Offset_ parameter to compensate for this.
 > Hold \[Alt] while adjusting a drag control to slow down or \[Shift] to speed
 > up.
 
-# Optimization
+# Transform Optimization
 
-The _OPTIMIZATION_ section lets us adjust optimization parameters, which contain
-tooltips as well and are fairly straightforward. You can specify stop conditions
-in the _STOP IF_ section.
+The grid transform from the previous section will be jittered around in the
+first N iterations of optimization to potentially lower the cost. In the
+_TRANSFORM OPTIMIZATION_ section, we can specify how much the scale, rotation,
+and offset should be jittered around, and how many iterations will be spent on
+transform optimization.
 
 > [!TIP]
 > Hold \[Ctrl] and click on a slider to type in a value.
 
-Once again, we won't change these settings for this
-example.
+We'll use the default values for this example.
+
+# Warp Optimization
+
+The _WARP OPTIMIZATION_ section lets us adjust grid warping strength. There's
+also a plot showing how the strength will change based on the number of
+iterations.
+
+> [!TIP]
+> Some controls contain tooltips that show up when you hover your mouse over the
+> title. Read these if you're confused.
+
+We won't change these parameters just yet.
+
+# Stop Conditions
+
+You can specify stop conditions in the _STOP IF_ section, like the maximum
+number of iterations or the minimum change in cost. We won't change these
+settings for this example.
+
+# Starting Optimization
 
 4. Hit _Start Alignin'_ to start minimizing the cost (as explained in the
 [README](../../README.md)).
@@ -84,6 +105,14 @@ Once optimization starts, a new section named _STATS_ will show up which will
 display optimization statistics and a plot of the cost. Also, the image viewer
 will switch to the difference image which is updated in realtime along with
 the grid preview.
+
+> [!NOTE]
+> These realtime previews may include unconfirmed iterations where the cost is
+> actually larger than before. This is only temporary and you should judge the
+> final result after optimization stops.
+
+After optimization stops, the base image should be properly aligned with the
+target image.
 
 # Another Example
 
@@ -118,20 +147,23 @@ doesn't change anymore, which is what we want.
 
 8. Hit _Reset_ in the _TRANSFORM_ section.
 
+9. In the _TRANSFORM OPTIMIZATION_ section, set the _Number of Iterations_ to 0
+to disable transform optimization.
+
 We don't need to change the transform for this set of images, but we'll modify
 the optimization settings.
 
-9. Play with _Warp Strength_ and related parameters in the _OPTIMIZATION_
+10. Play with _Warp Strength_ and related parameters in the _WARP OPTIMIZATION_
 section and observe how the warp strength plot changes.
 
-10. Set _Warp Strength_ to 0.0002 and adjust the _Warp Strength Decay Rate_ to
+11. Set _Warp Strength_ to 0.0002 and adjust the _Warp Strength Decay Rate_ to
 about 0.001 to make the warp strength go down as the number of iterations
 increases.
 
-11. Set _Min Warp Strength_ to 0.0001 to prevent the warp strength from getting
+12. Set _Min Warp Strength_ to 0.0001 to prevent the warp strength from getting
 too tiny.
 
-12. Hit _Start Alignin'_ and observe mathematical beauty.
+13. Hit _Start Alignin'_ and wait for optimization to finish.
 
 # Exporting
 

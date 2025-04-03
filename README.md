@@ -59,12 +59,19 @@ introduce local differences while decreasing the average difference. If the cost
 resolution is 1x1, this will have no effect, but if the cost resolution is too
 high, it can slow down the optimization.
 
+Apart from warping, a basic linear transform can be applied to the grid by the
+user. When optimization starts, it will jitter this transforma around to
+potentially lower the cost before warp optimization.
+
 ## The Algorithm
 
 Here's what the algorithm looks like in every iteration:
-1. Warp the grid vertices using a gaussian distribution with a random center,
-radius, direction, and strength. The ranges of the random values are calculated
-based on parameters (warp strength, grid resolution, etc.).
+1. Do one of the following based on the number of iterations.
+   - Generate a random grid transform jittered around the initial transform set
+   by the user.
+   - Warp the grid vertices using a gaussian distribution with a random center,
+   radius, direction, and strength. The ranges of the random values are
+   calculated based on parameters (warp strength, grid resolution, etc.).
 2. Recalculate the cost (average difference) and the maximum local difference
 (max value in the cost image).
 3. If (cost > previous iteration's cost) or (max local diff. > initial max) then
@@ -124,7 +131,7 @@ img-aligner --cli
 
 > [!NOTE]
 > Most command line arguments still have an effect in GUI mode. For example, you
-> can use `-G -1` to manually choose a physical device (GPU) at the start of
+> can use `--gpu -1` to manually choose a physical device (GPU) at the start of
 > the program, or `--silent` to disable logging. The help message explains
 > every option and flag.
 
