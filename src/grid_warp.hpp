@@ -206,6 +206,22 @@ namespace img_aligner::grid_warp
 
         void regenerate_grid_vertices(const Transform2d& grid_transform);
 
+        // generate a random grid transform jittered around the base transform
+        // and regenerate the grid vertices with that transform. if it caused
+        // the cost (average difference) or the maximum local difference (max
+        // value in the cost image) to increase, we will undo the displacement
+        // and return false, otherwise we'll keep the changes and return true.
+        // out_jittered_transform will only be updated when returning true,
+        // otherwise it'll stay untouched.
+        bool optimize_transform(
+            const Transform2d& base_transform,
+            float scale_jitter,
+            float rotation_jitter,
+            float offset_jitter,
+            const bv::QueuePtr& queue,
+            Transform2d& out_jittered_transform
+        );
+
         // displace the grid vertices using an unnormalized gaussian
         // distribution with randomly generated center point, radius (standard
         // deviation), displacement direction and strength. the grid warp,
@@ -216,7 +232,7 @@ namespace img_aligner::grid_warp
         // return true. ideally, you would call this many times in a row to
         // minimize the difference between the warped image and the target
         // image.
-        bool optimize(float warp_strength, const bv::QueuePtr& queue);
+        bool optimize_warp(float warp_strength, const bv::QueuePtr& queue);
 
     private:
         void create_vertex_and_index_buffer_and_generate_vertices(

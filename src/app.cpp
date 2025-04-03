@@ -951,6 +951,41 @@ namespace img_aligner
         );
 
         cli_app->add_option(
+            "--scale-jitter",
+            optimization_params.scale_jitter,
+            "span of the range in which the scale of the current grid "
+            "transform will be jittered. if this is 1.25, for example, the "
+            "scale of the current grid transform will itself be scaled by a "
+            "random value ranging from (1 / 1.25 = 0.8) to 1.25."
+        );
+
+        cli_app->add_option(
+            "--rotation-jitter",
+            optimization_params.rotation_jitter,
+            "span of the range in which the rotation of the current grid "
+            "transform will be jittered. if this is 2, for example, the "
+            "rotation of the current grid transform will be offset by a random "
+            "value ranging from -2 to 2."
+        );
+
+        cli_app->add_option(
+            "--offset-jitter",
+            optimization_params.offset_jitter,
+            "span of the range in which the offset of the current grid "
+            "transform will be jittered. if this is 0.01, for example, the "
+            "offset of the current grid transform will itself be offset by a "
+            "random vector in a square with a radius of 0.01 units (in "
+            "normalized, zero-centered, aspect-ratio-adjusted UV space)."
+        );
+
+        cli_app->add_option(
+            "--n-transform-iters",
+            optimization_params.n_transform_optimization_iters,
+            "number of transform optimization iterations. use 0 to disable "
+            "transform optimization."
+        );
+
+        cli_app->add_option(
             "-w,--warp-strength",
             optimization_params.warp_strength
         )->capture_default_str();
@@ -981,13 +1016,13 @@ namespace img_aligner
         cli_app->add_option(
             "-i,--max-iters",
             optimization_params.max_iters,
-            "maximum number of iterations"
+            "maximum number of iterations (use 0 for no limit)"
         )->capture_default_str();
 
         cli_app->add_option(
             "-T,--max-runtime",
             optimization_params.max_runtime_sec,
-            "maximum run time in seconds"
+            "maximum run time in seconds (use 0 for no limit)"
         )->capture_default_str();
 
         cli_app->add_flag(
@@ -1371,9 +1406,17 @@ namespace img_aligner
         {
             json j2;
 
-            j2["warp_strength"] = to_str_hp(
-                optimization_params.warp_strength
+            j2["scale_jitter"] = to_str_hp(optimization_params.scale_jitter);
+            j2["rotation_jitter"] = to_str_hp(
+                optimization_params.rotation_jitter
             );
+            j2["offset_jitter"] = to_str_hp(optimization_params.offset_jitter);
+            j2["n_transform_optimization_iters"] = to_str_hp(
+                optimization_params.n_transform_optimization_iters
+            );
+
+
+            j2["warp_strength"] = to_str_hp(optimization_params.warp_strength);
 
             j2["min_change_in_cost_in_last_n_iters"] = to_str_hp(
                 optimization_params.min_change_in_cost_in_last_n_iters
@@ -1418,6 +1461,24 @@ namespace img_aligner
 
             j2["n_iters"] = to_str_hp(optimization_info.n_iters);
             j2["n_good_iters"] = to_str_hp(optimization_info.n_good_iters);
+
+            j2["last_jittered_transform"]["scale"].push_back(to_str_hp(
+                optimization_info.last_jittered_transform.scale.x
+            ));
+            j2["last_jittered_transform"]["scale"].push_back(to_str_hp(
+                optimization_info.last_jittered_transform.scale.y
+            ));
+
+            j2["last_jittered_transform"]["rotation"] = to_str_hp(
+                optimization_info.last_jittered_transform.rotation
+            );
+
+            j2["last_jittered_transform"]["offset"].push_back(to_str_hp(
+                optimization_info.last_jittered_transform.offset.x
+            ));
+            j2["last_jittered_transform"]["offset"].push_back(to_str_hp(
+                optimization_info.last_jittered_transform.offset.y
+            ));
 
             j2["cost_history"] = json::array();
             for (const auto& v : optimization_info.cost_history)
@@ -1578,6 +1639,7 @@ namespace img_aligner
         }
 
         is_optimizing = true;
+        optimization_info.last_jittered_transform = grid_transform;
         optimization_info.start_time =
             std::chrono::high_resolution_clock::now();
         optimization_info.stop_reason = GridWarpOptimizationStopReason::None;
@@ -1590,30 +1652,77 @@ namespace img_aligner
                 {
                     optimization_mutex.lock();
 
-                    // optimize
-                    bool cost_decreased = grid_warper->optimize(
-                        optimization_params.calc_warp_strength(
-                            optimization_info.n_iters
-                        ),
-                        state.queue_grid_warp_optimize
-                    );
+                    bool cost_decreased = false;
+                    if (optimization_info.n_iters <
+                        optimization_params.n_transform_optimization_iters)
+                    {
+                        // optimize the transform
+                        cost_decreased = grid_warper->optimize_transform(
+                            grid_transform,
+                            optimization_params.scale_jitter,
+                            optimization_params.rotation_jitter,
+                            optimization_params.offset_jitter,
+                            state.queue_grid_warp_optimize,
+                            optimization_info.last_jittered_transform
+                        );
+                    }
+                    else
+                    {
+                        // optimize by warping
+                        cost_decreased = grid_warper->optimize_warp(
+                            optimization_params.calc_warp_strength(
+                                optimization_info.n_iters
+                            ),
+                            state.queue_grid_warp_optimize
+                        );
+                    }
 
                     // update optimization info
                     optimization_info_mutex.lock();
 
-                    // update the number of iterations
-                    optimization_info.n_iters++;
-                    if (cost_decreased)
+                    // if transform optimization is enabled but the jitter
+                    // intensities are 0 then skip it entirely.
+                    if (optimization_info.n_iters == 0
+                        && optimization_params.n_transform_optimization_iters >
+                        0
+                        && optimization_params.scale_jitter == 0.f
+                        && optimization_params.rotation_jitter == 0.f
+                        && optimization_params.offset_jitter == 0.f)
                     {
-                        optimization_info.n_good_iters++;
-                    }
+                        // update number of iterations
+                        optimization_info.n_iters =
+                            optimization_params.n_transform_optimization_iters;
 
-                    // update cost history
-                    if (grid_warper->get_last_avg_diff().has_value())
+                        // update cost history
+                        if (grid_warper->get_last_avg_diff().has_value())
+                        {
+                            for (size_t i = 0;
+                                i < optimization_params.
+                                n_transform_optimization_iters;
+                                i++)
+                            {
+                                optimization_info.cost_history.push_back(
+                                    *grid_warper->get_last_avg_diff()
+                                );
+                            }
+                        }
+                    }
+                    else
                     {
-                        optimization_info.cost_history.push_back(
-                            *grid_warper->get_last_avg_diff()
-                        );
+                        // update number of iterations
+                        optimization_info.n_iters++;
+                        if (cost_decreased)
+                        {
+                            optimization_info.n_good_iters++;
+                        }
+
+                        // update cost history
+                        if (grid_warper->get_last_avg_diff().has_value())
+                        {
+                            optimization_info.cost_history.push_back(
+                                *grid_warper->get_last_avg_diff()
+                            );
+                        }
                     }
 
                     // update min. change in cost in last N iters
@@ -1628,8 +1737,18 @@ namespace img_aligner
                             - optimization_info.cost_history.back();
                     }
 
-                    // stop condition: min. change in cost in last N iters
-                    if (optimization_info.change_in_cost_in_last_n_iters <
+                    // stop condition: min. change in cost in last N iters. this
+                    // should only take effect if transform optimization was
+                    // finished more than
+                    // grid_warp::N_ITERS_TO_CHECK_CHANGE_IN_COST iterations
+                    // ago.
+                    bool transform_opt_finished_long_ago =
+                        optimization_info.n_iters >= (
+                            optimization_params.n_transform_optimization_iters
+                            + grid_warp::N_ITERS_TO_CHECK_CHANGE_IN_COST
+                            );
+                    if (transform_opt_finished_long_ago
+                        && optimization_info.change_in_cost_in_last_n_iters <
                         optimization_params.min_change_in_cost_in_last_n_iters)
                     {
                         optimization_info.stop_reason =
@@ -2211,7 +2330,71 @@ namespace img_aligner
         }
 
         imgui_div();
-        imgui_bold("OPTIMIZATION");
+        imgui_bold("TRANSFORM OPTIMIZATION");
+
+        // scale jitter
+        imgui_small_div();
+        imgui_slider_or_drag(
+            "Scale Jitter",
+            "##scale_jitter",
+            "Span of the range in which the scale of the current grid "
+            "transform will be jittered. If this is 1.25, for example, the "
+            "scale of the current grid transform will itself be scaled by a "
+            "random value ranging from (1 / 1.25 = 0.8) to 1.25.",
+            &optimization_params.scale_jitter,
+            1.f,
+            1.25f,
+            .01f,
+            4
+        );
+
+        // rotation jitter
+        imgui_small_div();
+        imgui_slider_or_drag(
+            "Rotation Jitter",
+            "##rotation_jitter",
+            "Span of the range in which the rotation of the current grid "
+            "transform will be jittered. If this is 2, for example, the "
+            "rotation of the current grid transform will be offset by a random "
+            "value ranging from -2 to 2.",
+            &optimization_params.rotation_jitter,
+            0.f,
+            10.f,
+            .1f,
+            4
+        );
+
+        // offset jitter
+        imgui_small_div();
+        imgui_slider_or_drag(
+            "Offset Jitter",
+            "##offset_jitter",
+            "Span of the range in which the offset of the current grid "
+            "transform will be jittered. If this is 0.01, for example, the "
+            "offset of the current grid transform will itself be offset by a "
+            "random vector in a square with a radius of 0.01 units (in "
+            "normalized, zero-centered, aspect-ratio-adjusted UV space).",
+            &optimization_params.offset_jitter,
+            0.f,
+            .1f,
+            .001f,
+            4
+        );
+
+        // number of transform optimization iterations
+        imgui_small_div();
+        imgui_slider_or_drag(
+            "Number of Iterations",
+            "##n_transform_optimization_iters",
+            "Use 0 to disable transform optimization.",
+            &optimization_params.n_transform_optimization_iters,
+            (uint32_t)0,
+            (uint32_t)10000,
+            2.f
+        );
+
+        imgui_div();
+        imgui_bold("WARP OPTIMIZATION");
 
         // warp strength
         imgui_small_div();
@@ -2312,7 +2495,7 @@ namespace img_aligner
                 grid_warp::N_ITERS_TO_CHECK_CHANGE_IN_COST
             ),
             "##min_change_in_cost_in_last_n_iters",
-            "",
+            "This only takes affect after transform optimization is finished.",
             &optimization_params.min_change_in_cost_in_last_n_iters,
             0.f,
             .001f,
@@ -2324,9 +2507,10 @@ namespace img_aligner
         // max iterations
         imgui_small_div();
         imgui_slider_or_drag(
-            "The number of iterations exceeds",
+            "The total number of iterations exceeds",
             "##max_iters",
-            "0 means unlimited number of iterations",
+            "This includes transform optimization iterations as well. Use 0 "
+            "for unlimited number of iterations.",
             &optimization_params.max_iters,
             (uint32_t)0,
             (uint32_t)4000000000,
@@ -2338,7 +2522,7 @@ namespace img_aligner
         imgui_slider_or_drag(
             "Run time exceeds (seconds)",
             "##max_runtime",
-            "0 means unlimited run time",
+            "Use 0 for unlimited run time",
             &optimization_params.max_runtime_sec,
             0.f,
             3000000.f,

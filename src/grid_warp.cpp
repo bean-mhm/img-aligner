@@ -398,7 +398,68 @@ namespace img_aligner::grid_warp
         vertex_buf_mem->flush();
     }
 
-    bool GridWarper::optimize(
+    bool GridWarper::optimize_transform(
+        const Transform2d& base_transform,
+        float scale_jitter,
+        float rotation_jitter,
+        float offset_jitter,
+        const bv::QueuePtr& queue,
+        Transform2d& out_jittered_transform
+    )
+    {
+        std::uniform_real_distribution<float> dist(0.f, 1.f);
+
+        // keep track of the cost
+        if (!last_avg_diff || !initial_max_local_diff)
+        {
+            auto cost_info = run_difference_and_cost_pass(queue);
+            last_avg_diff = cost_info.avg_diff;
+            initial_max_local_diff = cost_info.max_local_diff;
+        }
+        float old_avg_diff = *last_avg_diff;
+
+        // make a copy of the vertices in case we decide to undo the
+        // displacement
+        make_copy_of_vertices();
+
+        // generate a new jittered grid transform within the specified ranges
+
+        Transform2d jittered_transform = base_transform;
+
+        float scale_jitter_log = std::log(scale_jitter);
+        jittered_transform.scale *= std::exp(
+            (dist(rng) * 2.f - 1.f) * scale_jitter_log
+        );
+
+        jittered_transform.rotation +=
+            (dist(rng) * 2.f - 1.f) * rotation_jitter;
+
+        jittered_transform.offset.x += (dist(rng) * 2.f - 1.f) * offset_jitter;
+        jittered_transform.offset.y += (dist(rng) * 2.f - 1.f) * offset_jitter;
+
+        // regenerate grid vertices with the jittered transform
+        regenerate_grid_vertices(jittered_transform);
+
+        // see if the displacement did any good (decreased the cost)
+        run_grid_warp_pass(false, queue);
+        auto new_cost_info = run_difference_and_cost_pass(queue);
+
+        // undo the displacement (warping) if it wasn't good
+        if (new_cost_info.avg_diff > old_avg_diff
+            || new_cost_info.max_local_diff > *initial_max_local_diff)
+        {
+            restore_copy_of_vertices();
+            return false;
+        }
+        else
+        {
+            last_avg_diff = new_cost_info.avg_diff;
+            out_jittered_transform = jittered_transform;
+        }
+        return true;
+    }
+
+    bool GridWarper::optimize_warp(
         float warp_strength,
         const bv::QueuePtr& queue
     )

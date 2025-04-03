@@ -44,6 +44,14 @@ namespace img_aligner
 
     struct GridWarpOptimizationParams
     {
+        // transform optimization
+        float scale_jitter = 1.01f;
+        float rotation_jitter = .8f;
+        float offset_jitter = .005f;
+        uint32_t n_transform_optimization_iters = 200;
+
+        // warp optimization
+
         float warp_strength = .0001f;
         float warp_strength_decay_rate = 0.f;
         float min_warp_strength = .00001f;
@@ -77,6 +85,11 @@ namespace img_aligner
     {
         size_t n_iters = 0; // num. total iterations
         size_t n_good_iters = 0; // num. iterations where the cost decreased
+
+        // last jittered grid transform that was potentially optimized in
+        // transform optimization. if transform optimization was disabled, this
+        // will be equal to the current grid transform.
+        Transform2d last_jittered_transform;
 
         std::vector<float> cost_history;
         float change_in_cost_in_last_n_iters = FLT_MAX;
