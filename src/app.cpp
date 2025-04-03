@@ -1658,6 +1658,7 @@ namespace img_aligner
                     {
                         // optimize the transform
                         cost_decreased = grid_warper->optimize_transform(
+                            (uint32_t)optimization_info.n_iters,
                             grid_transform,
                             optimization_params.scale_jitter,
                             optimization_params.rotation_jitter,
@@ -1670,6 +1671,7 @@ namespace img_aligner
                     {
                         // optimize by warping
                         cost_decreased = grid_warper->optimize_warp(
+                            (uint32_t)optimization_info.n_iters,
                             optimization_params.calc_warp_strength(
                                 optimization_info.n_iters
                             ),

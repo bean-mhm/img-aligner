@@ -7,6 +7,7 @@
 #include "misc/numbers.hpp"
 #include "misc/transform2d.hpp"
 #include "misc/vk_utils.hpp"
+#include "misc/hash.hpp"
 
 #include "ui_pass.hpp"
 
@@ -214,6 +215,7 @@ namespace img_aligner::grid_warp
         // out_jittered_transform will only be updated when returning true,
         // otherwise it'll stay untouched.
         bool optimize_transform(
+            uint32_t hash_index,
             const Transform2d& base_transform,
             float scale_jitter,
             float rotation_jitter,
@@ -232,7 +234,11 @@ namespace img_aligner::grid_warp
         // return true. ideally, you would call this many times in a row to
         // minimize the difference between the warped image and the target
         // image.
-        bool optimize_warp(float warp_strength, const bv::QueuePtr& queue);
+        bool optimize_warp(
+            uint32_t hash_index,
+            float warp_strength,
+            const bv::QueuePtr& queue
+        );
 
     private:
         void create_vertex_and_index_buffer_and_generate_vertices(
@@ -251,7 +257,7 @@ namespace img_aligner::grid_warp
 
     private:
         AppState& state;
-        std::mt19937 rng;
+        uint32_t rng_seed = 0;
 
         // base and target images provided in the constructor
         bv::ImageViewWPtr base_imgview;

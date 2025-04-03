@@ -40,7 +40,7 @@ namespace img_aligner::grid_warp
         const bv::QueuePtr& queue
     )
         : state(state),
-        rng(params.rng_seed),
+        rng_seed(params.rng_seed),
         base_imgview(params.base_imgview),
         target_imgview(params.target_imgview)
     {
@@ -399,6 +399,7 @@ namespace img_aligner::grid_warp
     }
 
     bool GridWarper::optimize_transform(
+        uint32_t hash_index,
         const Transform2d& base_transform,
         float scale_jitter,
         float rotation_jitter,
@@ -407,7 +408,16 @@ namespace img_aligner::grid_warp
         Transform2d& out_jittered_transform
     )
     {
-        std::uniform_real_distribution<float> dist(0.f, 1.f);
+        // generate random values
+        constexpr uint32_t N_RAND = 4;
+        float rand[N_RAND];
+        for (uint32_t i = 0; i < N_RAND; i++)
+        {
+            rand[i] = hash_f32(
+                rng_seed,
+                hash_index * N_RAND + i
+            );
+        }
 
         // keep track of the cost
         if (!last_avg_diff || !initial_max_local_diff)
@@ -428,14 +438,14 @@ namespace img_aligner::grid_warp
 
         float scale_jitter_log = std::log(scale_jitter);
         jittered_transform.scale *= std::exp(
-            (dist(rng) * 2.f - 1.f) * scale_jitter_log
+            (rand[0] * 2.f - 1.f) * scale_jitter_log
         );
 
         jittered_transform.rotation +=
-            (dist(rng) * 2.f - 1.f) * rotation_jitter;
+            (rand[1] * 2.f - 1.f) * rotation_jitter;
 
-        jittered_transform.offset.x += (dist(rng) * 2.f - 1.f) * offset_jitter;
-        jittered_transform.offset.y += (dist(rng) * 2.f - 1.f) * offset_jitter;
+        jittered_transform.offset.x += (rand[2] * 2.f - 1.f) * offset_jitter;
+        jittered_transform.offset.y += (rand[3] * 2.f - 1.f) * offset_jitter;
 
         // regenerate grid vertices with the jittered transform
         regenerate_grid_vertices(jittered_transform);
@@ -460,10 +470,22 @@ namespace img_aligner::grid_warp
     }
 
     bool GridWarper::optimize_warp(
+        uint32_t hash_index,
         float warp_strength,
         const bv::QueuePtr& queue
     )
     {
+        // generate random values
+        constexpr uint32_t N_RAND = 5;
+        float rand[N_RAND];
+        for (uint32_t i = 0; i < N_RAND; i++)
+        {
+            rand[i] = hash_f32(
+                rng_seed,
+                hash_index * N_RAND + i
+            );
+        }
+
         // keep track of the cost
         if (!last_avg_diff || !initial_max_local_diff)
         {
@@ -477,14 +499,12 @@ namespace img_aligner::grid_warp
         // displacement
         make_copy_of_vertices();
 
-        std::uniform_real_distribution<float> dist(0.f, 1.f);
-
         // warp vertices based on an unnormalized gaussian distribution
 
         // gaussian center
         glm::vec2 center{
-            dist(rng) * (float)intermediate_res_x,
-            dist(rng) * (float)intermediate_res_y
+            rand[0] * (float)intermediate_res_x,
+            rand[1] * (float)intermediate_res_y
         };
 
         // radius = standard deviation
@@ -504,15 +524,15 @@ namespace img_aligner::grid_warp
         float log_radius = lerp(
             log_min_radius,
             log_max_radius,
-            dist(rng)
+            rand[2]
         );
         float radius = std::exp(log_radius);
 
         // strength
-        float strength = (warp_strength * dist(rng)) * radius;
+        float strength = (warp_strength * rand[3]) * radius;
 
         // direction
-        float angle = glm::tau<float>() * dist(rng);
+        float angle = glm::tau<float>() * rand[4];
         glm::vec2 direction{ std::cos(angle), std::sin(angle) };
 
         // move vertices
