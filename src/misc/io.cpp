@@ -22,19 +22,19 @@ namespace img_aligner
 {
 
     const std::filesystem::path& exec_dir(
-        const std::filesystem::path& new_value
+        const std::optional<std::filesystem::path>& new_value
     )
     {
-        static std::filesystem::path dir;
-        if (!new_value.empty())
+        static std::optional<std::filesystem::path> dir;
+        if (new_value)
         {
-            dir = new_value;
+            dir = *new_value;
         }
-        else if (dir.empty())
+        else if (!dir)
         {
             throw std::runtime_error("executable directory has not been set");
         }
-        return dir;
+        return *dir;
     }
 
     std::vector<uint8_t> read_file(const std::filesystem::path& path)

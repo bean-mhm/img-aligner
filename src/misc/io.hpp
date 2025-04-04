@@ -7,7 +7,7 @@ namespace img_aligner
 {
 
     const std::filesystem::path& exec_dir(
-        const std::filesystem::path& new_value = {}
+        const std::optional<std::filesystem::path>& new_value = std::nullopt
     );
 
     std::vector<uint8_t> read_file(const std::filesystem::path& path);

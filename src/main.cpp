@@ -10,12 +10,11 @@ static void pause_on_error()
 
 int main(int argc, char** argv)
 {
-    img_aligner::exec_dir(
-        std::filesystem::weakly_canonical(argv[0]).parent_path()
-    );
-
     try
     {
+        auto exec_dir_path = std::filesystem::absolute(argv[0]).parent_path();
+        img_aligner::exec_dir(exec_dir_path);
+
         img_aligner::App app(argc, argv);
         app.run();
     }
