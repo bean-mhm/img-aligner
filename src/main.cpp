@@ -12,8 +12,10 @@ int main(int argc, char** argv)
 {
     try
     {
-        auto exec_dir_path = std::filesystem::absolute(argv[0]).parent_path();
-        img_aligner::exec_dir(exec_dir_path);
+        // set executable directory
+        img_aligner::exec_dir(
+            std::filesystem::absolute(argv[0]).parent_path()
+        );
 
         img_aligner::App app(argc, argv);
         app.run();
