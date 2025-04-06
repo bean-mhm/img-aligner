@@ -173,6 +173,7 @@ namespace img_aligner
         TimePoint last_ui_update_when_optimizing_time;
 
         // export options
+        bool export_warped_img_undo_base_img_mul = true;
         MetadataExportOptions metadata_export_options;
 
         void init();
@@ -272,7 +273,7 @@ namespace img_aligner
             bv::MemoryChunkPtr& img_mem,
             bv::ImageViewPtr& imgview
         );
-        void browse_and_save_image(const bv::ImagePtr& img);
+        void browse_and_save_image(const bv::ImagePtr& img, float mul = 1.f);
         void browse_and_export_metadata();
 
         void select_ui_pass_image(std::string_view name);

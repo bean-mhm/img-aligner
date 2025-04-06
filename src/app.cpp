@@ -890,6 +890,14 @@ namespace img_aligner
             "target image multiplier"
         )->capture_default_str();
 
+        cli_add_toggle(
+            *cli_app,
+            "-U,--undo-base-mul",
+            export_warped_img_undo_base_img_mul,
+            "toggle whether to apply the inverse of the base image multiplier "
+            "when exporting the warped image"
+        );
+
         cli_app->add_option(
             "-g,--grid-res",
             grid_warp_params.grid_res_area,
@@ -1250,7 +1258,11 @@ namespace img_aligner
                 save_image(
                     state,
                     grid_warper->get_warped_hires_img(),
-                    cli_params.output_img_path
+                    cli_params.output_img_path,
+
+                    export_warped_img_undo_base_img_mul
+                    ? 1.f / grid_warp_params.base_img_mul
+                    : 1.f
                 );
             }
         }
@@ -2661,13 +2673,31 @@ namespace img_aligner
 
         imgui_bold("EXPORT IMAGES");
 
-        // export warped image
         ImGui::BeginDisabled(optimization_info.n_iters < 1);
+
+        // undo base image multiplier when exporting warped image
+        ImGui::Checkbox(
+            "Undo Base Image Multiplier",
+            &export_warped_img_undo_base_img_mul
+        );
+        imgui_tooltip(
+            "Apply the inverse of the base image multiplier when exporting the "
+            "warped image"
+        );
+
+        // export warped image
         if (imgui_button_full_width("Export Warped Image"))
         {
-            browse_and_save_image(grid_warper->get_warped_hires_img());
+            browse_and_save_image(
+                grid_warper->get_warped_hires_img(),
+
+                export_warped_img_undo_base_img_mul
+                ? 1.f / grid_warp_params.base_img_mul
+                : 1.f
+            );
         }
         imgui_tooltip("Export the warped image at full resolution");
+
         ImGui::EndDisabled();
 
         // export difference image
@@ -3552,7 +3582,7 @@ namespace img_aligner
         return false;
     }
 
-    void App::browse_and_save_image(const bv::ImagePtr& img)
+    void App::browse_and_save_image(const bv::ImagePtr& img, float mul)
     {
         nfdu8char_t* nfd_filename;
         nfdsavedialogu8args_t args{ 0 };
@@ -3572,7 +3602,7 @@ namespace img_aligner
 
             try
             {
-                save_image(state, img, filename);
+                save_image(state, img, filename, mul);
             }
             catch (const std::exception& e)
             {
