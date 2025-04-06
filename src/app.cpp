@@ -456,7 +456,7 @@ namespace img_aligner
                 const bv::DebugMessageData& message_data
                 )
             {
-                std::cout << "Vulkan: " << message_data.message << '\n';
+                fprintln("Vulkan: {}", message_data.message);
             }
         );
     }
@@ -572,8 +572,8 @@ namespace img_aligner
             if (!cli_params.flag_silent)
             {
                 const auto& pdev = supported_physical_devices[actual_pdev_idx];
-                std::cout << std::format(
-                    "automatically selected physical device {}: {} ({})\n",
+                fprintln(
+                    "automatically selected physical device {}: {} ({})",
                     actual_pdev_idx,
                     pdev.properties().device_name,
                     VkPhysicalDeviceType_to_str(pdev.properties().device_type)
@@ -582,12 +582,12 @@ namespace img_aligner
         }
         else if (physical_device_idx == PHYSICAL_DEVICE_IDX_PROMPT)
         {
-            std::cout << "pick a physical device by entering its index:\n";
+            println("pick a physical device by entering its index:");
             for (size_t i = 0; i < supported_physical_devices.size(); i++)
             {
                 const auto& pdev = supported_physical_devices[i];
 
-                std::cout << std::format(
+                fprint(
                     "{}: {} ({})",
                     i,
                     pdev.properties().device_name,
@@ -599,10 +599,10 @@ namespace img_aligner
                 // automatic.
                 if (i == actual_pdev_idx)
                 {
-                    std::cout << " (default)";
+                    print(" (default)");
                 }
 
-                std::cout << '\n';
+                println();
             }
 
             while (true)
@@ -621,10 +621,10 @@ namespace img_aligner
                 }
                 catch (const std::exception&)
                 {
-                    std::cout << "enter a valid physical device index\n";
+                    println("enter a valid physical device index");
                 }
             }
-            std::cout << '\n';
+            println();
         }
         else if (physical_device_idx < 0
             || physical_device_idx >= supported_physical_devices.size())
@@ -1104,13 +1104,13 @@ namespace img_aligner
 
         if (cli_params.flag_help || argc <= 2)
         {
-            std::cout << cli_app->help() << '\n';
+            println(cli_app->help());
             return;
         }
 
         if (cli_params.flag_version)
         {
-            std::cout << APP_VERSION << '\n';
+            println(APP_VERSION);
             return;
         }
 
@@ -1204,7 +1204,7 @@ namespace img_aligner
 
         if (!cli_params.flag_silent)
         {
-            std::cout << "starting optimization\n";
+            println("starting optimization");
         }
 
         start_optimization();
@@ -1239,8 +1239,8 @@ namespace img_aligner
 
         if (!cli_params.flag_silent)
         {
-            std::cout << std::format(
-                "done optimizing. stop reason: {}\n",
+            fprintln(
+                "done optimizing. stop reason: {}",
                 GridWarpOptimizationStopReason_to_str_friendly(
                     optimization_info.stop_reason
                 )
@@ -1318,8 +1318,8 @@ namespace img_aligner
 
         if (!cli_params.flag_silent)
         {
-            std::cout << std::format(
-                "everything is done ({} s)\n",
+            fprintln(
+                "everything is done ({} s)",
                 to_str(elapsed_sec(time_start))
             );
         }
@@ -1882,7 +1882,7 @@ namespace img_aligner
             total_elapsed += elapsed_sec(optimization_info.start_time);
         }
 
-        std::cout << std::format(
+        fprint(
             "\nelapsed: {} s\n"
             "total iterations: {}\n"
             "good iterations: {} ({:.1f}%)\n"

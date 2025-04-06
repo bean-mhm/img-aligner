@@ -13,7 +13,7 @@ namespace img_aligner
     {
         if (should_print && !start_message.empty())
         {
-            std::cout << start_message;
+            std::cout << start_message << std::flush;
         }
     }
 
@@ -26,7 +26,7 @@ namespace img_aligner
         std::cout << std::vformat(
             end_message,
             std::make_format_args(to_str(elapsed_sec(start_time)))
-        );
+        ) << std::flush;
     }
 
     double elapsed_sec(const TimePoint& t)

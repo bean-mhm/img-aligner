@@ -6,6 +6,30 @@
 namespace img_aligner
 {
 
+    inline void print(std::string_view s)
+    {
+        std::cout << s << std::flush;
+    }
+
+    inline void println(std::string_view s = "")
+    {
+        std::cout << s << std::endl;
+    }
+
+    template<typename... Args>
+    void fprint(std::format_string<Args...> fmt, Args&&... args)
+    {
+        std::cout << std::vformat(fmt.get(), std::make_format_args(args...));
+        std::cout.flush();
+    }
+
+    template<typename... Args>
+    void fprintln(std::format_string<Args...> fmt, Args&&... args)
+    {
+        std::cout << std::vformat(fmt.get(), std::make_format_args(args...));
+        std::cout << std::endl;
+    }
+
     const std::filesystem::path& exec_dir(
         const std::optional<std::filesystem::path>& new_value = std::nullopt
     );

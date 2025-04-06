@@ -4,7 +4,7 @@
 
 static void pause_on_error()
 {
-    std::cerr << "press [Enter] to exit\n";
+    std::cerr << "press [Enter] to exit" << std::endl;
     std::cin.get();
 }
 
@@ -24,21 +24,21 @@ int main(int argc, char** argv)
     {
         if (e.get_exit_code() != (int)CLI::ExitCodes::Success)
         {
-            std::cerr << "CLI: " << e.what() << '\n';
+            std::cerr << "CLI: " << e.what() << std::endl;
             pause_on_error();
         }
         return e.get_exit_code();
     }
     catch (const bv::Error& e)
     {
-        std::cerr << "beva: " << e.to_string() << '\n';
+        std::cerr << "beva: " << e.to_string() << std::endl;
         pause_on_error();
 
         return EXIT_FAILURE;
     }
     catch (const std::exception& e)
     {
-        std::cerr << e.what() << '\n';
+        std::cerr << e.what() << std::endl;
         pause_on_error();
 
         return EXIT_FAILURE;
