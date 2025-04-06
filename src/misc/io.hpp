@@ -77,7 +77,8 @@ namespace img_aligner
     void save_image(
         AppState& state,
         const bv::ImagePtr& img,
-        const std::filesystem::path& path
+        const std::filesystem::path& path,
+        float mul = 1.f
     );
 
 }

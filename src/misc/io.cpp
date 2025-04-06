@@ -198,11 +198,25 @@ namespace img_aligner
     void save_image(
         AppState& state,
         const bv::ImagePtr& img,
-        const std::filesystem::path& path
+        const std::filesystem::path& path,
+        float mul
     )
     {
         std::vector<float> pixels_rgbaf32 =
             read_back_image_rgbaf32(state, img, state.queue_main, true);
+
+        // apply multiplier
+        for (size_t i = 0; i < pixels_rgbaf32.size(); i++)
+        {
+            // skip the alpha channel
+            if (i % 4 == 3)
+            {
+                continue;
+            }
+
+            pixels_rgbaf32[i] *= mul;
+        }
+
 
         uint32_t width = img->config().extent.width;
         uint32_t height = img->config().extent.height;
