@@ -21,6 +21,8 @@ make use of.
 section to open a file dialog and choose `demo/images/1-sky-a.exr`. Next,
 hit _Load Target Image_ and choose `demo/images/1-sky-b.exr`.
 
+![screenshot](../../images/sky-image-loaded.png)
+
 You'll notice two controls in the _IMAGES_ section named _Base Image Multiplier_
 and _Target Image Multiplier_. We'll address these in later examples.
 
@@ -33,6 +35,8 @@ You can also adjust the exposure and the zoom level, check _flim_ to apply the
 displaying, or check _Preview Grid_ to see a preview of the grid used for
 warping.
 
+![screenshot](../../images/image-viewer.png)
+
 # Grid Warper
 
 The grid warper is the underlying construct that warps the base image and
@@ -43,6 +47,8 @@ this tutorial, we'll leave these intact and use the default values.
 
 2. Hit _Recreate Grid Warper_ to prepare resources for grid warping. This will
 switch the current image in the _Image Viewer_ to the _Difference Image_.
+
+![screenshot](../../images/recreate-grid-warper.png)
 
 > [!NOTE]
 > Every time you change the grid warper settings, the grid warper gets
@@ -66,6 +72,8 @@ darker.
 > Hold \[Alt] while adjusting a drag control to slow down or \[Shift] to speed
 > up.
 
+![screenshot](../../images/grid-transform.png)
+
 # Transform Optimization
 
 The grid transform from the previous section will be jittered around in the
@@ -79,6 +87,8 @@ transform optimization.
 
 We'll use the default values for this example.
 
+![screenshot](../../images/transform-opt.png)
+
 # Warp Optimization
 
 The _WARP OPTIMIZATION_ section lets us adjust grid warping strength. There's
@@ -91,11 +101,15 @@ iterations.
 
 We won't change these parameters just yet.
 
+![screenshot](../../images/warp-opt.png)
+
 # Stop Conditions
 
 You can specify stop conditions in the _STOP IF_ section, like the maximum
 number of iterations or the minimum change in cost. We won't change these
 settings for this example.
+
+![screenshot](../../images/stop-cond.png)
 
 # Starting Optimization
 
@@ -107,6 +121,8 @@ display optimization statistics and a plot of the cost. Also, the image viewer
 will switch to the difference image which is updated in realtime along with
 the grid preview.
 
+![screenshot](../../images/stats.png)
+
 > [!NOTE]
 > These realtime previews may include unconfirmed iterations where the cost is
 > actually larger than before. This is only temporary and you should judge the
@@ -114,6 +130,8 @@ the grid preview.
 
 After optimization stops, the base image should be properly aligned with the
 target image.
+
+![screenshot](../../images/opt-done.png)
 
 # Another Example
 
@@ -123,6 +141,8 @@ the [README](../../README.md) (read it!).
 5. Load `demo/images/2-exposure-1-over-20.exr` as the base image and
 `demo/images/2-exposure-1-over-57.exr` as the target image.
 
+![screenshot](../../images/exp-1-over-x.png)
+
 As can be seen in the file names, the base image is a linear image captured in
 1/20 seconds, and the target image has a light exposure time of 1/57 seconds,
 so the base image is 2.85 times brighter than the target image.
@@ -131,6 +151,8 @@ Switch between the base and target images in the _Image Viewer_ and notice the
 sudden jump in brightness. This is bad for optimization, so let's fix it.
 
 6. In the _IMAGES_ section, set _Target Image Multiplier_ to 2.85.
+
+![screenshot](../../images/target-mul.png)
 
 > [!TIP]
 > Check _flim_ in the _Image Viewer_ to apply a filmic color transform when
@@ -148,8 +170,12 @@ doesn't change anymore, which is what we want.
 
 8. Hit _Reset_ in the _TRANSFORM_ section.
 
+![screenshot](../../images/reset-transform.png)
+
 9. In the _TRANSFORM OPTIMIZATION_ section, set the _Number of Iterations_ to 0
 to disable transform optimization.
+
+![screenshot](../../images/disable-transform-opt.png)
 
 We don't need to change the transform for this set of images, but we'll modify
 the optimization settings.
@@ -164,17 +190,25 @@ increases.
 12. Set _Min Warp Strength_ to 0.0001 to prevent the warp strength from getting
 too small.
 
+![screenshot](../../images/warp-decay.png)
+
 13. Hit _Start Alignin'_ and wait for optimization to finish.
+
+![screenshot](../../images/opt-done-classroom.png)
 
 # Exporting
 
 The _EXPORT IMAGES_ and _EXPORT METADATA_ sections let you export the warped
 image, the difference image, or metadata to files.
 
+![screenshot](../../images/export-sections.png)
+
 # Misc
 
 Apart from a UI scale control, the _Misc_ tab simply shows the app name and
 version and contains a link to the GitHub page.
+
+![screenshot](../../images/misc-tab.png)
 
 # Getting Better Results
 
