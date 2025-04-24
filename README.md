@@ -136,8 +136,9 @@ img-aligner --cli
 > every option and flag.
 
 Check out `demo/exposure-bracket-batch-processing` for a number of
-exposure-bracketed images and a Python script that uses img-aligner's CLI to
-align these images.
+exposure-bracketed images, a Python script that uses img-aligner's CLI to
+align those images, and a Blender file for fusing the aligned images into a
+single 32-bit linear image and minor post processing.
 
 # How to Run
 
