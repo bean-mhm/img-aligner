@@ -135,6 +135,10 @@ img-aligner --cli
 > the program, or `--silent` to disable logging. The help message explains
 > every option and flag.
 
+Check out `demo/exposure-bracket-batch-processing` for a number of
+exposure-bracketed images and a Python script that uses img-aligner's CLI to
+align these images.
+
 # How to Run
 
 You can find the latest release in

@@ -18,8 +18,8 @@ img-aligner comes with a few example images in the `demo` directory which we'll
 make use of.
 
 1. In the _Controls_ tab, use the _Load Base Image_ button in the _IMAGES_
-section to open a file dialog and choose `demo/images/1-house-base.exr`. Next,
-hit _Load Target Image_ and choose `demo/images/1-house-target.exr`.
+section to open a file dialog and choose `demo/images/1-sky-a.exr`. Next,
+hit _Load Target Image_ and choose `demo/images/1-sky-b.exr`.
 
 You'll notice two controls in the _IMAGES_ section named _Base Image Multiplier_
 and _Target Image Multiplier_. We'll address these in later examples.
@@ -59,7 +59,8 @@ If you keep switching between the base image and the target image in the
 _Image Viewer_, you'll notice the target image has been slightly translated to
 the right. You can adjust the _Offset_ parameter to compensate for this.
 
-3. Adjust the _Offset_ until the difference image becomes darker.
+3. Adjust the _Offset_ ever so slightly until the difference image becomes
+darker.
 
 > [!TIP]
 > Hold \[Alt] while adjusting a drag control to slow down or \[Shift] to speed
@@ -119,17 +120,17 @@ target image.
 The next example uses two images from an exposure bracket, as explained in
 the [README](../../README.md) (read it!).
 
-5. Load `demo/images/2-exposure-1-over-28.exr` as the base image and
-`demo/images/2-exposure-1-over-10.exr` as the target image.
+5. Load `demo/images/2-exposure-1-over-20.exr` as the base image and
+`demo/images/2-exposure-1-over-57.exr` as the target image.
 
 As can be seen in the file names, the base image is a linear image captured in
-1/28 seconds, and the target image has a light exposure time of 1/10 seconds,
-so the target image is 2.8 times brighter than the base image.
+1/20 seconds, and the target image has a light exposure time of 1/57 seconds,
+so the base image is 2.85 times brighter than the target image.
 
 Switch between the base and target images in the _Image Viewer_ and notice the
 sudden jump in brightness. This is bad for optimization, so let's fix it.
 
-6. In the _IMAGES_ section, set _Base Image Multiplier_ to 2.8.
+6. In the _IMAGES_ section, set _Target Image Multiplier_ to 2.85.
 
 > [!TIP]
 > Check _flim_ in the _Image Viewer_ to apply a filmic color transform when
@@ -161,7 +162,7 @@ about 0.001 to make the warp strength go down as the number of iterations
 increases.
 
 12. Set _Min Warp Strength_ to 0.0001 to prevent the warp strength from getting
-too tiny.
+too small.
 
 13. Hit _Start Alignin'_ and wait for optimization to finish.
 
