@@ -250,7 +250,7 @@ namespace img_aligner
                 { 0.f, 0.f },
                 1.f,
                 Imf::LineOrder::INCREASING_Y,
-                Imf::Compression::ZIP_COMPRESSION
+                Imf::Compression::DWAB_COMPRESSION
             );
             header.channels().insert("R", Imf::Channel(Imf::PixelType::FLOAT));
             header.channels().insert("G", Imf::Channel(Imf::PixelType::FLOAT));
