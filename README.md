@@ -79,7 +79,7 @@ resolution is 1x1, this will have no effect, but if the cost resolution is too
 high, it can slow down the optimization.
 
 Apart from warping, a basic linear transform can be applied to the grid by the
-user. When optimization starts, it will jitter this transforma around to
+user. When optimization starts, it will jitter this transform around to
 potentially lower the cost before warp optimization.
 
 ## The Algorithm
