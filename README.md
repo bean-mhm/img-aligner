@@ -1,7 +1,11 @@
 # img-aligner
 
-This program allows you to warp an image (the __base image__) to look
-like another, already similar image (the __target image__).
+![screenshot](images/main-ss.png)
+
+![screenshot](images/main-ss-2.png)
+
+img-aligner lets you warp an image (called the __base image__) to look
+like another, __already similar__ image (the __target image__).
 
 # Why
 
@@ -114,7 +118,7 @@ libraries for proper color management and image IO (like in
 [RealBloom](https://github.com/bean-mhm/realbloom)), but they were painfully
 hard to configure and build with CMake, and I got errors after errors.
 
-# Usage
+# How to Use
 
 This [step-by-step tutorial](docs/v0.1.0-alpha/tutorial.md) contains most of
 what you need to know to get started with img-aligner.
