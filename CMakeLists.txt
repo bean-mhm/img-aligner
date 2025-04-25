@@ -165,6 +165,8 @@ add_custom_command(TARGET img-aligner
 mkdir_if_needed_post_build("${CMAKE_BINARY_DIR}/bin/licenses")
 mkdir_if_needed_post_build("${CMAKE_BINARY_DIR}/bin/fonts")
 mkdir_if_needed_post_build("${CMAKE_BINARY_DIR}/bin/demo")
+mkdir_if_needed_post_build("${CMAKE_BINARY_DIR}/bin/docs")
+mkdir_if_needed_post_build("${CMAKE_BINARY_DIR}/bin/images")
 add_custom_command(TARGET img-aligner
     POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E echo copying resource files
