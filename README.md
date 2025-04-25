@@ -8,7 +8,7 @@
     <br />
     <a href="https://github.com/bean-mhm/img-aligner/releases">Latest Release</a>
     ·
-    <a href="https://github.com/bean-mhm/img-aligner/blob/main/docs/">Documentation</a>
+    <a href="docs/">Documentation</a>
     ·
     <a href="https://github.com/bean-mhm/img-aligner/issues">Report Bug</a>
   </p>
