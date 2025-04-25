@@ -12,7 +12,11 @@ set(CMAKE_COLOR_DIAGNOSTICS ON)
 project(img-aligner VERSION 1.0)
 
 # see if we're building for Windows
-set(WINDOWS MSVC OR MSYS OR MINGW OR WIN32)
+if (MSVC OR MSYS OR MINGW OR WIN32)
+    set(WINDOWS ON)
+else()
+    set(WINDOWS OFF)
+endif()
 
 # figure out the executable file extension in the current platform
 if(WINDOWS)
