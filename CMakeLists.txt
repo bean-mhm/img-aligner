@@ -171,6 +171,10 @@ add_custom_command(TARGET img-aligner
     COMMAND ${CMD_RCOPY_PREFIX} "\"${CMAKE_SOURCE_DIR}/licenses/.\" \"${CMAKE_BINARY_DIR}/bin/licenses\"" ${CMD_RCOPY_SUFFIX}
     COMMAND ${CMD_RCOPY_PREFIX} "\"${CMAKE_SOURCE_DIR}/fonts/.\" \"${CMAKE_BINARY_DIR}/bin/fonts\"" ${CMD_RCOPY_SUFFIX}
     COMMAND ${CMD_RCOPY_PREFIX} "\"${CMAKE_SOURCE_DIR}/demo/.\" \"${CMAKE_BINARY_DIR}/bin/demo\"" ${CMD_RCOPY_SUFFIX}
+    COMMAND ${CMD_RCOPY_PREFIX} "\"${CMAKE_SOURCE_DIR}/docs/.\" \"${CMAKE_BINARY_DIR}/bin/docs\"" ${CMD_RCOPY_SUFFIX}
+    COMMAND ${CMD_RCOPY_PREFIX} "\"${CMAKE_SOURCE_DIR}/images/.\" \"${CMAKE_BINARY_DIR}/bin/images\"" ${CMD_RCOPY_SUFFIX}
+    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/LICENSE.txt" "${CMAKE_BINARY_DIR}/bin/LICENSE.txt"
+    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/README.md" "${CMAKE_BINARY_DIR}/bin/README.md"
     COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/imgui.ini" "${CMAKE_BINARY_DIR}/bin/imgui.ini"
     COMMAND ${CMAKE_COMMAND} -E echo done copying resource files
     DEPENDS ALWAYS
