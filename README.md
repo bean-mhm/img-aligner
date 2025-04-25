@@ -1,4 +1,16 @@
-# img-aligner
+<div align="center">
+<h1 align="center">img-aligner</h1>
+  <p align="center">
+    Align 32-bit linear images with grid warping optimization 
+    <br />
+    <a href="https://github.com/bean-mhm/img-aligner/releases">Latest Release</a>
+    ·
+    <a href="https://github.com/bean-mhm/img-aligner/blob/main/docs/">Documentation</a>
+    ·
+    <a href="https://github.com/bean-mhm/img-aligner/issues">Report Bug</a>
+  </p>
+</div>
+<br>
 
 ![screenshot](images/main-ss.png)
 
@@ -40,7 +52,7 @@ feature, but it doesn't seem to work for images in linear color spaces with
 32-bit floating-point data, and I don't wanna rely on paid Adobe software (or
 any Adobe software for that matter).
 
-As a side note, if you're curious, I use [darktable](https://www.darktable.org)
+If you're curious, I use [darktable](https://www.darktable.org)
 to convert DNG files from my phone to OpenEXR images in Linear BT.709 while
 also applying corrections and minimal processing.
 
