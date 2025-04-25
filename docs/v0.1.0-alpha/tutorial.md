@@ -138,21 +138,21 @@ target image.
 The next example uses two images from an exposure bracket, as explained in
 the [README](../../README.md) (read it!).
 
-5. Load `demo/images/2-exposure-1-over-20.exr` as the base image and
-`demo/images/2-exposure-1-over-57.exr` as the target image.
+5. Load `demo/images/2-exposure-1-over-57.exr` as the base image and
+`demo/images/2-exposure-1-over-20.exr` as the target image.
 
 ![screenshot](../../images/exp-1-over-x.png)
 
 As can be seen in the file names, the base image is a linear image captured in
-1/20 seconds, and the target image has a light exposure time of 1/57 seconds,
-so the base image is 2.85 times brighter than the target image.
+1/57 seconds, and the target image has a light exposure time of 1/20 seconds,
+so the target image is 2.85 times brighter than the base image.
 
 Switch between the base and target images in the _Image Viewer_ and notice the
 sudden jump in brightness. This is bad for optimization, so let's fix it.
 
-6. In the _IMAGES_ section, set _Target Image Multiplier_ to 2.85.
+6. In the _IMAGES_ section, set _Base Image Multiplier_ to 2.85.
 
-![screenshot](../../images/target-mul.png)
+![screenshot](../../images/base-mul.png)
 
 > [!TIP]
 > Check _flim_ in the _Image Viewer_ to apply a filmic color transform when
