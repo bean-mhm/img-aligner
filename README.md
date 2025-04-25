@@ -2,7 +2,7 @@
   <a href="https://github.com/bean-mhm/img-aligner">
     <img src="images/icon.png" alt="img-aligner icon" width="120" height="120">
   </a>
-  <h2 align="center">img-aligner</h2>
+  <h3 align="center">img-aligner</h3>
   <p align="center">
     Align 32-bit linear images with grid warping optimization 
     <br />
