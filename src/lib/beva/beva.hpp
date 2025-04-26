@@ -20,7 +20,6 @@
 #include "fmt/format.h"
 
 #include "vulkan/vulkan.h"
-#include "vulkan/vk_enum_string_helper.h"
 
 #define _BV_DELETE_DEFAULT_CTOR(ClassName) ClassName() = delete
 
@@ -4160,11 +4159,13 @@ namespace bv
     "internal resources required for compression are exhausted. this must only "
         "be returned when fixed-rate compression is requested."
 },
+#ifdef VK_ERROR_INCOMPATIBLE_SHADER_BINARY_EXT
 {
     VK_ERROR_INCOMPATIBLE_SHADER_BINARY_EXT,
     "VK_INCOMPATIBLE_SHADER_BINARY_EXT : the provided binary shader code "
     "is not compatible with this device."
 }
+#endif
     };
 
     std::string VkResult_to_string(VkResult result);

@@ -23,9 +23,12 @@ namespace img_aligner
         {
             return;
         }
-        std::cout << std::vformat(
+
+	std::string elapsed_str = to_str(elapsed_sec(start_time));
+
+        std::cout << fmt::vformat(
             end_message,
-            std::make_format_args(to_str(elapsed_sec(start_time)))
+            fmt::make_format_args(elapsed_str)
         ) << std::flush;
     }
 
