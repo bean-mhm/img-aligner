@@ -1,3 +1,6 @@
+// NOTE: this version of beva is modified to use the fmt library instead of
+// std::format.
+
 #include "beva.hpp"
 
 // define a derived class named ClassName_public_ctor that lets us use the
@@ -142,7 +145,7 @@ namespace bv
 
     std::string Version::to_string() const
     {
-        return std::format("{}.{}.{}.{}", variant, major, minor, patch);
+        return fmt::format("{}.{}.{}.{}", variant, major, minor, patch);
     }
 
     std::string VkResult_to_string(VkResult result)
@@ -151,7 +154,7 @@ namespace bv
         {
             return VkResult_strmap[result];
         }
-        return std::format(
+        return fmt::format(
             "undocumented VkResult: {}",
             string_VkResult((VkResult)result)
         );
@@ -5751,7 +5754,7 @@ namespace bv
     {
         std::scoped_lock lock(*mutex);
 
-        std::string s = std::format(
+        std::string s = fmt::format(
             "-----------------------------------------\n"
             "memory bank status\n"
             "  n. regions: {}\n"
@@ -5762,7 +5765,7 @@ namespace bv
         for (size_t i = 0; i < regions.size(); i++)
         {
             const auto& region = regions[i];
-            s += std::format(
+            s += fmt::format(
                 "-----------------------------------------\n"
                 "region {}\n"
                 "  size: {}\n"

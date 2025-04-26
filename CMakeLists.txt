@@ -101,6 +101,11 @@ add_subdirectory(thirdparty/freetype)
 target_include_directories(img-aligner PUBLIC thirdparty/freetype/include)
 target_link_libraries(img-aligner PUBLIC freetype)
 
+# fmt
+add_subdirectory(thirdparty/fmt)
+target_include_directories(img-aligner PUBLIC thirdparty/fmt/include)
+target_link_libraries(img-aligner PRIVATE fmt)
+
 # Windows API
 if(WINDOWS)
     target_link_libraries(img-aligner PUBLIC

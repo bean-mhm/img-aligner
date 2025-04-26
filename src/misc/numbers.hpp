@@ -86,7 +86,7 @@ namespace img_aligner
             max_precision
         );
 
-        std::string s = std::format("{0:.{1}f}", v, precision);
+        std::string s = fmt::format("{0:.{1}f}", v, precision);
 
         // remove redundant trailing zeros after decimal point
         int32_t n_trailing_zeros = 0;
@@ -131,7 +131,7 @@ namespace img_aligner
     template<std::floating_point T>
     std::string to_str_hhp(T v)
     {
-        std::string s = std::format(
+        std::string s = fmt::format(
             std::is_same_v<T, float> ? "{0:.50f}" : "{0:.326f}",
             v
         );
@@ -190,7 +190,7 @@ namespace img_aligner
 
         // don't remove literally all trailing zeros for ImGui because it bugs
         // out sometimes.
-        return std::format(
+        return fmt::format(
             "%.{}f",
             std::max(precision - n_trailing_zeros, min_precision)
         );

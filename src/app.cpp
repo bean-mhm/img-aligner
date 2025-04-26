@@ -817,7 +817,7 @@ namespace img_aligner
     void App::parse_command_line()
     {
         cli_app = std::make_unique<CLI::App>(
-            std::format("{} v{} ({})", APP_TITLE, APP_VERSION, APP_GITHUB_URL),
+            fmt::format("{} v{} ({})", APP_TITLE, APP_VERSION, APP_GITHUB_URL),
             APP_TITLE
         );
         argv = cli_app->ensure_utf8(argv);
@@ -1014,7 +1014,7 @@ namespace img_aligner
         cli_app->add_option(
             "-m,--min-change-in-cost",
             optimization_params.min_change_in_cost_in_last_n_iters,
-            std::format(
+            fmt::format(
                 "stop optimization if the cost decreased by less than this "
                 "value in {} iterations",
                 grid_warp::N_ITERS_TO_CHECK_CHANGE_IN_COST
@@ -1141,7 +1141,7 @@ namespace img_aligner
         }
         catch (const std::exception& e)
         {
-            throw std::runtime_error(std::format(
+            throw std::runtime_error(fmt::format(
                 "failed to load base image: {}",
                 e.what()
             ).c_str());
@@ -1160,7 +1160,7 @@ namespace img_aligner
         }
         catch (const std::exception& e)
         {
-            throw std::runtime_error(std::format(
+            throw std::runtime_error(fmt::format(
                 "failed to load target image: {}",
                 e.what()
             ).c_str());
@@ -1173,7 +1173,7 @@ namespace img_aligner
         }
         catch (const std::exception& e)
         {
-            throw std::runtime_error(std::format(
+            throw std::runtime_error(fmt::format(
                 "failed to create grid warper: {}",
                 e.what()
             ).c_str());
@@ -1196,7 +1196,7 @@ namespace img_aligner
         }
         catch (const std::exception& e)
         {
-            throw std::runtime_error(std::format(
+            throw std::runtime_error(fmt::format(
                 "failed to save difference image before optimization: {}",
                 e.what()
             ).c_str());
@@ -1268,7 +1268,7 @@ namespace img_aligner
         }
         catch (const std::exception& e)
         {
-            throw std::runtime_error(std::format(
+            throw std::runtime_error(fmt::format(
                 "failed to save warped image: {}",
                 e.what()
             ).c_str());
@@ -1291,7 +1291,7 @@ namespace img_aligner
         }
         catch (const std::exception& e)
         {
-            throw std::runtime_error(std::format(
+            throw std::runtime_error(fmt::format(
                 "failed to save difference image after optimization: {}",
                 e.what()
             ).c_str());
@@ -1310,7 +1310,7 @@ namespace img_aligner
         }
         catch (const std::exception& e)
         {
-            throw std::runtime_error(std::format(
+            throw std::runtime_error(fmt::format(
                 "failed to export metadata: {}",
                 e.what()
             ).c_str());
@@ -1344,7 +1344,7 @@ namespace img_aligner
 
         json j;
 
-        j["exported_from"] = std::format(
+        j["exported_from"] = fmt::format(
             "{} v{} ({})",
             APP_TITLE, APP_VERSION, APP_GITHUB_URL
         );
@@ -2233,7 +2233,7 @@ namespace img_aligner
             }
             catch (const std::exception& e)
             {
-                current_errors.push_back(std::format(
+                current_errors.push_back(fmt::format(
                     "Failed to recreate grid warper: {}",
                     e.what()
                 ));
@@ -2478,7 +2478,7 @@ namespace img_aligner
         // draw warp strength plot
         imgui_small_div();
         {
-            ImGui::TextWrapped(std::format(
+            ImGui::TextWrapped(fmt::format(
                 "Warp Strength in {} Iterations",
                 GRID_WARP_OPTIMIZATION_WARP_STRENGTH_PLOT_N_ITERS
             ).c_str());
@@ -2504,7 +2504,7 @@ namespace img_aligner
         // min change in cost in N iters
         imgui_small_div();
         imgui_slider_or_drag(
-            std::format(
+            fmt::format(
                 "In {} iterations, the cost decreased by less than",
                 grid_warp::N_ITERS_TO_CHECK_CHANGE_IN_COST
             ),
@@ -2598,17 +2598,17 @@ namespace img_aligner
                 total_elapsed += elapsed_sec(optimization_info.start_time);
             }
 
-            ImGui::TextWrapped(std::format(
+            ImGui::TextWrapped(fmt::format(
                 "Elapsed: {} s",
                 to_str(total_elapsed, 3, 0, 2)
             ).c_str());
 
-            ImGui::TextWrapped(std::format(
+            ImGui::TextWrapped(fmt::format(
                 "Total Iterations: {}",
                 optimization_info.n_iters
             ).c_str());
 
-            ImGui::TextWrapped(std::format(
+            ImGui::TextWrapped(fmt::format(
                 "Good Iterations: {} ({:.1f}%%)",
                 optimization_info.n_good_iters,
                 100.f * (float)optimization_info.n_good_iters
@@ -2621,7 +2621,7 @@ namespace img_aligner
 
             if (grid_warper->get_initial_max_local_diff().has_value())
             {
-                ImGui::TextWrapped(std::format(
+                ImGui::TextWrapped(fmt::format(
                     "Max Local Diff.: {}",
                     to_str(*grid_warper->get_initial_max_local_diff())
                 ).c_str());
@@ -2634,19 +2634,19 @@ namespace img_aligner
             }
             else
             {
-                ImGui::TextWrapped(std::format(
+                ImGui::TextWrapped(fmt::format(
                     "Change in Cost: {}",
                     to_str(optimization_info.change_in_cost_in_last_n_iters)
                 ).c_str());
             }
-            imgui_tooltip(std::format(
+            imgui_tooltip(fmt::format(
                 "How much the cost decreased in the last {} iterations",
                 grid_warp::N_ITERS_TO_CHECK_CHANGE_IN_COST
             ).c_str());
 
             if (!optimization_info.cost_history.empty())
             {
-                ImGui::TextWrapped(std::format(
+                ImGui::TextWrapped(fmt::format(
                     "Cost: {}",
                     to_str(optimization_info.cost_history.back())
                 ).c_str());
@@ -2786,7 +2786,7 @@ namespace img_aligner
         imgui_bold("INFO");
 
         // version
-        ImGui::TextWrapped(std::format(
+        ImGui::TextWrapped(fmt::format(
             "{} v{}",
             APP_TITLE,
             APP_VERSION
@@ -3558,7 +3558,7 @@ namespace img_aligner
             }
             catch (const std::exception& e)
             {
-                current_errors.push_back(std::format(
+                current_errors.push_back(fmt::format(
                     "Failed to load image from file \"{}\": {}",
                     filename,
                     e.what()
@@ -3572,7 +3572,7 @@ namespace img_aligner
         }
         else if (result == NFD_ERROR)
         {
-            current_errors.push_back(std::format(
+            current_errors.push_back(fmt::format(
                 "Native File Dialog: {}",
                 NFD_GetError()
             ));
@@ -3606,7 +3606,7 @@ namespace img_aligner
             }
             catch (const std::exception& e)
             {
-                current_errors.push_back(std::format(
+                current_errors.push_back(fmt::format(
                     "Failed to save image to file \"{}\": {}",
                     filename,
                     e.what()
@@ -3620,7 +3620,7 @@ namespace img_aligner
         }
         else if (result == NFD_ERROR)
         {
-            current_errors.push_back(std::format(
+            current_errors.push_back(fmt::format(
                 "Native File Dialog: {}",
                 NFD_GetError()
             ));
@@ -3647,7 +3647,7 @@ namespace img_aligner
             }
             catch (const std::exception& e)
             {
-                current_errors.push_back(std::format(
+                current_errors.push_back(fmt::format(
                     "Failed to export metadata to file \"{}\": {}",
                     filename,
                     e.what()
@@ -3661,7 +3661,7 @@ namespace img_aligner
         }
         else if (result == NFD_ERROR)
         {
-            current_errors.push_back(std::format(
+            current_errors.push_back(fmt::format(
                 "Native File Dialog: {}",
                 NFD_GetError()
             ));
@@ -3691,7 +3691,7 @@ namespace img_aligner
 
     static void glfw_error_callback(int error, const char* description)
     {
-        std::cerr << std::format("GLFW error {}: {}\n", error, description);
+        std::cerr << fmt::format("GLFW error {}: {}\n", error, description);
     }
 
     static void imgui_check_vk_result(VkResult err)

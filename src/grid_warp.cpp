@@ -78,7 +78,7 @@ namespace img_aligner::grid_warp
         if (base_extent.width != target_extent.width
             || base_extent.height != target_extent.height)
         {
-            throw std::invalid_argument(std::format(
+            throw std::invalid_argument(fmt::format(
                 "provided base and target images must have the same resolution "
                 "instead of {}x{} and {}x{} respectively.",
                 base_extent.width, base_extent.height,

@@ -343,7 +343,7 @@ namespace img_aligner
             {
                 if (n_components > 1)
                 {
-                    format = std::format("%.{}f", precision);
+                    format = fmt::format("%.{}f", precision);
                 }
                 else
                 {
@@ -354,7 +354,7 @@ namespace img_aligner
                         min_precision
                     );*/
 
-                    format = std::format("%.{}f", precision);
+                    format = fmt::format("%.{}f", precision);
                 }
             }
 

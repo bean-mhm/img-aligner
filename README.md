@@ -181,6 +181,7 @@ following libraries.
 | [stb_image](https://github.com/nothings/stb) | Reading images |
 | [GLM](https://github.com/g-truc/glm) | Math |
 | [nlohmann/json](https://github.com/nlohmann/json) | JSON serialization |
+| [fmt](https://github.com/fmtlib/fmt) | String formatting |
 
 # How to Build
 

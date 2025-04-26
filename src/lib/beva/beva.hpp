@@ -1,8 +1,10 @@
-﻿#pragma once
+﻿// NOTE: this version of beva is modified to use the fmt library instead of
+// std::format.
+
+#pragma once
 
 #include <vector>
 #include <string>
-#include <format>
 #include <array>
 #include <unordered_map>
 #include <memory>
@@ -14,6 +16,8 @@
 #include <mutex>
 #include <stdexcept>
 #include <cstdint>
+
+#include "fmt/format.h"
 
 #include "vulkan/vulkan.h"
 #include "vulkan/vk_enum_string_helper.h"

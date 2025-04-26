@@ -17,16 +17,16 @@ namespace img_aligner
     }
 
     template<typename... Args>
-    void fprint(std::format_string<Args...> fmt, Args&&... args)
+    void fprint(fmt::format_string<Args...> format, Args&&... args)
     {
-        std::cout << std::vformat(fmt.get(), std::make_format_args(args...));
+        std::cout << fmt::vformat(format.get(), fmt::make_format_args(args...));
         std::cout.flush();
     }
 
     template<typename... Args>
-    void fprintln(std::format_string<Args...> fmt, Args&&... args)
+    void fprintln(fmt::format_string<Args...> format, Args&&... args)
     {
-        std::cout << std::vformat(fmt.get(), std::make_format_args(args...));
+        std::cout << fmt::vformat(format.get(), fmt::make_format_args(args...));
         std::cout << std::endl;
     }
 
@@ -55,7 +55,7 @@ namespace img_aligner
         auto result = stbi_load_fn(filename, x, y, comp, req_comp);
         if (!result)
         {
-            throw std::runtime_error(std::format(
+            throw std::runtime_error(fmt::format(
                 "failed to load image from file \"{}\": {}",
                 filename,
                 stbi_failure_reason()

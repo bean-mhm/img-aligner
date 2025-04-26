@@ -297,7 +297,7 @@ namespace img_aligner
             break;
 
         default:
-            throw std::invalid_argument(std::format(
+            throw std::invalid_argument(fmt::format(
                 "image format ({}) not supported for read back",
                 string_VkFormat(image->config().format)
             ).c_str());

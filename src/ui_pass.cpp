@@ -402,7 +402,7 @@ namespace img_aligner
 
         if (width > _max_width || height > _max_height)
         {
-            throw std::invalid_argument(std::format(
+            throw std::invalid_argument(fmt::format(
                 "UI pass' max width and/or height ({}x{}) isn't large enough "
                 "to fit image ({}x{})",
                 _max_width,

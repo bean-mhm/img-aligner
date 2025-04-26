@@ -42,7 +42,7 @@ namespace img_aligner
         std::ifstream f(path, std::ios::ate | std::ios::binary);
         if (!f.is_open())
         {
-            throw std::runtime_error(std::format(
+            throw std::runtime_error(fmt::format(
                 "failed to read file \"{}\"",
                 path.string()
             ).c_str());
@@ -64,11 +64,11 @@ namespace img_aligner
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
         ShellExecuteA(NULL, "open", url.data(), NULL, NULL, SW_SHOWNORMAL);
 #elif __APPLE__
-        std::system(std::format("open \"{}\"", url).c_str());
+        std::system(fmt::format("open \"{}\"", url).c_str());
 #elif __linux__
-        std::system(std::format("xdg-open \"{}\"", url).c_str());
+        std::system(fmt::format("xdg-open \"{}\"", url).c_str());
 #else
-        throw std::exception(std::format(
+        throw std::exception(fmt::format(
             "{} is not implemented for this platform",
             __FUNCTION__
         ).c_str());

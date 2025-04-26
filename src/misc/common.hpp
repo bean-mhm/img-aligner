@@ -3,7 +3,6 @@
 #include <iostream>
 #include <fstream>
 #include <filesystem>
-#include <format>
 #include <string>
 #include <vector>
 #include <array>
@@ -27,6 +26,8 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstdint>
+
+#include "fmt/format.h"
 
 #include "CLI11/CLI11.hpp"
 
@@ -111,7 +112,7 @@ namespace img_aligner
             {
                 flag_result = !flag_result;
             },
-            std::format("{} (default: {})", flag_description, flag_result)
+            fmt::format("{} (default: {})", flag_description, flag_result)
         );
     }
 
