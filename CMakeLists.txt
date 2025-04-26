@@ -3,8 +3,8 @@ cmake_minimum_required(VERSION 3.24)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-#set(CMAKE_C_COMPILER gcc)
-#set(CMAKE_CXX_COMPILER g++)
+set(CMAKE_C_COMPILER gcc)
+set(CMAKE_CXX_COMPILER g++)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_COLOR_DIAGNOSTICS ON)
@@ -13,15 +13,9 @@ project(img-aligner VERSION 1.0)
 
 # see if we're building for Windows
 if (MSVC OR MSYS OR MINGW OR WIN32)
-<<<<<<< HEAD
     set(WINDOWS ON)
 else()
     set(WINDOWS OFF)
-=======
-	set(WINDOWS ON)
-else()
-	set(WINDOWS OFF)
->>>>>>> 2b01eee (Update CMakeLists for linux builds)
 endif()
 
 # figure out the executable file extension in the current platform
