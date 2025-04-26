@@ -197,6 +197,12 @@ a text editor or an IDE (like
 On Windows, you can use [MSYS2](https://www.msys2.org/) which comes with the
 MinGW compilers and a whole lot of other useful tools and libraries.
 
+> [!WARNING]
+> You need the g++ compiler to build this project. This is mainly because the
+> [OpenEXR](https://openexr.com) library doesn't compile with clang. The
+> `CMakeLists.txt` already sets `CMAKE_CXX_COMPILER` to g++ so you just need to
+> have g++ installed.
+
 ## Building
 
 > [!NOTE]
