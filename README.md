@@ -197,12 +197,10 @@ a text editor or an IDE (like
 On Windows, you can use [MSYS2](https://www.msys2.org/) which comes with the
 MinGW compilers and a whole lot of other useful tools and libraries.
 
-> [!CAUTION]
-> Thanks to the amazing talented developers at
-> [Academy Software Foundation (ASWF)](https://www.aswf.io), the
-> [OpenEXR](https://openexr.com) library doesn't seem to compile with the clang
-> compiler, so you should use g++. The `CMakeLists.txt` already sets
-> CMAKE_CXX_COMPILER to g++.
+> [!WARNING]
+> The [OpenEXR](https://openexr.com) library doesn't seem to compile with the
+> clang compiler, so you should use g++. The `CMakeLists.txt` already sets
+> `CMAKE_CXX_COMPILER` to g++.
 
 ## Building
 
