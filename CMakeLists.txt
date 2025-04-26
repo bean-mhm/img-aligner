@@ -3,8 +3,8 @@ cmake_minimum_required(VERSION 3.24)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(CMAKE_C_COMPILER gcc)
-set(CMAKE_CXX_COMPILER g++)
+#set(CMAKE_C_COMPILER gcc)
+#set(CMAKE_CXX_COMPILER g++)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_COLOR_DIAGNOSTICS ON)
@@ -13,15 +13,21 @@ project(img-aligner VERSION 1.0)
 
 # see if we're building for Windows
 if (MSVC OR MSYS OR MINGW OR WIN32)
+<<<<<<< HEAD
     set(WINDOWS ON)
 else()
     set(WINDOWS OFF)
+=======
+	set(WINDOWS ON)
+else()
+	set(WINDOWS OFF)
+>>>>>>> 2b01eee (Update CMakeLists for linux builds)
 endif()
 
 # figure out the executable file extension in the current platform
 if(WINDOWS)
     set(EXEC_FILE_EXT ".exe")
-elseif(APPLE)
+elseif(${APPLE})
     set(EXEC_FILE_EXT ".app")
 else()
     set(EXEC_FILE_EXT "")
@@ -45,8 +51,13 @@ target_compile_definitions(img-aligner PRIVATE
 
 # compiler and linker flags
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    target_compile_options(img-aligner PRIVATE -static -static-libgcc -static-libstdc++ -mconsole)
-    target_link_options(img-aligner PRIVATE -static -static-libgcc -static-libstdc++ -mconsole)
+    if (WINDOWS)
+	target_compile_options(img-aligner PRIVATE -mconsole)
+	target_link_options(img-aligned PRIVATE -mconsole)
+    endif()
+
+    target_compile_options(img-aligner PRIVATE -static -static-libgcc -static-libstdc++)
+    target_link_options(img-aligner PRIVATE -static -static-libgcc -static-libstdc++)
 endif()
 
 # include dirs
@@ -191,26 +202,28 @@ add_custom_command(TARGET img-aligner
     DEPENDS ALWAYS
 )
 
-# find required runtime DLLs
-find_file(LIBGCC_DLL libgcc_s_seh-1.dll PATHS ${CMAKE_C_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
-find_file(LIBSTDCXX_DLL libstdc++-6.dll PATHS ${CMAKE_CXX_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
-find_file(LIBWINPTHREAD_DLL libwinpthread-1.dll PATHS ${CMAKE_C_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
-find_file(LIBBZ2_DLL libbz2-1.dll PATHS ${CMAKE_C_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
-find_file(ZLIB_DLL zlib1.dll PATHS ${CMAKE_C_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
+if (WINDOWS)
+	# find required runtime DLLs
+	find_file(LIBGCC_DLL libgcc_s_seh-1.dll PATHS ${CMAKE_C_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
+	find_file(LIBSTDCXX_DLL libstdc++-6.dll PATHS ${CMAKE_CXX_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
+	find_file(LIBWINPTHREAD_DLL libwinpthread-1.dll PATHS ${CMAKE_C_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
+	find_file(LIBBZ2_DLL libbz2-1.dll PATHS ${CMAKE_C_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
+	find_file(ZLIB_DLL zlib1.dll PATHS ${CMAKE_C_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
 
-# post build: copy required DLLs to the output directory
-add_custom_command(TARGET img-aligner POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E echo copying runtime DLLs
+	# post build: copy required DLLs to the output directory
+	add_custom_command(TARGET img-aligner POST_BUILD
+	    COMMAND ${CMAKE_COMMAND} -E echo copying runtime DLLs
 
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    # ${LIBGCC_DLL} (these are statically linked)
-    # ${LIBSTDCXX_DLL} (these are statically linked)
-    # ${LIBWINPTHREAD_DLL} (these are statically linked)
-    ${LIBBZ2_DLL}
-    ${ZLIB_DLL}
-    ${CMAKE_BINARY_DIR}/bin
+	    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+	    # ${LIBGCC_DLL} (these are statically linked)
+	    # ${LIBSTDCXX_DLL} (these are statically linked)
+	    # ${LIBWINPTHREAD_DLL} (these are statically linked)
+	    ${LIBBZ2_DLL}
+	    ${ZLIB_DLL}
+	    ${CMAKE_BINARY_DIR}/bin
 
-    COMMAND ${CMAKE_COMMAND} -E echo done copying runtime DLLs
+	    COMMAND ${CMAKE_COMMAND} -E echo done copying runtime DLLs
 
-    DEPENDS ALWAYS
-)
+	    DEPENDS ALWAYS
+	)
+endif()
