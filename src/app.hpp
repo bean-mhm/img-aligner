@@ -71,7 +71,8 @@ namespace img_aligner
         ManuallyStopped,
         LowChangeInCost,
         ReachedMaxIters,
-        ReachedMaxRuntime
+        ReachedMaxRuntime,
+        Error
     };
 
     const char* GridWarpOptimizationStopReason_to_str(
@@ -234,6 +235,9 @@ namespace img_aligner
 
         void start_optimization();
         void stop_optimization();
+
+        // this is the actual code that will run in the optimization thread
+        void start_optimization_internal();
 
         void print_optimization_statistics(bool clear);
 

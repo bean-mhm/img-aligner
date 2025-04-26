@@ -58,6 +58,53 @@
 #define ACCESS_2D(arr, ix, iy, res_x) ((arr)[(ix) + (iy) * (res_x)])
 #define INDEX_2D(ix, iy, res_x) ((ix) + (iy) * (res_x))
 
+#define IMG_ALIGNER_CATCH_ALL \
+    catch (const CLI::Error& e) \
+    { \
+        if (e.get_exit_code() != (int)CLI::ExitCodes::Success) \
+        { \
+            std::cerr << "CLI: " << e.what() << std::endl; \
+        } \
+        return; \
+    } \
+    catch (const bv::Error& e) \
+    { \
+        std::cerr << "beva: " << e.to_string() << std::endl; \
+     \
+        return; \
+    } \
+    catch (const std::exception& e) \
+    { \
+        std::cerr << e.what() << std::endl; \
+     \
+        return; \
+    }
+
+#define IMG_ALIGNER_CATCH_ALL_IN_MAIN \
+    catch (const CLI::Error& e) \
+    { \
+        if (e.get_exit_code() != (int)CLI::ExitCodes::Success) \
+        { \
+            std::cerr << "CLI: " << e.what() << std::endl; \
+            pause_on_error(); \
+        } \
+        return e.get_exit_code(); \
+    } \
+    catch (const bv::Error& e) \
+    { \
+        std::cerr << "beva: " << e.to_string() << std::endl; \
+        pause_on_error(); \
+     \
+        return EXIT_FAILURE; \
+    } \
+    catch (const std::exception& e) \
+    { \
+        std::cerr << e.what() << std::endl; \
+        pause_on_error(); \
+     \
+        return EXIT_FAILURE; \
+    }
+
 namespace img_aligner
 {
 

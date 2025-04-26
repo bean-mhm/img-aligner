@@ -20,27 +20,5 @@ int main(int argc, char** argv)
         img_aligner::App app(argc, argv);
         app.run();
     }
-    catch (const CLI::Error& e)
-    {
-        if (e.get_exit_code() != (int)CLI::ExitCodes::Success)
-        {
-            std::cerr << "CLI: " << e.what() << std::endl;
-            pause_on_error();
-        }
-        return e.get_exit_code();
-    }
-    catch (const bv::Error& e)
-    {
-        std::cerr << "beva: " << e.to_string() << std::endl;
-        pause_on_error();
-
-        return EXIT_FAILURE;
-    }
-    catch (const std::exception& e)
-    {
-        std::cerr << e.what() << std::endl;
-        pause_on_error();
-
-        return EXIT_FAILURE;
-    }
+    IMG_ALIGNER_CATCH_ALL_IN_MAIN;
 }

@@ -41,6 +41,8 @@ namespace img_aligner
             return "ReachedMaxIters";
         case GridWarpOptimizationStopReason::ReachedMaxRuntime:
             return "ReachedMaxRuntime";
+        case GridWarpOptimizationStopReason::Error:
+            return "Error";
         default:
             return "None";
         }
@@ -60,6 +62,8 @@ namespace img_aligner
             return "reached maximum iterations";
         case GridWarpOptimizationStopReason::ReachedMaxRuntime:
             return "reached maximum run time";
+        case GridWarpOptimizationStopReason::Error:
+            return "an error occurred, check the console";
         default:
             return "none";
         }
@@ -1660,182 +1664,20 @@ namespace img_aligner
         optimization_thread = std::make_unique<std::jthread>(
             [this]()
             {
-                while (!optimization_thread_stop)
+                bool success = false;
+                try
                 {
-                    optimization_mutex.lock();
-
-                    bool cost_decreased = false;
-                    if (optimization_info.n_iters <
-                        optimization_params.n_transform_optimization_iters)
-                    {
-                        // optimize the transform
-                        cost_decreased = grid_warper->optimize_transform(
-                            (uint32_t)optimization_info.n_iters,
-                            grid_transform,
-                            optimization_params.scale_jitter,
-                            optimization_params.rotation_jitter,
-                            optimization_params.offset_jitter,
-                            state.queue_grid_warp_optimize,
-                            optimization_info.last_jittered_transform
-                        );
-                    }
-                    else
-                    {
-                        // optimize by warping
-                        cost_decreased = grid_warper->optimize_warp(
-                            (uint32_t)optimization_info.n_iters,
-                            optimization_params.calc_warp_strength(
-                                optimization_info.n_iters
-                            ),
-                            state.queue_grid_warp_optimize
-                        );
-                    }
-
-                    // update optimization info
-                    optimization_info_mutex.lock();
-
-                    // if transform optimization is enabled but the jitter
-                    // intensities are effectively 0 then skip it entirely.
-                    if (optimization_info.n_iters == 0
-                        && optimization_params.n_transform_optimization_iters >
-                        0
-                        && optimization_params.scale_jitter == 1.f
-                        && optimization_params.rotation_jitter == 0.f
-                        && optimization_params.offset_jitter == 0.f)
-                    {
-                        // update number of iterations
-                        optimization_info.n_iters =
-                            optimization_params.n_transform_optimization_iters;
-
-                        // update cost history
-                        if (grid_warper->get_last_avg_diff().has_value())
-                        {
-                            for (size_t i = 0;
-                                i < optimization_params.
-                                n_transform_optimization_iters;
-                                i++)
-                            {
-                                optimization_info.cost_history.push_back(
-                                    *grid_warper->get_last_avg_diff()
-                                );
-                            }
-                        }
-                    }
-                    else
-                    {
-                        // update number of iterations
-                        optimization_info.n_iters++;
-                        if (cost_decreased)
-                        {
-                            optimization_info.n_good_iters++;
-                        }
-
-                        // update cost history
-                        if (grid_warper->get_last_avg_diff().has_value())
-                        {
-                            optimization_info.cost_history.push_back(
-                                *grid_warper->get_last_avg_diff()
-                            );
-                        }
-                    }
-
-                    // update min. change in cost in last N iters
-                    if (optimization_info.cost_history.size() >
-                        grid_warp::N_ITERS_TO_CHECK_CHANGE_IN_COST)
-                    {
-                        optimization_info.change_in_cost_in_last_n_iters =
-                            optimization_info.cost_history[
-                                optimization_info.cost_history.size() - 1
-                                    - grid_warp::N_ITERS_TO_CHECK_CHANGE_IN_COST
-                            ]
-                            - optimization_info.cost_history.back();
-                    }
-
-                    // stop condition: min. change in cost in last N iters. this
-                    // should only take effect if transform optimization was
-                    // finished more than
-                    // grid_warp::N_ITERS_TO_CHECK_CHANGE_IN_COST iterations
-                    // ago.
-                    bool transform_opt_finished_long_ago =
-                        optimization_info.n_iters >= (
-                            optimization_params.n_transform_optimization_iters
-                            + grid_warp::N_ITERS_TO_CHECK_CHANGE_IN_COST
-                            );
-                    if (transform_opt_finished_long_ago
-                        && optimization_info.change_in_cost_in_last_n_iters <
-                        optimization_params.min_change_in_cost_in_last_n_iters)
-                    {
-                        optimization_info.stop_reason =
-                            GridWarpOptimizationStopReason::LowChangeInCost;
-                        optimization_thread_stop = true;
-                    }
-
-                    // stop condition: max iters
-                    if (optimization_params.max_iters > 0
-                        && optimization_info.n_iters >= optimization_params
-                        .max_iters)
-                    {
-                        optimization_info.stop_reason =
-                            GridWarpOptimizationStopReason::ReachedMaxIters;
-                        optimization_thread_stop = true;
-                    }
-
-                    // stop condition: max run time
-                    float total_elapsed =
-                        elapsed_sec(optimization_info.start_time)
-                        + optimization_info.accum_elapsed;
-                    if (optimization_params.max_runtime_sec > 0.f
-                        && total_elapsed >= optimization_params.max_runtime_sec)
-                    {
-                        optimization_info.stop_reason =
-                            GridWarpOptimizationStopReason::ReachedMaxRuntime;
-                        optimization_thread_stop = true;
-                    }
-
-                    optimization_info_mutex.unlock();
-
-                    // let other threads use the lock if they need to
-                    optimization_mutex.unlock();
-                    need_the_optimization_mutex.wait(true);
+                    start_optimization_internal();
+                    success = true;
                 }
+                IMG_ALIGNER_CATCH_ALL;
 
+                if (!success)
                 {
-                    std::scoped_lock lock(optimization_mutex);
-                    std::scoped_lock lock2(optimization_info_mutex);
-
-                    if (optimization_info.stop_reason ==
-                        GridWarpOptimizationStopReason::None)
-                    {
-                        optimization_info.stop_reason =
-                            GridWarpOptimizationStopReason::ManuallyStopped;
-                    }
-
-                    // update accumulated elapsed time
-                    optimization_info.accum_elapsed += elapsed_sec(
-                        optimization_info.start_time
-                    );
-
-                    // run the different passes one last time
-                    grid_warper->run_grid_warp_pass(
-                        false,
-                        state.queue_grid_warp_optimize
-                    );
-                    grid_warper->run_grid_warp_pass(
-                        true,
-                        state.queue_grid_warp_optimize
-                    );
-                    grid_warper->run_difference_and_cost_pass(
-                        state.queue_grid_warp_optimize
-                    );
+                    optimization_info.stop_reason =
+                        GridWarpOptimizationStopReason::Error;
 
                     is_optimizing = false;
-                }
-
-                // switch to warped hires image in ui pass
-                if (!state.cli_mode && ui_pass != nullptr)
-                {
-                    select_ui_pass_image(grid_warp::WARPED_HIRES_IMAGE_NAME);
-                    need_to_run_ui_pass = true;
                 }
             }
         );
@@ -1865,6 +1707,188 @@ namespace img_aligner
         optimization_thread_stop = true;
         optimization_thread->join();
         optimization_thread = nullptr;
+    }
+
+    void App::start_optimization_internal()
+    {
+        while (!optimization_thread_stop)
+        {
+            optimization_mutex.lock();
+
+            bool cost_decreased = false;
+            if (optimization_info.n_iters <
+                optimization_params.n_transform_optimization_iters)
+            {
+                // optimize the transform
+                cost_decreased = grid_warper->optimize_transform(
+                    (uint32_t)optimization_info.n_iters,
+                    grid_transform,
+                    optimization_params.scale_jitter,
+                    optimization_params.rotation_jitter,
+                    optimization_params.offset_jitter,
+                    state.queue_grid_warp_optimize,
+                    optimization_info.last_jittered_transform
+                );
+            }
+            else
+            {
+                // optimize by warping
+                cost_decreased = grid_warper->optimize_warp(
+                    (uint32_t)optimization_info.n_iters,
+                    optimization_params.calc_warp_strength(
+                        optimization_info.n_iters
+                    ),
+                    state.queue_grid_warp_optimize
+                );
+            }
+
+            // update optimization info
+            optimization_info_mutex.lock();
+
+            // if transform optimization is enabled but the jitter
+            // intensities are effectively 0 then skip it entirely.
+            if (optimization_info.n_iters == 0
+                && optimization_params.n_transform_optimization_iters >
+                0
+                && optimization_params.scale_jitter == 1.f
+                && optimization_params.rotation_jitter == 0.f
+                && optimization_params.offset_jitter == 0.f)
+            {
+                // update number of iterations
+                optimization_info.n_iters =
+                    optimization_params.n_transform_optimization_iters;
+
+                // update cost history
+                if (grid_warper->get_last_avg_diff().has_value())
+                {
+                    for (size_t i = 0;
+                        i < optimization_params.
+                        n_transform_optimization_iters;
+                        i++)
+                    {
+                        optimization_info.cost_history.push_back(
+                            *grid_warper->get_last_avg_diff()
+                        );
+                    }
+                }
+            }
+            else
+            {
+                // update number of iterations
+                optimization_info.n_iters++;
+                if (cost_decreased)
+                {
+                    optimization_info.n_good_iters++;
+                }
+
+                // update cost history
+                if (grid_warper->get_last_avg_diff().has_value())
+                {
+                    optimization_info.cost_history.push_back(
+                        *grid_warper->get_last_avg_diff()
+                    );
+                }
+            }
+
+            // update min. change in cost in last N iters
+            if (optimization_info.cost_history.size() >
+                grid_warp::N_ITERS_TO_CHECK_CHANGE_IN_COST)
+            {
+                optimization_info.change_in_cost_in_last_n_iters =
+                    optimization_info.cost_history[
+                        optimization_info.cost_history.size() - 1
+                            - grid_warp::N_ITERS_TO_CHECK_CHANGE_IN_COST
+                    ]
+                    - optimization_info.cost_history.back();
+            }
+
+            // stop condition: min. change in cost in last N iters. this
+            // should only take effect if transform optimization was
+            // finished more than
+            // grid_warp::N_ITERS_TO_CHECK_CHANGE_IN_COST iterations
+            // ago.
+            bool transform_opt_finished_long_ago =
+                optimization_info.n_iters >= (
+                    optimization_params.n_transform_optimization_iters
+                    + grid_warp::N_ITERS_TO_CHECK_CHANGE_IN_COST
+                    );
+            if (transform_opt_finished_long_ago
+                && optimization_info.change_in_cost_in_last_n_iters <
+                optimization_params.min_change_in_cost_in_last_n_iters)
+            {
+                optimization_info.stop_reason =
+                    GridWarpOptimizationStopReason::LowChangeInCost;
+                optimization_thread_stop = true;
+            }
+
+            // stop condition: max iters
+            if (optimization_params.max_iters > 0
+                && optimization_info.n_iters >= optimization_params
+                .max_iters)
+            {
+                optimization_info.stop_reason =
+                    GridWarpOptimizationStopReason::ReachedMaxIters;
+                optimization_thread_stop = true;
+            }
+
+            // stop condition: max run time
+            float total_elapsed =
+                elapsed_sec(optimization_info.start_time)
+                + optimization_info.accum_elapsed;
+            if (optimization_params.max_runtime_sec > 0.f
+                && total_elapsed >= optimization_params.max_runtime_sec)
+            {
+                optimization_info.stop_reason =
+                    GridWarpOptimizationStopReason::ReachedMaxRuntime;
+                optimization_thread_stop = true;
+            }
+
+            optimization_info_mutex.unlock();
+
+            // let other threads use the lock if they need to
+            optimization_mutex.unlock();
+            need_the_optimization_mutex.wait(true);
+        }
+
+        // finalize
+        {
+            std::scoped_lock lock(optimization_mutex);
+            std::scoped_lock lock2(optimization_info_mutex);
+
+            if (optimization_info.stop_reason ==
+                GridWarpOptimizationStopReason::None)
+            {
+                optimization_info.stop_reason =
+                    GridWarpOptimizationStopReason::ManuallyStopped;
+            }
+
+            // update accumulated elapsed time
+            optimization_info.accum_elapsed += elapsed_sec(
+                optimization_info.start_time
+            );
+
+            // run the different passes one last time
+            grid_warper->run_grid_warp_pass(
+                false,
+                state.queue_grid_warp_optimize
+            );
+            grid_warper->run_grid_warp_pass(
+                true,
+                state.queue_grid_warp_optimize
+            );
+            grid_warper->run_difference_and_cost_pass(
+                state.queue_grid_warp_optimize
+            );
+
+            is_optimizing = false;
+        }
+
+        // switch to warped hires image in ui pass
+        if (!state.cli_mode && ui_pass != nullptr)
+        {
+            select_ui_pass_image(grid_warp::WARPED_HIRES_IMAGE_NAME);
+            need_to_run_ui_pass = true;
+        }
     }
 
     void App::print_optimization_statistics(bool clear)
