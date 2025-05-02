@@ -12,7 +12,7 @@ set(CMAKE_COLOR_DIAGNOSTICS ON)
 project(img-aligner VERSION 1.0)
 
 # see if we're building for Windows
-if (MSVC OR MSYS OR MINGW OR WIN32)
+if(MSVC OR MSYS OR MINGW OR WIN32)
     set(WINDOWS ON)
 else()
     set(WINDOWS OFF)
@@ -146,9 +146,9 @@ find_program(GLSLC_PATH ${Vulkan_GLSLC_EXECUTABLE})
 message(STATUS ${Vulkan_GLSLC_EXECUTABLE})
 
 if(NOT GLSLC_PATH)
-    message(FATAL_ERROR "glslc not found! Please ensure Vulkan SDK is installed correctly.")
+    message(FATAL_ERROR "glslc not found, please ensure the Vulkan SDK is installed correctly.")
 else()
-    message(STATUS "Using GLSLC from: ${GLSLC_PATH}")
+    message(STATUS "using GLSLC from: ${GLSLC_PATH}")
 endif()
 
 mkdir_if_needed_post_build("${CMAKE_BINARY_DIR}/bin/shaders")
@@ -188,28 +188,28 @@ add_custom_command(TARGET img-aligner
 )
 
 
-if (WINDOWS)
-	# find required runtime DLLs
-	find_file(LIBGCC_DLL libgcc_s_seh-1.dll PATHS ${CMAKE_C_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
-	find_file(LIBSTDCXX_DLL libstdc++-6.dll PATHS ${CMAKE_CXX_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
-	find_file(LIBWINPTHREAD_DLL libwinpthread-1.dll PATHS ${CMAKE_C_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
-	find_file(LIBBZ2_DLL libbz2-1.dll PATHS ${CMAKE_C_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
-	find_file(ZLIB_DLL zlib1.dll PATHS ${CMAKE_C_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
+if(WINDOWS)
+    # find required runtime DLLs
+    find_file(LIBGCC_DLL libgcc_s_seh-1.dll PATHS ${CMAKE_C_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
+    find_file(LIBSTDCXX_DLL libstdc++-6.dll PATHS ${CMAKE_CXX_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
+    find_file(LIBWINPTHREAD_DLL libwinpthread-1.dll PATHS ${CMAKE_C_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
+    find_file(LIBBZ2_DLL libbz2-1.dll PATHS ${CMAKE_C_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
+    find_file(ZLIB_DLL zlib1.dll PATHS ${CMAKE_C_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
 
-	# post build: copy required DLLs to the output directory
-	add_custom_command(TARGET img-aligner POST_BUILD
-	    COMMAND ${CMAKE_COMMAND} -E echo copying runtime DLLs
+    # post build: copy required DLLs to the output directory
+    add_custom_command(TARGET img-aligner POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E echo copying runtime DLLs
 
-	    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-	    # ${LIBGCC_DLL} (these are statically linked)
-	    # ${LIBSTDCXX_DLL} (these are statically linked)
-	    # ${LIBWINPTHREAD_DLL} (these are statically linked)
-	    ${LIBBZ2_DLL}
-	    ${ZLIB_DLL}
-	    ${CMAKE_BINARY_DIR}/bin
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        # ${LIBGCC_DLL} (these are statically linked)
+        # ${LIBSTDCXX_DLL} (these are statically linked)
+        # ${LIBWINPTHREAD_DLL} (these are statically linked)
+        ${LIBBZ2_DLL}
+        ${ZLIB_DLL}
+        ${CMAKE_BINARY_DIR}/bin
 
-	    COMMAND ${CMAKE_COMMAND} -E echo done copying runtime DLLs
+        COMMAND ${CMAKE_COMMAND} -E echo done copying runtime DLLs
 
-	    DEPENDS ALWAYS
-	)
+        DEPENDS ALWAYS
+    )
 endif()
