@@ -156,7 +156,7 @@ namespace bv
         }
         return fmt::format(
             "undocumented VkResult: {}",
-            string_VkResult((VkResult)result)
+            (int)result
         );
     }
 

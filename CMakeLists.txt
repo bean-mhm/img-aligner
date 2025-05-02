@@ -18,18 +18,14 @@ else()
     set(WINDOWS OFF)
 endif()
 
-# figure out the executable file extension in the current platform
-if(WINDOWS)
-    set(EXEC_FILE_EXT ".exe")
-elseif(APPLE)
-    set(EXEC_FILE_EXT ".app")
-else()
-    set(EXEC_FILE_EXT "")
-endif()
-
 # main executable
 file(GLOB_RECURSE SRC_CPP_FILES src/*.cpp)
 file(GLOB_RECURSE SRC_C_FILES src/*.c)
+
+if(NOT WINDOWS)
+    list(REMOVE_ITEM SRC_CPP_FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/imgui/imgui_impl_win32.cpp")
+endif()
+
 add_executable(img-aligner ${SRC_CPP_FILES} ${SRC_C_FILES})
 
 # set binary output directory
@@ -44,7 +40,7 @@ target_compile_definitions(img-aligner PRIVATE
 )
 
 # compiler and linker flags
-if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND WINDOWS)
     target_compile_options(img-aligner PRIVATE -static -static-libgcc -static-libstdc++ -mconsole)
     target_link_options(img-aligner PRIVATE -static -static-libgcc -static-libstdc++ -mconsole)
 endif()
@@ -138,24 +134,23 @@ else()
     macro(mkdir_if_needed_post_build dir)
         add_custom_command(TARGET img-aligner
             POST_BUILD
-            COMMAND if \[ ! -d \"${dir}\" \]; then mkdir \"${dir}\" fi
+            COMMAND mkdir -p \"${dir}\"
             DEPENDS ALWAYS
         )
     endmacro()
 endif()
 
-# figure out recursive directory copy command in the current platform
-if(WINDOWS)
-    set(CMD_RCOPY_PREFIX "xcopy")
-    set(CMD_RCOPY_SUFFIX /s)
-    list(APPEND COPY_COMMAND_SUFFIX /y)
+# post build: compile shaders
+find_program(GLSLC_PATH ${Vulkan_GLSLC_EXECUTABLE})
+
+message(STATUS ${Vulkan_GLSLC_EXECUTABLE})
+
+if(NOT GLSLC_PATH)
+    message(FATAL_ERROR "glslc not found! Please ensure Vulkan SDK is installed correctly.")
 else()
-    set(CMD_RCOPY_PREFIX "cp -ra")
-    set(CMD_RCOPY_SUFFIX "")
+    message(STATUS "Using GLSLC from: ${GLSLC_PATH}")
 endif()
 
-# post build: compile shaders
-set(GLSLC_PATH "C:/Program Files/VulkanSDK/1.3.250.1/Bin/glslc.exe")
 mkdir_if_needed_post_build("${CMAKE_BINARY_DIR}/bin/shaders")
 add_custom_command(TARGET img-aligner
     POST_BUILD
@@ -176,41 +171,45 @@ mkdir_if_needed_post_build("${CMAKE_BINARY_DIR}/bin/fonts")
 mkdir_if_needed_post_build("${CMAKE_BINARY_DIR}/bin/demo")
 mkdir_if_needed_post_build("${CMAKE_BINARY_DIR}/bin/docs")
 mkdir_if_needed_post_build("${CMAKE_BINARY_DIR}/bin/images")
+
 add_custom_command(TARGET img-aligner
     POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E echo copying resource files
-    COMMAND ${CMD_RCOPY_PREFIX} "\"${CMAKE_SOURCE_DIR}/licenses/.\" \"${CMAKE_BINARY_DIR}/bin/licenses\"" ${CMD_RCOPY_SUFFIX}
-    COMMAND ${CMD_RCOPY_PREFIX} "\"${CMAKE_SOURCE_DIR}/fonts/.\" \"${CMAKE_BINARY_DIR}/bin/fonts\"" ${CMD_RCOPY_SUFFIX}
-    COMMAND ${CMD_RCOPY_PREFIX} "\"${CMAKE_SOURCE_DIR}/demo/.\" \"${CMAKE_BINARY_DIR}/bin/demo\"" ${CMD_RCOPY_SUFFIX}
-    COMMAND ${CMD_RCOPY_PREFIX} "\"${CMAKE_SOURCE_DIR}/docs/.\" \"${CMAKE_BINARY_DIR}/bin/docs\"" ${CMD_RCOPY_SUFFIX}
-    COMMAND ${CMD_RCOPY_PREFIX} "\"${CMAKE_SOURCE_DIR}/images/.\" \"${CMAKE_BINARY_DIR}/bin/images\"" ${CMD_RCOPY_SUFFIX}
+    COMMAND ${CMAKE_COMMAND} -E echo "copying resource files"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/licenses" "${CMAKE_BINARY_DIR}/bin/licenses"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/fonts" "${CMAKE_BINARY_DIR}/bin/fonts"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/demo" "${CMAKE_BINARY_DIR}/bin/demo"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/docs" "${CMAKE_BINARY_DIR}/bin/docs"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/images" "${CMAKE_BINARY_DIR}/bin/images"
     COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/LICENSE.txt" "${CMAKE_BINARY_DIR}/bin/LICENSE.txt"
     COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/README.md" "${CMAKE_BINARY_DIR}/bin/README.md"
     COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/imgui.ini" "${CMAKE_BINARY_DIR}/bin/imgui.ini"
-    COMMAND ${CMAKE_COMMAND} -E echo done copying resource files
+    COMMAND ${CMAKE_COMMAND} -E echo "done copying resource files"
     DEPENDS ALWAYS
 )
 
-# find required runtime DLLs
-find_file(LIBGCC_DLL libgcc_s_seh-1.dll PATHS ${CMAKE_C_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
-find_file(LIBSTDCXX_DLL libstdc++-6.dll PATHS ${CMAKE_CXX_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
-find_file(LIBWINPTHREAD_DLL libwinpthread-1.dll PATHS ${CMAKE_C_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
-find_file(LIBBZ2_DLL libbz2-1.dll PATHS ${CMAKE_C_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
-find_file(ZLIB_DLL zlib1.dll PATHS ${CMAKE_C_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
 
-# post build: copy required DLLs to the output directory
-add_custom_command(TARGET img-aligner POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E echo copying runtime DLLs
+if (WINDOWS)
+	# find required runtime DLLs
+	find_file(LIBGCC_DLL libgcc_s_seh-1.dll PATHS ${CMAKE_C_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
+	find_file(LIBSTDCXX_DLL libstdc++-6.dll PATHS ${CMAKE_CXX_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
+	find_file(LIBWINPTHREAD_DLL libwinpthread-1.dll PATHS ${CMAKE_C_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
+	find_file(LIBBZ2_DLL libbz2-1.dll PATHS ${CMAKE_C_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
+	find_file(ZLIB_DLL zlib1.dll PATHS ${CMAKE_C_COMPILER_PATH} PATH_SUFFIXES ../bin REQUIRED)
 
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    # ${LIBGCC_DLL} (these are statically linked)
-    # ${LIBSTDCXX_DLL} (these are statically linked)
-    # ${LIBWINPTHREAD_DLL} (these are statically linked)
-    ${LIBBZ2_DLL}
-    ${ZLIB_DLL}
-    ${CMAKE_BINARY_DIR}/bin
+	# post build: copy required DLLs to the output directory
+	add_custom_command(TARGET img-aligner POST_BUILD
+	    COMMAND ${CMAKE_COMMAND} -E echo copying runtime DLLs
 
-    COMMAND ${CMAKE_COMMAND} -E echo done copying runtime DLLs
+	    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+	    # ${LIBGCC_DLL} (these are statically linked)
+	    # ${LIBSTDCXX_DLL} (these are statically linked)
+	    # ${LIBWINPTHREAD_DLL} (these are statically linked)
+	    ${LIBBZ2_DLL}
+	    ${ZLIB_DLL}
+	    ${CMAKE_BINARY_DIR}/bin
 
-    DEPENDS ALWAYS
-)
+	    COMMAND ${CMAKE_COMMAND} -E echo done copying runtime DLLs
+
+	    DEPENDS ALWAYS
+	)
+endif()
