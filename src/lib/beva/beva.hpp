@@ -4162,7 +4162,7 @@ namespace bv
 #ifdef VK_ERROR_INCOMPATIBLE_SHADER_BINARY_EXT
 {
     VK_ERROR_INCOMPATIBLE_SHADER_BINARY_EXT,
-    "VK_INCOMPATIBLE_SHADER_BINARY_EXT : the provided binary shader code "
+    "VK_INCOMPATIBLE_SHADER_BINARY_EXT: the provided binary shader code "
     "is not compatible with this device."
 }
 #endif
