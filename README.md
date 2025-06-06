@@ -133,9 +133,9 @@ libraries for proper color management and image IO (like in
 [RealBloom](https://github.com/bean-mhm/realbloom)), but they were painfully
 hard to configure and build with CMake, and I got errors after errors.
 
-# How to Use
+# How to Use (Tutorial)
 
-This [step-by-step tutorial](docs/v0.1.0-alpha/tutorial.md) contains most of
+This [step-by-step tutorial](docs/v0.1.1-alpha/tutorial.md) contains most of
 what you need to know to get started with img-aligner.
 
 # Command Line Interface
