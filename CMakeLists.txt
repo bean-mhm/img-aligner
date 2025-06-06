@@ -32,17 +32,26 @@ add_executable(img-aligner ${SRC_CPP_FILES} ${SRC_C_FILES})
 set_target_properties(img-aligner PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/$<0:>")
 set_target_properties(img-aligner PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/$<0:>")
 
-# add compile definition for debug builds
-target_compile_definitions(img-aligner PRIVATE
-    $<$<CONFIG:Debug>:
-    DEBUG_BUILD=1
-    >
-)
-
 # compiler and linker flags
+target_compile_options(img-aligner PRIVATE -static -static-libgcc -static-libstdc++)
+target_link_options(img-aligner PRIVATE -static -static-libgcc -static-libstdc++)
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND WINDOWS)
-    target_compile_options(img-aligner PRIVATE -static -static-libgcc -static-libstdc++ -mconsole)
-    target_link_options(img-aligner PRIVATE -static -static-libgcc -static-libstdc++ -mconsole)
+    target_compile_options(img-aligner PRIVATE -mconsole)
+    target_link_options(img-aligner PRIVATE -mconsole)
+endif()
+
+# include debugging information in debug mode
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_compile_definitions(img-aligner PRIVATE DEBUG_BUILD=1)
+    target_compile_options(img-aligner PRIVATE -g)
+    target_link_options(img-aligner PRIVATE -g)
+endif()
+
+# enable auto-vectorization and optimization in release mode
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    target_compile_options(img-aligner PRIVATE
+        -O3 -march=haswell -mtune=haswell -ftree-vectorize -fopt-info-vec
+    )
 endif()
 
 # include dirs

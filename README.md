@@ -231,7 +231,11 @@ cd build
 4. Generate CMake configuration files with Ninja.
 
 ```bash
-cmake -G "Ninja" ..
+# debug mode
+cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Debug ..
+
+# or release mode
+cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release ..
 ```
 
 Make sure you have a stable internet connection so that unavailable packages
@@ -241,12 +245,6 @@ debug and release builds.
 
 5. Build & Run.
 ```bash
-# build in debug mode
-cmake --build . --config Debug
-
-# or release mode
-cmake --build . --config Release
-
-# run
+cmake --build .
 ./bin/img-aligner
 ```
