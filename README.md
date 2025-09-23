@@ -13,6 +13,11 @@
     <a href="https://github.com/bean-mhm/img-aligner/issues">Report Bug</a>
   </p>
 </div>
+
+<div align="center">
+<a href='https://ko-fi.com/E1E81LFRKY' target='_blank'><img height='42' style='border:0px;height:42px;' src='https://storage.ko-fi.com/cdn/kofi2.png?v=6' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
+</div>
+
 <br>
 
 ![screenshot](images/main-ss.png)
